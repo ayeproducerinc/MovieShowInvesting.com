@@ -306,6 +306,12 @@ export const UploadFilmmakerTrailerResponse = zod.object({
 
 
 /**
+ * @summary Fetch the current visitor-owned Bunny trailer thumbnail without exposing provider credentials
+ */
+export const GetFilmmakerTrailerThumbnailResponse = zod.unknown()
+
+
+/**
  * @summary Upload an owned poster or share image to Bunny Storage
  */
 export const UploadFilmmakerImageQueryParams = zod.object({

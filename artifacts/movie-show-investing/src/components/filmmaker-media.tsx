@@ -1,3 +1,4 @@
+import { TrailerThumbnail } from './trailer-thumbnail';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { ArrowUpRight, RotateCcw, UploadCloud, X } from 'lucide-react';
 import {
@@ -139,6 +140,7 @@ function TrailerUploader({ config, trailerUrl, onSaved }: {
   return <div className="dossier-media-tile">
     <span className="dossier-kicker">Trailer / direct video upload</span>
     <p className="dossier-status">MP4, WebM or MOV · up to {Math.round(config.trailer_max_bytes / 1048576)} MiB. Uploads are sent in one request and cannot be resumed. Replacing media sends an approved project back to review.</p>
+    {trailerUrl?.startsWith('https://iframe.mediadelivery.net/embed/') && <TrailerThumbnail key={trailerUrl} />}
     {safeMediaUrl(trailerUrl) && <a href={safeMediaUrl(trailerUrl) || undefined} target="_blank" rel="noopener noreferrer" className="dossier-media-link" data-testid="link-current-trailer">View current trailer <ArrowUpRight size={14} style={{ display: 'inline' }}/></a>}
     <label className="dossier-file-label" htmlFor="media-trailer">Choose video<input id="media-trailer" data-testid="input-trailer-file" type="file" accept={config.trailer_types.join(',')} disabled={busy} onChange={select}/></label>
     {file && <p className="dossier-status" data-testid="text-trailer-selected">{file.name} · {(file.size / 1048576).toFixed(1)} MB</p>}

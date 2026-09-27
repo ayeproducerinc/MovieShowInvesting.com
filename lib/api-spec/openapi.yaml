@@ -269,6 +269,32 @@ paths:
           description: Bunny Stream upload or verification failed
         "503":
           description: Bunny Stream is not configured
+  /filmmakers/media/trailer/thumbnail:
+    get:
+      operationId: getFilmmakerTrailerThumbnail
+      tags: [filmmakers]
+      summary: Fetch the current visitor-owned Bunny trailer thumbnail without exposing provider credentials
+      responses:
+        "200":
+          description: Generated trailer thumbnail
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+        "202":
+          description: Bunny is still processing the thumbnail
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, const: processing }
+        "404":
+          description: No current uploaded Bunny trailer belongs to this visitor
+        "502":
+          description: Bunny thumbnail could not be retrieved
+        "503":
+          description: Bunny thumbnail access is not configured
   /filmmakers/media/image:
     post:
       operationId: uploadFilmmakerImage

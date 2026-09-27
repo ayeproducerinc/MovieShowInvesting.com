@@ -38,6 +38,7 @@ import type {
   FirebaseConfig,
   Flow,
   FlowProgress,
+  GetFilmmakerTrailerThumbnail202,
   HealthStatus,
   LocationSearchPayload,
   PriceGroup,
@@ -1140,6 +1141,83 @@ export const useUploadFilmmakerTrailer = <TError = ErrorType<void>,
       > => {
       return useMutation(getUploadFilmmakerTrailerMutationOptions(options));
     }
+
+export const getGetFilmmakerTrailerThumbnailUrl = () => {
+
+
+
+
+  return `/api/filmmakers/media/trailer/thumbnail`
+}
+
+/**
+ * @summary Fetch the current visitor-owned Bunny trailer thumbnail without exposing provider credentials
+ */
+export const getFilmmakerTrailerThumbnail = async ( options?: Parameters<typeof customFetch>[1]): Promise<Blob | GetFilmmakerTrailerThumbnail202> => {
+
+  return customFetch<Blob | GetFilmmakerTrailerThumbnail202>(getGetFilmmakerTrailerThumbnailUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFilmmakerTrailerThumbnailQueryKey = () => {
+    return [
+    `/api/filmmakers/media/trailer/thumbnail`
+    ] as const;
+    }
+
+
+export const getGetFilmmakerTrailerThumbnailQueryOptions = <TData = Awaited<ReturnType<typeof getFilmmakerTrailerThumbnail>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerTrailerThumbnail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFilmmakerTrailerThumbnailQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFilmmakerTrailerThumbnail>>> = ({ signal }) => getFilmmakerTrailerThumbnail({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerTrailerThumbnail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFilmmakerTrailerThumbnailQueryResult = NonNullable<Awaited<ReturnType<typeof getFilmmakerTrailerThumbnail>>>
+export type GetFilmmakerTrailerThumbnailQueryError = ErrorType<void>
+
+
+/**
+ * @summary Fetch the current visitor-owned Bunny trailer thumbnail without exposing provider credentials
+ */
+
+export function useGetFilmmakerTrailerThumbnail<TData = Awaited<ReturnType<typeof getFilmmakerTrailerThumbnail>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerTrailerThumbnail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFilmmakerTrailerThumbnailQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getUploadFilmmakerImageUrl = (params: UploadFilmmakerImageParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -36,6 +36,7 @@ export * from './firebaseConfig';
 export * from './flow';
 export * from './flowProgress';
 export * from './flowProgressAnswers';
+export * from './getFilmmakerTrailerThumbnail202';
 export * from './healthStatus';
 export * from './locationSearchPayload';
 export * from './locationSuggestion';

@@ -453,6 +453,10 @@ export type SearchLocationsParams = {
 query: string;
 };
 
+export type GetFilmmakerTrailerThumbnail202 = {
+  status: 'processing';
+};
+
 export type UploadFilmmakerImageParams = {
 kind: UploadFilmmakerImageKind;
 };
