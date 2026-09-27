@@ -32,10 +32,12 @@ const descriptions = [
   'Leave a way to reach you. We’ll use this to follow up about this early-stage exploration.',
 ];
 
-function Choice({ selected, onClick, children, id, detail }: { selected:boolean; onClick:()=>void; children:ReactNode; id:string; detail?:string }) {
-  return <button type="button" data-testid={`button-${id}`} aria-pressed={selected} onClick={onClick} className={`fm-choice ${selected ? 'selected' : ''}`}>
-    <span>{children}{detail && <small>{detail}</small>}</span><span aria-hidden="true" className="fm-choice-mark" />
-  </button>;
+function Choice({ selected, onClick, children, id, name, multiple = false, detail }: { selected:boolean; onClick:()=>void; children:ReactNode; id:string; name:string; multiple?:boolean; detail?:string }) {
+  return <label data-testid={`button-${id}`} className={`fm-choice ${selected ? 'selected' : ''} ${multiple ? 'is-multiple' : ''}`}>
+    <span>{children}{detail && <small>{detail}</small>}</span>
+    <input className="fm-choice-input" data-testid={`input-${id}`} type={multiple ? 'checkbox' : 'radio'} name={name} checked={selected} onChange={onClick} />
+    <span aria-hidden="true" className="fm-choice-mark" />
+  </label>;
 }
 function Field({ label, id, value, onChange, required=false, type='text', placeholder='', multiline=false }: { label:string; id:string; value:string; onChange:(v:string)=>void; required?:boolean; type?:string; placeholder?:string; multiline?:boolean }) {
   return <div className="fm-field"><label htmlFor={id} className="fm-label">{label}{!required && <span className="fm-small"> · optional</span>}</label>
@@ -221,7 +223,7 @@ export default function Filmmaker() {
       <button type="button" data-testid="button-example-budget" className={a.budget_mode === 'example' ? 'active' : ''} aria-pressed={a.budget_mode === 'example'} onClick={()=>setA(current=>({...current,budget_mode:'example',budget:examples(stage,current.format).includes(current.budget) ? current.budget : examples(stage,current.format)[0]}))}>Example budget</button>
       <button type="button" data-testid="button-your-budget" className={a.budget_mode === 'custom' ? 'active' : ''} aria-pressed={a.budget_mode === 'custom'} onClick={()=>setA(current=>({...current,budget_mode:'custom',budget:current.budget || examples(stage,current.format)[0]}))}>Your budget</button>
     </div>
-    {a.budget_mode === 'example' ? <div className="fm-amounts">{budgetOptions.map(value=><Choice key={value} id={`budget-${value}`} selected={a.budget===value} onClick={()=>change('budget',value)}>{money(value)}</Choice>)}</div> :
+    {a.budget_mode === 'example' ? <div className="fm-amounts">{budgetOptions.map(value=><Choice key={value} id={`budget-${value}`} name="example-budget" selected={a.budget===value} onClick={()=>change('budget',value)}>{money(value)}</Choice>)}</div> :
       <div className="fm-field"><label htmlFor="custom-budget" className="fm-label">Your estimated budget · USD</label><input id="custom-budget" data-testid="input-custom-budget" className="fm-input" inputMode="numeric" value={a.budget ? a.budget.toLocaleString('en-US') : ''} onChange={e=>{ const raw=e.target.value.replace(/,/g,''); if (/^\d*$/.test(raw)) change('budget',raw ? Number(raw) : 0); }} aria-invalid={!budgetValid} />{!budgetValid && <p className="fm-error" role="alert">Enter a positive whole-dollar amount.</p>}</div>}
   </div>;
 
@@ -234,16 +236,16 @@ export default function Filmmaker() {
       <div className="fm-intro" key={`intro-${screen}`}><p className="fm-kicker">The filmmaker worksheet / 0{screen}</p><h1 data-testid="text-flow-heading">{headings[screen-1]}</h1><p>{a.no_project_yet && screen===6 ? 'No project details needed. Just leave a way to reach you if you’d like to be part of what comes next.' : descriptions[screen-1]}</p><div className="fm-note">This is an early conversation, not an application for funding. No money is collected and nothing here commits you to a deal.</div></div>
       <div className="fm-panel" key={`panel-${screen}`}>
         {screen === 1 && <><div className="fm-choice-list">
-          <Choice id="stage-distribution" selected={a.stage==='distribution'} onClick={()=>selectStage('distribution')} detail="A finished film looking toward release.">Distribution phase</Choice>
-          <Choice id="stage-production" selected={a.stage==='production'} onClick={()=>selectStage('production')} detail="A short or pilot you want to make next.">Short or pilot I want to develop</Choice>
-          <Choice id="stage-idea" selected={a.stage==='idea'} onClick={()=>selectStage('idea')} detail="The story is taking shape.">Script or idea</Choice>
-          <Choice id="stage-other" selected={a.stage==='other'} onClick={()=>selectStage('other')}>Other</Choice>
+          <Choice id="stage-distribution" name="project-stage" selected={a.stage==='distribution'} onClick={()=>selectStage('distribution')} detail="A finished film looking toward release.">Distribution phase</Choice>
+          <Choice id="stage-production" name="project-stage" selected={a.stage==='production'} onClick={()=>selectStage('production')} detail="A short or pilot you want to make next.">Short or pilot I want to develop</Choice>
+          <Choice id="stage-idea" name="project-stage" selected={a.stage==='idea'} onClick={()=>selectStage('idea')} detail="The story is taking shape.">Script or idea</Choice>
+          <Choice id="stage-other" name="project-stage" selected={a.stage==='other'} onClick={()=>selectStage('other')}>Other</Choice>
         </div>{a.stage==='other' && <div className="fm-section"><Field id="stage-other" label="Tell us where you are" value={a.stage_other} onChange={v=>change('stage_other',v)} required/><p className="fm-small">For the illustrative numbers ahead, we’ll use the idea-stage examples.</p></div>}</>}
         {screen === 2 && <><label className="fm-check fm-section"><input type="checkbox" data-testid="checkbox-no-project" checked={a.no_project_yet} disabled={saving} onChange={e=>chooseNoProject(e.target.checked)}/><span><strong>I don’t have a project yet. I want to participate in the future.</strong><small style={{display:'block',color:'#666',marginTop:5}}>Skip the project and deal questions. We’ll only ask how to reach you.</small></span></label>
           {!a.no_project_yet && <>
             <Field id="project-title" label="Working title" value={a.title} onChange={v=>change('title',v)} required placeholder="Even a working title is fine"/>
-            <div className="fm-field"><p className="fm-label">Format</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{(['movie','show'] as const).map(value=><Choice id={`format-${value}`} key={value} selected={a.format===value} onClick={()=>setA(current=>({...current,format:value,budget:current.budget_mode==='example' ? examples(stage,value)[0] : current.budget}))}>{value==='movie'?'Movie':'Show'}</Choice>)}</div></div>
-            <div className="fm-field"><p className="fm-label">Genre</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{genres.map(g=><Choice id={`genre-${g}`} key={g} selected={a.genre===g} onClick={()=>change('genre',g)}>{g}</Choice>)}</div></div>
+             <div className="fm-field"><p className="fm-label">Format</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{(['movie','show'] as const).map(value=><Choice id={`format-${value}`} name="project-format" key={value} selected={a.format===value} onClick={()=>setA(current=>({...current,format:value,budget:current.budget_mode==='example' ? examples(stage,value)[0] : current.budget}))}>{value==='movie'?'Movie':'Show'}</Choice>)}</div></div>
+             <div className="fm-field"><p className="fm-label">Genre</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{genres.map(g=><Choice id={`genre-${g}`} name="project-genre" key={g} selected={a.genre===g} onClick={()=>change('genre',g)}>{g}</Choice>)}</div></div>
             {a.genre==='Other' && <Field id="genre-other" label="Describe your genre" value={a.genre_other} onChange={v=>change('genre_other',v)} required/>}
             <Field id="logline" label="Logline" value={a.logline} onChange={v=>change('logline',v)} required multiline placeholder="The story, in a sentence or two"/>
             <Field id="trailer-url" label="Trailer URL" value={a.trailer_url} onChange={v=>change('trailer_url',v)} type="url" placeholder="https://"/>
@@ -251,13 +253,13 @@ export default function Filmmaker() {
           </>}
         </>}
         {screen === 3 && <>{budgetTabs}{displayReceipt(false)}<div className="fm-section"><p className="fm-label">Would you consider a deal like this?</p><div className="fm-choice-list">
-          {([['yes','Yes, I’d take it'],['maybe','Maybe if I could negotiate'],['no','No, not at these terms']] as const).map(([value,label])=><Choice id={`deal-${value}`} key={value} selected={a.deal_answer===value} onClick={()=>setA(current=>({...current,deal_answer:value,offer_choice:value==='yes'?'standard':'',offer_per100:value==='yes'?standard:null,wants_lower:false}))}>{label}</Choice>)}
+           {([['yes','Yes, I’d take it'],['maybe','Maybe if I could negotiate'],['no','No, not at these terms']] as const).map(([value,label])=><Choice id={`deal-${value}`} name="deal-answer" key={value} selected={a.deal_answer===value} onClick={()=>setA(current=>({...current,deal_answer:value,offer_choice:value==='yes'?'standard':'',offer_per100:value==='yes'?standard:null,wants_lower:false}))}>{label}</Choice>)}
         </div></div></>}
         {screen === 4 && <>{budgetTabs}<div className="fm-section"><p className="fm-kicker">Standard for {phase(stage)==='idea'?'Idea':phase(stage)==='production'?'Production':'Distribution'}</p><h2 className="serif" style={{fontSize:38,margin:'10px 0 9px'}}>{money(standard)} per $100</h2><p className="fm-small">For each $100 of project budget, this is the illustrative investor payback target before the platform fee.</p></div>
           <div className="fm-section"><p className="fm-label">What would you offer instead?</p><div className="fm-choice-list">
-            <Choice id="offer-standard" selected={a.offer_choice==='standard' && !a.wants_lower} onClick={()=>setA(current=>({...current,offer_choice:'standard',offer_per100:standard,wants_lower:false}))}>Standard · {money(standard)} per $100</Choice>
-            {[125,150,175,200].map(value=><Choice id={`offer-${value}`} key={value} selected={a.offer_choice===String(value) && !a.wants_lower} onClick={()=>setA(current=>({...current,offer_choice:String(value),offer_per100:value,wants_lower:false}))}>{money(value)} per $100</Choice>)}
-            <Choice id="offer-other" selected={a.offer_choice==='other' && !a.wants_lower} onClick={()=>setA(current=>({...current,offer_choice:'other',offer_per100:current.offer_other_text ? Number(current.offer_other_text) : null,wants_lower:false}))}>Other amount</Choice>
+             <Choice id="offer-standard" name="investor-offer" selected={a.offer_choice==='standard' && !a.wants_lower} onClick={()=>setA(current=>({...current,offer_choice:'standard',offer_per100:standard,wants_lower:false}))}>Standard · {money(standard)} per $100</Choice>
+             {[125,150,175,200].map(value=><Choice id={`offer-${value}`} name="investor-offer" key={value} selected={a.offer_choice===String(value) && !a.wants_lower} onClick={()=>setA(current=>({...current,offer_choice:String(value),offer_per100:value,wants_lower:false}))}>{money(value)} per $100</Choice>)}
+             <Choice id="offer-other" name="investor-offer" selected={a.offer_choice==='other' && !a.wants_lower} onClick={()=>setA(current=>({...current,offer_choice:'other',offer_per100:current.offer_other_text ? Number(current.offer_other_text) : null,wants_lower:false}))}>Other amount</Choice>
           </div>
           {a.offer_choice==='other' && !a.wants_lower && <div className="fm-field" style={{marginTop:18}}><label htmlFor="offer-other-amount" className="fm-label">Amount per $100</label><input id="offer-other-amount" data-testid="input-offer-other-amount" className="fm-input" inputMode="numeric" value={a.offer_other_text} onChange={e=>{ if (/^\d*$/.test(e.target.value)) setA(current=>({...current,offer_other_text:e.target.value,offer_per100:e.target.value?Number(e.target.value):null})); }} aria-invalid={otherOfferError}/>{otherOfferError && <p className="fm-error" role="alert">The minimum listed offer is $125 per $100. If you want less, select the option below.</p>}</div>}
           <label className="fm-check"><input type="checkbox" data-testid="checkbox-wants-lower" checked={a.wants_lower} onChange={e=>setA(current=>({...current,wants_lower:e.target.checked,offer_choice:e.target.checked?'125':'',offer_per100:e.target.checked?125:null}))}/><span>I’d want to offer less than $125 per $100. Please note my preference.<small style={{display:'block',color:'#686b69'}}>For this worksheet, the listed and saved offer stays at $125.</small></span></label></div>
@@ -277,14 +279,14 @@ export default function Filmmaker() {
             <p className="fm-small fm-phase-disclaimer">These are examples, not forecasts or guarantees. Actual receipts may differ, and the payback threshold may never be reached.</p>
           </div>}
           <div className="fm-section"><p className="fm-label">How do those payback terms feel?</p><div className="fm-choice-list">
-            <Choice id="payback-works" selected={a.payback_terms==='works'} onClick={()=>change('payback_terms','works')}>Works for me</Choice>
-            <Choice id="payback-need-some" selected={a.payback_terms==='need_some'} onClick={()=>change('payback_terms','need_some')}>I need some from day one</Choice>
-            <Choice id="payback-other" selected={a.payback_terms==='other'} onClick={()=>change('payback_terms','other')}>Other</Choice>
+             <Choice id="payback-works" name="payback-terms" selected={a.payback_terms==='works'} onClick={()=>change('payback_terms','works')}>Works for me</Choice>
+             <Choice id="payback-need-some" name="payback-terms" selected={a.payback_terms==='need_some'} onClick={()=>change('payback_terms','need_some')}>I need some from day one</Choice>
+             <Choice id="payback-other" name="payback-terms" selected={a.payback_terms==='other'} onClick={()=>change('payback_terms','other')}>Other</Choice>
           </div>{a.payback_terms==='other' && <div style={{marginTop:18}}><Field id="payback-other" label="Tell us what you’d need" value={a.payback_terms_other} onChange={v=>change('payback_terms_other',v)} required multiline/></div>}</div>
         </>}
-        {screen === 5 && <><p className="fm-label">Where have you looked for funding? Select all that apply.</p><div className="fm-choice-list">{funding.map(source=><Choice id={`funding-${source.replace(/\W+/g,'-').toLowerCase()}`} key={source} selected={a.funding_sources.includes(source)} onClick={()=>toggleArray('funding_sources',source)}>{source}</Choice>)}</div>
+         {screen === 5 && <><p className="fm-label">Where have you looked for funding? Select all that apply.</p><div className="fm-choice-list">{funding.map(source=><Choice id={`funding-${source.replace(/\W+/g,'-').toLowerCase()}`} name="funding-source" multiple key={source} selected={a.funding_sources.includes(source)} onClick={()=>toggleArray('funding_sources',source)}>{source}</Choice>)}</div>
           {a.funding_sources.includes('Other') && <div className="fm-section"><Field id="funding-other" label="Other funding source" value={a.funding_other} onChange={v=>change('funding_other',v)} required/></div>}
-          <div className="fm-section"><p className="fm-label">Did you reach your goal?</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}><Choice id="goal-yes" selected={a.reached_goal===true} onClick={()=>change('reached_goal',true)}>Yes</Choice><Choice id="goal-no" selected={a.reached_goal===false} onClick={()=>change('reached_goal',false)}>No</Choice></div></div>
+           <div className="fm-section"><p className="fm-label">Did you reach your goal?</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}><Choice id="goal-yes" name="funding-goal" selected={a.reached_goal===true} onClick={()=>change('reached_goal',true)}>Yes</Choice><Choice id="goal-no" name="funding-goal" selected={a.reached_goal===false} onClick={()=>change('reached_goal',false)}>No</Choice></div></div>
           <div className="fm-section"><Field id="funding-experience" label="What was your experience?" value={a.funding_experience} onChange={v=>change('funding_experience',v)} required multiline placeholder="What worked, what didn’t, or what you wish had been different"/></div>
         </>}
         {screen === 6 && <>{a.no_project_yet && <div className="fm-note">You’re joining the conversation without a project. We won’t ask for a budget or deal terms.</div>}
@@ -292,7 +294,7 @@ export default function Filmmaker() {
           <Field id="email" label="Email address" value={a.email} onChange={v=>change('email',v)} type="email" required/>
           <Field id="phone" label="Phone number" value={a.phone} onChange={v=>change('phone',v)} type="tel"/>
           <div className="fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}><Field id="city" label="City" value={a.city} onChange={v=>change('city',v)} required/><Field id="state" label="State" value={a.state} onChange={v=>change('state',v)} required/></div>
-          <div className="fm-section"><p className="fm-label">Favorite genres · select any</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{genres.map(g=><Choice id={`favorite-${g}`} key={g} selected={a.favorite_genres.includes(g)} onClick={()=>toggleArray('favorite_genres',g)}>{g}</Choice>)}</div></div>
+           <div className="fm-section"><p className="fm-label">Favorite genres · select any</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{genres.map(g=><Choice id={`favorite-${g}`} name="favorite-genre" multiple key={g} selected={a.favorite_genres.includes(g)} onClick={()=>toggleArray('favorite_genres',g)}>{g}</Choice>)}</div></div>
           <label className="fm-check fm-section"><input type="checkbox" data-testid="checkbox-chat-opt-in" checked={a.chat_opt_in} onChange={e=>change('chat_opt_in',e.target.checked)}/><span>I’m open to a quick 15-minute chat about my experience.</span></label>
           <p className="fm-small">By submitting, you’re sharing information for this prelaunch conversation. This does not create a project listing or an investment opportunity. See our <Link href="/privacy" className="underline" data-testid="link-flow-privacy">privacy policy</Link>.</p>
         </>}
