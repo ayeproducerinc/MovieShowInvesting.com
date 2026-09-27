@@ -4,7 +4,9 @@ import siteRouter from "./site";
 import progressRouter from "./progress";
 import adminRouter from "./admin";
 import filmmakerRouter from "./filmmaker";
+import filmmakerMediaRouter from "./filmmaker-media";
 import locationsRouter from "./locations";
+import projectsRouter from "./projects";
 
 const router: IRouter = Router();
 
@@ -13,6 +15,8 @@ router.use(siteRouter);
 router.use(progressRouter);
 router.use(adminRouter);
 router.use(filmmakerRouter);
+router.use(filmmakerMediaRouter);
 router.use(locationsRouter);
+router.use(projectsRouter);
 
 export default router;

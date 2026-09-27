@@ -195,6 +195,183 @@ export const SubmitFilmmakerResponse = zod.object({
 
 
 /**
+ * @summary Read the current visitor's completed filmmaker result
+ */
+export const GetFilmmakerResultResponse = zod.object({
+  "completed": zod.literal(true),
+  "no_project_yet": zod.boolean(),
+  "project_slug": zod.string().nullable(),
+  "stage": zod.string().nullable(),
+  "stage_other": zod.string().nullable(),
+  "title": zod.string().nullable(),
+  "format": zod.string().nullable(),
+  "genre": zod.string().nullable(),
+  "genre_other": zod.string().nullable(),
+  "logline": zod.string().nullable(),
+  "offer_per100": zod.number().int().nullable(),
+  "offer_other_text": zod.string().nullable(),
+  "wants_lower": zod.boolean().nullable(),
+  "budget": zod.number().int().nullable(),
+  "budget_from_example": zod.boolean().nullable(),
+  "price_group": zod.union([zod.literal('A'),zod.literal('B'),zod.literal(null)]).nullable(),
+  "deal_answer": zod.string().nullable(),
+  "payback_terms": zod.string().nullable(),
+  "payback_terms_other": zod.string().nullable(),
+  "showcase_requested": zod.boolean().nullable(),
+  "approved": zod.boolean().nullable(),
+  "hidden": zod.boolean().nullable(),
+  "synopsis": zod.string().nullable(),
+  "team_links": zod.array(zod.string()),
+  "money_use": zod.string().nullable(),
+  "distribution_plan": zod.string().nullable(),
+  "trailer_url": zod.string().url().nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable()
+})
+
+
+/**
+ * @summary Request showcase and update the current visitor's project showcase details
+ */
+export const updateFilmmakerShowcaseBodySynopsisMax = 5000;
+
+export const updateFilmmakerShowcaseBodyTeamLinksItemMax = 500;
+
+
+export const updateFilmmakerShowcaseBodyTeamLinksItemRegExp = new RegExp('^https?:/');
+export const updateFilmmakerShowcaseBodyTeamLinksMax = 8;
+
+export const updateFilmmakerShowcaseBodyMoneyUseMax = 3000;
+
+export const updateFilmmakerShowcaseBodyDistributionPlanMax = 3000;
+
+export const updateFilmmakerShowcaseBodyTrailerUrlMax = 2048;
+
+
+export const updateFilmmakerShowcaseBodyTrailerUrlRegExp = new RegExp('^https?:/');
+
+
+export const UpdateFilmmakerShowcaseBody = zod.object({
+  "showcase_requested": zod.boolean().optional(),
+  "synopsis": zod.string().max(updateFilmmakerShowcaseBodySynopsisMax).nullish(),
+  "team_links": zod.array(zod.string().max(updateFilmmakerShowcaseBodyTeamLinksItemMax).regex(updateFilmmakerShowcaseBodyTeamLinksItemRegExp)).max(updateFilmmakerShowcaseBodyTeamLinksMax).nullish(),
+  "money_use": zod.string().max(updateFilmmakerShowcaseBodyMoneyUseMax).nullish(),
+  "distribution_plan": zod.string().max(updateFilmmakerShowcaseBodyDistributionPlanMax).nullish(),
+  "trailer_url": zod.string().max(updateFilmmakerShowcaseBodyTrailerUrlMax).regex(updateFilmmakerShowcaseBodyTrailerUrlRegExp).nullish()
+})
+
+export const UpdateFilmmakerShowcaseResponse = zod.object({
+  "project_slug": zod.string(),
+  "showcase_requested": zod.boolean(),
+  "approved": zod.boolean(),
+  "hidden": zod.boolean(),
+  "synopsis": zod.string().nullable(),
+  "team_links": zod.array(zod.string()),
+  "money_use": zod.string().nullable(),
+  "distribution_plan": zod.string().nullable(),
+  "trailer_url": zod.string().nullable()
+})
+
+
+/**
+ * @summary Read non-secret filmmaker media upload availability and limits
+ */
+export const GetFilmmakerMediaConfigResponse = zod.object({
+  "stream_available": zod.boolean(),
+  "storage_available": zod.boolean(),
+  "trailer_max_bytes": zod.literal(524288000),
+  "trailer_types": zod.array(zod.enum(['video/mp4', 'video/webm', 'video/quicktime'])),
+  "image_max_bytes": zod.literal(10485760),
+  "image_types": zod.array(zod.enum(['image/jpeg', 'image/png', 'image/webp']))
+})
+
+
+/**
+ * @summary Bounded streaming upload of a trailer to Bunny Stream for the visitor-owned project
+ */
+export const uploadFilmmakerTrailerHeaderContentLengthMax = 524288000;
+
+
+
+export const UploadFilmmakerTrailerHeader = zod.object({
+  "Content-Length": zod.number().int().min(1).max(uploadFilmmakerTrailerHeaderContentLengthMax)
+})
+
+export const UploadFilmmakerTrailerResponse = zod.object({
+  "video_id": zod.string().uuid(),
+  "trailer_url": zod.string().url(),
+  "embed_url": zod.string().url(),
+  "thumbnail_url": zod.string().url().nullable()
+})
+
+
+/**
+ * @summary Upload an owned poster or share image to Bunny Storage
+ */
+export const UploadFilmmakerImageQueryParams = zod.object({
+  "kind": zod.enum(['poster', 'share'])
+})
+
+export const UploadFilmmakerImageResponse = zod.object({
+  "kind": zod.enum(['poster', 'share']),
+  "image_url": zod.string().url()
+})
+
+
+/**
+ * @summary Read safe public details for a project accessible by unlisted link
+ */
+export const getPublicProjectPathSlugMax = 120;
+
+
+export const getPublicProjectPathSlugRegExp = new RegExp('^[a-z0-9-]+$');
+
+
+export const GetPublicProjectParams = zod.object({
+  "slug": zod.coerce.string().min(1).max(getPublicProjectPathSlugMax).regex(getPublicProjectPathSlugRegExp)
+})
+
+export const getPublicProjectResponseConfirmedPledgeTotalMin = 0;
+
+
+
+export const GetPublicProjectResponse = zod.object({
+  "slug": zod.string(),
+  "title": zod.string(),
+  "format": zod.string().nullable(),
+  "genre": zod.string().nullable(),
+  "stage": zod.string().nullable(),
+  "logline": zod.string().nullable(),
+  "synopsis": zod.string().nullable(),
+  "team_links": zod.array(zod.string()),
+  "money_use": zod.string().nullable(),
+  "distribution_plan": zod.string().nullable(),
+  "trailer_url": zod.string().url().nullable(),
+  "trailer_thumbnail_url": zod.string().url().nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "confirmed_pledge_total": zod.number().min(getPublicProjectResponseConfirmedPledgeTotalMin),
+  "approved": zod.boolean(),
+  "showcase_requested": zod.boolean()
+})
+
+
+/**
+ * @summary Serve crawler-readable social metadata and a browser project link
+ */
+export const getProjectShareMetadataPathSlugMax = 120;
+
+
+export const getProjectShareMetadataPathSlugRegExp = new RegExp('^[a-z0-9-]+$');
+
+
+export const GetProjectShareMetadataParams = zod.object({
+  "slug": zod.coerce.string().min(1).max(getProjectShareMetadataPathSlugMax).regex(getProjectShareMetadataPathSlugRegExp)
+})
+
+export const GetProjectShareMetadataResponse = zod.unknown()
+
+
+/**
  * @summary Check verified Firebase admin access
  */
 export const GetAdminMeResponse = zod.object({

@@ -44,14 +44,14 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 4 — Project page, result, share, and showcase
 
-**Status:** not started  
+**Status:** in progress — result, share, unlisted page, showcase, and media upload code are built; Bunny configuration and live upload verification are pending.  
 **Deliverables:**
 
 - Filmmaker result screen using the selected offer, a share card without dollar amounts, and share/copy actions.
 - Unlisted project page with the securities notice, project details, required investor disclosures, and confirmed pledge totals only.
 - Do not present “I'm interested” or “Ask the filmmaker” as working actions until their Phase 7 and Phase 5 flows exist; explain that investor pledges open later during the filmmaker-only launch. “Private” means unlisted, not restricted to signed-in users.
 - Showcase request and optional synopsis, team links, money-use, distribution-plan, trailer, and poster fields.
-- Bunny Stream uploads for trailers and Bunny Storage/CDN for posters and share images, with the documented size and file-type limits.
+- Bunny Stream uploads for MP4/WebM/MOV trailers up to 500 MB and Bunny Storage/CDN for JPEG/PNG/WebP posters and share images up to 10 MB, with server-side enforcement.
 - Social link-preview metadata; unapproved pages are noindex. Only approved, non-hidden projects may appear in Explore.
 - YouTube/Vimeo oEmbed thumbnails where applicable.
 

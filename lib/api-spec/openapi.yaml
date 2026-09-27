@@ -16,6 +16,8 @@ tags:
     description: Saved flow progress and visitor assignment
   - name: filmmakers
     description: Filmmaker submissions
+  - name: projects
+    description: Unlisted project pages and showcase requests
   - name: locations
     description: International city and region suggestions
   - name: admin
@@ -176,6 +178,170 @@ paths:
                 $ref: "#/components/schemas/FilmmakerSubmission"
         "400":
           description: Invalid submission or missing visitor
+  /filmmakers/result:
+    get:
+      operationId: getFilmmakerResult
+      tags: [filmmakers]
+      summary: Read the current visitor's completed filmmaker result
+      responses:
+        "200":
+          description: Completed submission result, including a no-project result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerResult"
+        "404":
+          description: No completed filmmaker submission for this visitor
+  /filmmakers/showcase:
+    patch:
+      operationId: updateFilmmakerShowcase
+      tags: [filmmakers]
+      summary: Request showcase and update the current visitor's project showcase details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FilmmakerShowcaseUpdate"
+      responses:
+        "200":
+          description: Updated showcase request and content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerShowcase"
+        "400":
+          description: Invalid showcase details or missing visitor
+        "404":
+          description: No completed project submission for this visitor
+  /filmmakers/media/config:
+    get:
+      operationId: getFilmmakerMediaConfig
+      tags: [filmmakers]
+      summary: Read non-secret filmmaker media upload availability and limits
+      responses:
+        "200":
+          description: Provider availability and upload constraints
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerMediaConfig"
+  /filmmakers/media/trailer:
+    post:
+      operationId: uploadFilmmakerTrailer
+      tags: [filmmakers]
+      summary: Bounded streaming upload of a trailer to Bunny Stream for the visitor-owned project
+      parameters:
+        - name: Content-Length
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 524288000 }
+      requestBody:
+        required: true
+        content:
+          video/mp4:
+            schema:
+              $ref: "#/components/schemas/FilmmakerTrailerBinary"
+          video/webm:
+            schema:
+              $ref: "#/components/schemas/FilmmakerTrailerBinary"
+          video/quicktime:
+            schema:
+              $ref: "#/components/schemas/FilmmakerTrailerBinary"
+      responses:
+        "201":
+          description: Uploaded, verified, and finalized trailer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerTrailerUpload"
+        "400":
+          description: Invalid or incomplete upload or missing visitor cookie
+        "411":
+          description: Content-Length is required
+        "413":
+          description: Trailer exceeds the 500 MB limit
+        "404":
+          description: No completed owned project
+        "429":
+          description: Trailer upload concurrency limit reached
+        "502":
+          description: Bunny Stream upload or verification failed
+        "503":
+          description: Bunny Stream is not configured
+  /filmmakers/media/image:
+    post:
+      operationId: uploadFilmmakerImage
+      tags: [filmmakers]
+      summary: Upload an owned poster or share image to Bunny Storage
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [poster, share]
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema: { type: string, format: binary }
+          image/png:
+            schema: { type: string, format: binary }
+          image/webp:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Saved image CDN URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerImageUpload"
+        "400":
+          description: Invalid image, kind, or missing visitor cookie
+        "404":
+          description: No completed owned project
+        "502":
+          description: Bunny Storage upload failed
+        "503":
+          description: Bunny Storage is not configured
+  /projects/{slug}:
+    get:
+      operationId: getPublicProject
+      tags: [projects]
+      summary: Read safe public details for a project accessible by unlisted link
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 120, pattern: "^[a-z0-9-]+$" }
+      responses:
+        "200":
+          description: Safe public project details and confirmed pledge total
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicProject"
+        "404":
+          description: Project not found or hidden
+  /projects/{slug}/share:
+    get:
+      operationId: getProjectShareMetadata
+      tags: [projects]
+      summary: Serve crawler-readable social metadata and a browser project link
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 120, pattern: "^[a-z0-9-]+$" }
+      responses:
+        "200":
+          description: Social metadata HTML with a link to the project page
+          content:
+            text/html:
+              schema: { type: string }
+        "404":
+          description: Project not found or hidden
   /admin/me:
     get:
       operationId: getAdminMe
@@ -405,6 +571,135 @@ components:
       properties:
         filmmaker_id: { type: integer, minimum: 1 }
         project_id: { type: ["integer", "null"], minimum: 1 }
+    FilmmakerResult:
+      type: object
+      additionalProperties: false
+      required: [completed, no_project_yet, project_slug, stage, stage_other, title, format, genre, genre_other, logline, offer_per100, offer_other_text, wants_lower, budget, budget_from_example, price_group, deal_answer, payback_terms, payback_terms_other, showcase_requested, approved, hidden, synopsis, team_links, money_use, distribution_plan, trailer_url, poster_url, share_image_url]
+      properties:
+        completed: { type: boolean, enum: [true] }
+        no_project_yet: { type: boolean }
+        project_slug: { type: ["string", "null"] }
+        stage: { type: ["string", "null"] }
+        stage_other: { type: ["string", "null"] }
+        title: { type: ["string", "null"] }
+        format: { type: ["string", "null"] }
+        genre: { type: ["string", "null"] }
+        genre_other: { type: ["string", "null"] }
+        logline: { type: ["string", "null"] }
+        offer_per100: { type: ["integer", "null"] }
+        offer_other_text: { type: ["string", "null"] }
+        wants_lower: { type: ["boolean", "null"] }
+        budget: { type: ["integer", "null"] }
+        budget_from_example: { type: ["boolean", "null"] }
+        price_group: { type: ["string", "null"], enum: [A, B, null] }
+        deal_answer: { type: ["string", "null"] }
+        payback_terms: { type: ["string", "null"] }
+        payback_terms_other: { type: ["string", "null"] }
+        showcase_requested: { type: ["boolean", "null"] }
+        approved: { type: ["boolean", "null"] }
+        hidden: { type: ["boolean", "null"] }
+        synopsis: { type: ["string", "null"] }
+        team_links:
+          type: array
+          items: { type: string }
+        money_use: { type: ["string", "null"] }
+        distribution_plan: { type: ["string", "null"] }
+        trailer_url: { type: ["string", "null"], format: uri }
+        poster_url: { type: ["string", "null"], format: uri }
+        share_image_url: { type: ["string", "null"], format: uri }
+    FilmmakerShowcaseUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        showcase_requested: { type: boolean }
+        synopsis: { type: ["string", "null"], maxLength: 5000 }
+        team_links:
+          type: ["array", "null"]
+          maxItems: 8
+          items:
+            type: string
+            maxLength: 500
+            pattern: "^https?://"
+        money_use: { type: ["string", "null"], maxLength: 3000 }
+        distribution_plan: { type: ["string", "null"], maxLength: 3000 }
+        trailer_url:
+          type: ["string", "null"]
+          maxLength: 2048
+          pattern: "^https?://"
+    FilmmakerShowcase:
+      type: object
+      additionalProperties: false
+      required: [project_slug, showcase_requested, approved, hidden, synopsis, team_links, money_use, distribution_plan, trailer_url]
+      properties:
+        project_slug: { type: string }
+        showcase_requested: { type: boolean }
+        approved: { type: boolean }
+        hidden: { type: boolean }
+        synopsis: { type: ["string", "null"] }
+        team_links:
+          type: array
+          items: { type: string }
+        money_use: { type: ["string", "null"] }
+        distribution_plan: { type: ["string", "null"] }
+        trailer_url: { type: ["string", "null"] }
+    FilmmakerMediaConfig:
+      type: object
+      additionalProperties: false
+      required: [stream_available, storage_available, trailer_max_bytes, trailer_types, image_max_bytes, image_types]
+      properties:
+        stream_available: { type: boolean }
+        storage_available: { type: boolean }
+        trailer_max_bytes: { type: integer, const: 524288000 }
+        trailer_types:
+          type: array
+          items: { type: string, enum: [video/mp4, video/webm, video/quicktime] }
+        image_max_bytes: { type: integer, const: 10485760 }
+        image_types:
+          type: array
+          items: { type: string, enum: [image/jpeg, image/png, image/webp] }
+    FilmmakerTrailerBinary:
+      type: string
+      format: binary
+    FilmmakerTrailerUpload:
+      type: object
+      additionalProperties: false
+      required: [video_id, trailer_url, embed_url, thumbnail_url]
+      properties:
+        video_id: { type: string, format: uuid }
+        trailer_url: { type: string, format: uri }
+        embed_url: { type: string, format: uri }
+        thumbnail_url: { type: ["string", "null"], format: uri }
+    FilmmakerImageUpload:
+      type: object
+      additionalProperties: false
+      required: [kind, image_url]
+      properties:
+        kind: { type: string, enum: [poster, share] }
+        image_url: { type: string, format: uri }
+    PublicProject:
+      type: object
+      additionalProperties: false
+      required: [slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, confirmed_pledge_total, approved, showcase_requested]
+      properties:
+        slug: { type: string }
+        title: { type: string }
+        format: { type: ["string", "null"] }
+        genre: { type: ["string", "null"] }
+        stage: { type: ["string", "null"] }
+        logline: { type: ["string", "null"] }
+        synopsis: { type: ["string", "null"] }
+        team_links:
+          type: array
+          items: { type: string }
+        money_use: { type: ["string", "null"] }
+        distribution_plan: { type: ["string", "null"] }
+        trailer_url: { type: ["string", "null"], format: uri }
+        trailer_thumbnail_url: { type: ["string", "null"], format: uri }
+        poster_url: { type: ["string", "null"], format: uri }
+        confirmed_pledge_total: { type: number, minimum: 0 }
+        approved: { type: boolean }
+        showcase_requested: { type: boolean }
     FlowProgress:
       type: object
       required: [flow, last_screen, answers, completed, updated_at]

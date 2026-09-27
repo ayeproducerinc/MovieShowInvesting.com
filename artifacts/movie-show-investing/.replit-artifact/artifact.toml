@@ -20,6 +20,10 @@ serve = "static"
 publicDir = "artifacts/movie-show-investing/dist/public"
 
 [[services.production.rewrites]]
+from = "/project/*"
+to = "/project.html"
+
+[[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
 

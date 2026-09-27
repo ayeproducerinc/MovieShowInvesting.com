@@ -181,6 +181,203 @@ export interface FilmmakerSubmission {
   project_id: number | null;
 }
 
+/**
+ * @nullable
+ */
+export type FilmmakerResultPriceGroup = typeof FilmmakerResultPriceGroup[keyof typeof FilmmakerResultPriceGroup] | null;
+
+
+export const FilmmakerResultPriceGroup = {
+  A: 'A',
+  B: 'B',
+} as const;
+
+export interface FilmmakerResult {
+  completed: true;
+  no_project_yet: boolean;
+  /** @nullable */
+  project_slug: string | null;
+  /** @nullable */
+  stage: string | null;
+  /** @nullable */
+  stage_other: string | null;
+  /** @nullable */
+  title: string | null;
+  /** @nullable */
+  format: string | null;
+  /** @nullable */
+  genre: string | null;
+  /** @nullable */
+  genre_other: string | null;
+  /** @nullable */
+  logline: string | null;
+  /** @nullable */
+  offer_per100: number | null;
+  /** @nullable */
+  offer_other_text: string | null;
+  /** @nullable */
+  wants_lower: boolean | null;
+  /** @nullable */
+  budget: number | null;
+  /** @nullable */
+  budget_from_example: boolean | null;
+  /** @nullable */
+  price_group: FilmmakerResultPriceGroup;
+  /** @nullable */
+  deal_answer: string | null;
+  /** @nullable */
+  payback_terms: string | null;
+  /** @nullable */
+  payback_terms_other: string | null;
+  /** @nullable */
+  showcase_requested: boolean | null;
+  /** @nullable */
+  approved: boolean | null;
+  /** @nullable */
+  hidden: boolean | null;
+  /** @nullable */
+  synopsis: string | null;
+  team_links: string[];
+  /** @nullable */
+  money_use: string | null;
+  /** @nullable */
+  distribution_plan: string | null;
+  /** @nullable */
+  trailer_url: string | null;
+  /** @nullable */
+  poster_url: string | null;
+  /** @nullable */
+  share_image_url: string | null;
+}
+
+export interface FilmmakerShowcaseUpdate {
+  showcase_requested?: boolean;
+  /**
+     * @maxLength 5000
+     * @nullable
+     */
+  synopsis?: string | null;
+  /**
+     * @maxItems 8
+     * @nullable
+     * @items.maxLength 500
+     * @items.pattern ^https?://
+     */
+  team_links?: string[] | null;
+  /**
+     * @maxLength 3000
+     * @nullable
+     */
+  money_use?: string | null;
+  /**
+     * @maxLength 3000
+     * @nullable
+     */
+  distribution_plan?: string | null;
+  /**
+     * @maxLength 2048
+     * @nullable
+     * @pattern ^https?://
+     */
+  trailer_url?: string | null;
+}
+
+export interface FilmmakerShowcase {
+  project_slug: string;
+  showcase_requested: boolean;
+  approved: boolean;
+  hidden: boolean;
+  /** @nullable */
+  synopsis: string | null;
+  team_links: string[];
+  /** @nullable */
+  money_use: string | null;
+  /** @nullable */
+  distribution_plan: string | null;
+  /** @nullable */
+  trailer_url: string | null;
+}
+
+export type FilmmakerMediaConfigTrailerTypesItem = typeof FilmmakerMediaConfigTrailerTypesItem[keyof typeof FilmmakerMediaConfigTrailerTypesItem];
+
+
+export const FilmmakerMediaConfigTrailerTypesItem = {
+  'video/mp4': 'video/mp4',
+  'video/webm': 'video/webm',
+  'video/quicktime': 'video/quicktime',
+} as const;
+
+export type FilmmakerMediaConfigImageTypesItem = typeof FilmmakerMediaConfigImageTypesItem[keyof typeof FilmmakerMediaConfigImageTypesItem];
+
+
+export const FilmmakerMediaConfigImageTypesItem = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface FilmmakerMediaConfig {
+  stream_available: boolean;
+  storage_available: boolean;
+  trailer_max_bytes: 524288000;
+  trailer_types: FilmmakerMediaConfigTrailerTypesItem[];
+  image_max_bytes: 10485760;
+  image_types: FilmmakerMediaConfigImageTypesItem[];
+}
+
+export type FilmmakerTrailerBinary = Blob;
+
+export interface FilmmakerTrailerUpload {
+  video_id: string;
+  trailer_url: string;
+  embed_url: string;
+  /** @nullable */
+  thumbnail_url: string | null;
+}
+
+export type FilmmakerImageUploadKind = typeof FilmmakerImageUploadKind[keyof typeof FilmmakerImageUploadKind];
+
+
+export const FilmmakerImageUploadKind = {
+  poster: 'poster',
+  share: 'share',
+} as const;
+
+export interface FilmmakerImageUpload {
+  kind: FilmmakerImageUploadKind;
+  image_url: string;
+}
+
+export interface PublicProject {
+  slug: string;
+  title: string;
+  /** @nullable */
+  format: string | null;
+  /** @nullable */
+  genre: string | null;
+  /** @nullable */
+  stage: string | null;
+  /** @nullable */
+  logline: string | null;
+  /** @nullable */
+  synopsis: string | null;
+  team_links: string[];
+  /** @nullable */
+  money_use: string | null;
+  /** @nullable */
+  distribution_plan: string | null;
+  /** @nullable */
+  trailer_url: string | null;
+  /** @nullable */
+  trailer_thumbnail_url: string | null;
+  /** @nullable */
+  poster_url: string | null;
+  /** @minimum 0 */
+  confirmed_pledge_total: number;
+  approved: boolean;
+  showcase_requested: boolean;
+}
+
 export type FlowProgressAnswers = { [key: string]: unknown };
 
 export interface FlowProgress {
@@ -255,4 +452,16 @@ export type SearchLocationsParams = {
  */
 query: string;
 };
+
+export type UploadFilmmakerImageParams = {
+kind: UploadFilmmakerImageKind;
+};
+
+export type UploadFilmmakerImageKind = typeof UploadFilmmakerImageKind[keyof typeof UploadFilmmakerImageKind];
+
+
+export const UploadFilmmakerImageKind = {
+  poster: 'poster',
+  share: 'share',
+} as const;
 

@@ -18,6 +18,7 @@ export const projectsTable = pgTable("projects", {
   trailerUrl: text("trailer_url"),
   pilotUrl: text("pilot_url"),
   bunnyVideoId: text("bunny_video_id"),
+  pendingBunnyVideoId: text("pending_bunny_video_id"),
   posterUrl: text("poster_url"),
   shareImageUrl: text("share_image_url"),
   budget: integer("budget"),

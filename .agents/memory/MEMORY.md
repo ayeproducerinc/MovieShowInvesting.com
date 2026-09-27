@@ -2,3 +2,4 @@
 - [Firebase email-link handoff](firebase-email-link-handoff.md) — keep admin sign-in in the existing tab; embedded previews may partition storage, so retain the secure fallback.
 - [Plain Node and DB package imports](plain-node-db-imports.md) — raw Node ESM cannot directly load the DB package's TypeScript source; the database driver belongs to that package.
 - [International location fallback](international-location-fallback.md) — keep a manual location path beside city suggestions so limited provider coverage or outages do not block intake.
+- [Bounded Bunny uploads](bounded-bunny-uploads.md) — enforce trailer size at the server upload boundary; a signed direct TUS upload alone cannot enforce the stated cap.

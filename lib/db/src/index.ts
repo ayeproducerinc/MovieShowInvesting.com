@@ -312,6 +312,240 @@ export async function updateProjectReview(
   return project;
 }
 
+type FilmmakerSubmissionReference = { filmmaker_id?: unknown; project_id?: unknown };
+
+async function getOwnedCompletedProject(
+  visitorId: string,
+): Promise<{ filmmakerId: number; projectId: number | null } | null> {
+  const progress = await findVisitorFlowProgress(visitorId, "filmmaker");
+  if (!progress?.completed) return null;
+  const reference = progress.answers._submission;
+  if (!reference || typeof reference !== "object") return null;
+  const submission = reference as FilmmakerSubmissionReference;
+  if (typeof submission.filmmaker_id !== "number"
+    || (submission.project_id !== null && typeof submission.project_id !== "number")) return null;
+  const [filmmaker] = await db.select({ id: filmmakersTable.id, noProjectYet: filmmakersTable.noProjectYet })
+    .from(filmmakersTable)
+    .where(and(
+      eq(filmmakersTable.id, submission.filmmaker_id),
+      eq(filmmakersTable.visitorId, visitorId),
+    ));
+  if (!filmmaker) return null;
+  if (submission.project_id === null) {
+    return filmmaker.noProjectYet ? { filmmakerId: filmmaker.id, projectId: null } : null;
+  }
+  const [project] = await db.select({ id: projectsTable.id })
+    .from(projectsTable)
+    .where(and(
+      eq(projectsTable.id, submission.project_id),
+      eq(projectsTable.filmmakerId, filmmaker.id),
+    ));
+  return project ? { filmmakerId: filmmaker.id, projectId: project.id } : null;
+}
+
+export async function getCompletedFilmmakerResult(visitorId: string) {
+  const owner = await getOwnedCompletedProject(visitorId);
+  if (!owner) return null;
+  const progress = await findVisitorFlowProgress(visitorId, "filmmaker");
+  if (!progress) return null;
+  const [project] = owner.projectId === null
+    ? [undefined]
+    : await db.select().from(projectsTable).where(and(
+      eq(projectsTable.id, owner.projectId),
+      eq(projectsTable.filmmakerId, owner.filmmakerId),
+    ));
+  return { answers: progress.answers, project };
+}
+
+export async function updateOwnedFilmmakerShowcase(input: {
+  visitorId: string;
+  changes: {
+    showcase_requested?: boolean;
+    synopsis?: string | null;
+    team_links?: string[] | null;
+    money_use?: string | null;
+    distribution_plan?: string | null;
+    trailer_url?: string | null;
+  };
+}) {
+  const owner = await getOwnedCompletedProject(input.visitorId);
+  if (!owner?.projectId) return null;
+  return db.transaction(async (tx) => {
+    const [project] = await tx.select().from(projectsTable).where(and(
+      eq(projectsTable.id, owner.projectId!),
+      eq(projectsTable.filmmakerId, owner.filmmakerId),
+    )).for("update");
+    if (!project) return null;
+    const changes: Partial<typeof projectsTable.$inferInsert> = {};
+    if (input.changes.showcase_requested !== undefined) changes.showcaseRequested = input.changes.showcase_requested;
+    if (input.changes.synopsis !== undefined) changes.synopsis = input.changes.synopsis;
+    if (input.changes.team_links !== undefined) changes.teamLinks = input.changes.team_links;
+    if (input.changes.money_use !== undefined) changes.moneyUse = input.changes.money_use;
+    if (input.changes.distribution_plan !== undefined) changes.distributionPlan = input.changes.distribution_plan;
+    if (input.changes.trailer_url !== undefined) changes.trailerUrl = input.changes.trailer_url;
+    const existingContent = {
+      synopsis: project.synopsis,
+      team_links: project.teamLinks ?? [],
+      money_use: project.moneyUse,
+      distribution_plan: project.distributionPlan,
+      trailer_url: project.trailerUrl,
+    };
+    const hasContentEdit = ["synopsis", "team_links", "money_use", "distribution_plan", "trailer_url"].some((key) => {
+      if (!Object.prototype.hasOwnProperty.call(input.changes, key)) return false;
+      const field = key as keyof typeof existingContent;
+      const changeValue = input.changes[field];
+      const normalizedCurrent = existingContent[field] ?? (key === "team_links" ? [] : null);
+      const normalizedChange = key === "team_links" ? (changeValue ?? []) : (changeValue ?? null);
+      return JSON.stringify(normalizedCurrent) !== JSON.stringify(normalizedChange);
+    });
+    if (project.approved && hasContentEdit) changes.approved = false;
+    const [updated] = await tx.update(projectsTable).set(changes).where(and(
+      eq(projectsTable.id, project.id),
+      eq(projectsTable.filmmakerId, owner.filmmakerId),
+    )).returning();
+    return updated;
+  });
+}
+
+export async function getOwnedFilmmakerMedia(visitorId: string) {
+  const owner = await getOwnedCompletedProject(visitorId);
+  if (!owner?.projectId) return null;
+  const [project] = await db.select({
+    id: projectsTable.id,
+    slug: projectsTable.slug,
+    title: projectsTable.title,
+    trailerUrl: projectsTable.trailerUrl,
+    bunnyVideoId: projectsTable.bunnyVideoId,
+    pendingBunnyVideoId: projectsTable.pendingBunnyVideoId,
+    posterUrl: projectsTable.posterUrl,
+    shareImageUrl: projectsTable.shareImageUrl,
+  }).from(projectsTable).where(and(
+    eq(projectsTable.id, owner.projectId),
+    eq(projectsTable.filmmakerId, owner.filmmakerId),
+  ));
+  return project ?? null;
+}
+
+export async function setOwnedPendingBunnyVideo(input: {
+  visitorId: string;
+  videoId: string;
+}): Promise<boolean> {
+  const owner = await getOwnedCompletedProject(input.visitorId);
+  if (!owner?.projectId) return false;
+  const [updated] = await db.update(projectsTable)
+    .set({ pendingBunnyVideoId: input.videoId })
+    .where(and(
+      eq(projectsTable.id, owner.projectId),
+      eq(projectsTable.filmmakerId, owner.filmmakerId),
+    ))
+    .returning({ id: projectsTable.id });
+  return Boolean(updated);
+}
+
+export async function finalizeOwnedBunnyVideo(input: {
+  visitorId: string;
+  videoId: string;
+  trailerUrl: string;
+}): Promise<boolean> {
+  const owner = await getOwnedCompletedProject(input.visitorId);
+  if (!owner?.projectId) return false;
+  const [updated] = await db.update(projectsTable)
+    .set({
+      bunnyVideoId: input.videoId,
+      pendingBunnyVideoId: null,
+      trailerUrl: input.trailerUrl,
+      approved: false,
+    })
+    .where(and(
+      eq(projectsTable.id, owner.projectId),
+      eq(projectsTable.filmmakerId, owner.filmmakerId),
+      eq(projectsTable.pendingBunnyVideoId, input.videoId),
+    ))
+    .returning({ id: projectsTable.id });
+  return Boolean(updated);
+}
+
+export async function clearOwnedPendingBunnyVideo(input: {
+  visitorId: string;
+  videoId: string;
+}): Promise<void> {
+  const owner = await getOwnedCompletedProject(input.visitorId);
+  if (!owner?.projectId) return;
+  await db.update(projectsTable)
+    .set({ pendingBunnyVideoId: null })
+    .where(and(
+      eq(projectsTable.id, owner.projectId),
+      eq(projectsTable.filmmakerId, owner.filmmakerId),
+      eq(projectsTable.pendingBunnyVideoId, input.videoId),
+    ));
+}
+
+export async function saveOwnedFilmmakerImage(input: {
+  visitorId: string;
+  kind: "poster" | "share";
+  url: string;
+}): Promise<boolean> {
+  const owner = await getOwnedCompletedProject(input.visitorId);
+  if (!owner?.projectId) return false;
+  const [updated] = await db.update(projectsTable)
+    .set(input.kind === "poster"
+      ? { posterUrl: input.url, approved: false }
+      : { shareImageUrl: input.url, approved: false })
+    .where(and(
+      eq(projectsTable.id, owner.projectId),
+      eq(projectsTable.filmmakerId, owner.filmmakerId),
+    ))
+    .returning({ id: projectsTable.id });
+  return Boolean(updated);
+}
+
+export async function getPublicProjectBySlug(slug: string) {
+  const [project] = await db.select({
+    id: projectsTable.id,
+    slug: projectsTable.slug,
+    title: projectsTable.title,
+    format: projectsTable.format,
+    genre: projectsTable.genre,
+    stage: projectsTable.stage,
+    logline: projectsTable.logline,
+    synopsis: projectsTable.synopsis,
+    teamLinks: projectsTable.teamLinks,
+    moneyUse: projectsTable.moneyUse,
+    distributionPlan: projectsTable.distributionPlan,
+    trailerUrl: projectsTable.trailerUrl,
+    posterUrl: projectsTable.posterUrl,
+    shareImageUrl: projectsTable.shareImageUrl,
+    approved: projectsTable.approved,
+    showcaseRequested: projectsTable.showcaseRequested,
+    hidden: projectsTable.hidden,
+  }).from(projectsTable).where(and(eq(projectsTable.slug, slug), eq(projectsTable.hidden, false)));
+  if (!project?.slug || !project.title) return null;
+  const [pledges] = await db.select({ total: sql<number>`coalesce(sum(${schema.pledgesTable.amount}), 0)` })
+    .from(schema.pledgesTable)
+    .where(and(
+      eq(schema.pledgesTable.projectId, project.id),
+      eq(schema.pledgesTable.confirmed, true),
+    ));
+  return {
+    slug: project.slug,
+    title: project.title,
+    format: project.format,
+    genre: project.genre,
+    stage: project.stage,
+    logline: project.logline,
+    synopsis: project.synopsis,
+    teamLinks: project.teamLinks,
+    moneyUse: project.moneyUse,
+    distributionPlan: project.distributionPlan,
+    trailerUrl: project.trailerUrl,
+    posterUrl: project.posterUrl,
+    shareImageUrl: project.shareImageUrl,
+    confirmedPledgeTotal: Number(pledges.total),
+    approved: project.approved,
+    showcaseRequested: Boolean(project.showcaseRequested),
+  };
+}
+
 export async function updateMessageVisibility(
   messageId: number,
   hidden: boolean,

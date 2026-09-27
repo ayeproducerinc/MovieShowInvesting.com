@@ -13,7 +13,9 @@ import Admin from '@/pages/admin';
 import FAQ from '@/pages/faq';
 import Legal from '@/pages/legal';
 import OpeningLater from '@/pages/opening-later';
-import Filmmaker, { FilmmakerDone } from '@/pages/filmmaker';
+import Filmmaker from '@/pages/filmmaker';
+import FilmmakerDone from '@/pages/filmmaker-done';
+import Project from '@/pages/project';
 import NotFound from '@/pages/not-found';
 
 const queryClient = new QueryClient();
@@ -78,7 +80,8 @@ function PublicPages() {
         <Route path="/terms">{() => <Legal kind="terms" />}</Route>
         <Route path="/disclaimers">{() => <Legal kind="disclaimers" />}</Route>
         <Route path="/invest">{() => <OpeningLater audience="investor" />}</Route>
-         <Route path="/start/filmmaker/done" component={FilmmakerDone} />
+          <Route path="/start/filmmaker/done" component={FilmmakerDone} />
+          <Route path="/project/:slug" component={Project} />
          <Route path="/start/filmmaker">{() => visit.status === 'ready'
            ? <Filmmaker />
            : <section className="fm"><div className="page-wrap" style={{padding:'clamp(80px,10vw,150px) 0 160px'}}>

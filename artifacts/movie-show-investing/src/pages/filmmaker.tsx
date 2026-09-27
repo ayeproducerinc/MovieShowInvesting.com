@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, Check, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { getGetFlowProgressQueryKey, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
+import { getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey, useGetFilmmakerResult, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
 import type { FilmmakerSubmissionInput } from '@workspace/api-client-react';
 import { LocationPicker } from '../components/location-picker';
 import { calculateDeal, examples, money, phase, restoreWorksheet, standardOffer, validListedOffer, type Format, type Stage } from './filmmaker-calculator';
@@ -64,9 +64,8 @@ function payload(a:Answers):FilmmakerSubmissionInput {
 
 export default function Filmmaker() {
   const [, navigate] = useLocation();
-  useEffect(() => {
-    if (sessionStorage.getItem('filmmaker-submitted-no-project') !== null) navigate('/start/filmmaker/done');
-  }, [navigate]);
+  const completedResult = useGetFilmmakerResult({ query:{ queryKey:getGetFilmmakerResultQueryKey(), retry:(count,error)=>error.status !== 404 && count < 2 } });
+  useEffect(() => { if (completedResult.data?.completed) navigate('/start/filmmaker/done'); }, [completedResult.data?.completed, navigate]);
   const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:getGetFlowProgressQueryKey('filmmaker'), retry:(count,error)=>error.status !== 404 && count < 2 } });
   const group = useGetPriceGroup();
   const save = useSaveFlowProgress();
@@ -93,7 +92,6 @@ export default function Filmmaker() {
     setA(restored);
     setScreen(restoredScreen);
     if (progress.data.completed) {
-      sessionStorage.setItem('filmmaker-submitted-no-project', String(restored.no_project_yet));
       navigate('/start/filmmaker/done');
     } else {
       lastSaved.current = JSON.stringify({ screen:restoredScreen, answers:restored });
@@ -184,7 +182,6 @@ export default function Filmmaker() {
     try {
       await persist(6, a);
       await submit.mutateAsync({ data:payload(a) });
-      sessionStorage.setItem('filmmaker-submitted-no-project', String(a.no_project_yet));
       navigate('/start/filmmaker/done');
     } catch { setSaveError('We could not submit your information. Nothing has been confirmed. Please try again.'); }
   }
@@ -228,8 +225,8 @@ export default function Filmmaker() {
       <div className="fm-field"><label htmlFor="custom-budget" className="fm-label">Your estimated budget · USD</label><input id="custom-budget" data-testid="input-custom-budget" className="fm-input" inputMode="numeric" value={a.budget ? a.budget.toLocaleString('en-US') : ''} onChange={e=>{ const raw=e.target.value.replace(/,/g,''); if (/^\d*$/.test(raw)) change('budget',raw ? Number(raw) : 0); }} aria-invalid={!budgetValid} />{!budgetValid && <p className="fm-error" role="alert">Enter a positive whole-dollar amount.</p>}</div>}
   </div>;
 
-  if (progress.isLoading || group.isLoading || !hydrated && !progress.isError) return <section className="fm"><div className="page-wrap" style={{padding:'70px 0 140px'}} aria-label="Loading saved answers"><p className="fm-kicker">Opening your worksheet</p><div className="fm-skeleton" style={{maxWidth:440,height:75}}/><div className="fm-skeleton" style={{maxWidth:310}}/><div className="fm-skeleton" style={{maxWidth:600,height:190}}/></div></section>;
-  if (progress.isError && progress.error?.status !== 404 || group.isError || !group.data) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Connection interrupted</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>We can’t open your worksheet yet.</h1><p className="fm-small">Your previous answers and pricing group need to load before you continue. Please try again.</p><button type="button" data-testid="button-retry-loading" className="fm-primary" style={{marginTop:30}} onClick={()=>{ void progress.refetch(); void group.refetch(); }}><RotateCcw size={17}/> Try again</button></div></section>;
+  if (completedResult.isLoading || progress.isLoading || group.isLoading || !hydrated && !progress.isError) return <section className="fm"><div className="page-wrap" style={{padding:'70px 0 140px'}} aria-label="Loading saved answers"><p className="fm-kicker">Opening your worksheet</p><div className="fm-skeleton" style={{maxWidth:440,height:75}}/><div className="fm-skeleton" style={{maxWidth:310}}/><div className="fm-skeleton" style={{maxWidth:600,height:190}}/></div></section>;
+  if (completedResult.isError && completedResult.error?.status !== 404 || progress.isError && progress.error?.status !== 404 || group.isError || !group.data) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Connection interrupted</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>We can’t open your worksheet yet.</h1><p className="fm-small">Your previous answers and pricing group need to load before you continue. Please try again.</p><button type="button" data-testid="button-retry-loading" className="fm-primary" style={{marginTop:30}} onClick={()=>{ void completedResult.refetch(); void progress.refetch(); void group.refetch(); }}><RotateCcw size={17}/> Try again</button></div></section>;
   return <section className="fm"><div className="page-wrap">
     <div className="fm-top"><Link href="/" data-testid="link-flow-home" className="fm-kicker">Movie Show Investing / Filmmakers</Link><span className="fm-kicker" data-testid="text-progress">Step {screen} of 6</span></div>
     <div className="fm-progress" aria-label={`Step ${screen} of 6`}>{headings.map((heading,i)=><span key={heading} className={i<screen ? 'active' : ''} title={`Step ${i+1}: ${heading}`}/>)}</div>
@@ -312,23 +309,5 @@ export default function Filmmaker() {
         <p className="fm-status" role="status" data-testid="status-save" style={{marginTop:15}}>{saveError ? 'Changes not saved' : saving ? 'Saving your answers…' : lastSaved.current === JSON.stringify({screen,answers:a}) ? 'All changes saved' : 'Changes save automatically'}</p>
       </div>
     </div>
-  </div></section>;
-}
-
-export function FilmmakerDone() {
-  const submitted = sessionStorage.getItem('filmmaker-submitted-no-project');
-  const noProject = submitted === 'true';
-  if (submitted === null) return <section className="fm"><div className="page-wrap" style={{padding:'clamp(80px,12vw,160px) 0 170px',maxWidth:980}}>
-    <p className="fm-kicker">Filmmaker worksheet</p>
-    <h1 className="serif" style={{fontSize:'clamp(60px,8vw,110px)',lineHeight:'.94',margin:'30px 0'}}>Let’s start<br/><em>at the beginning.</em></h1>
-    <p style={{maxWidth:530,lineHeight:1.75}}>There’s no submission confirmation to show here. You can open the worksheet to continue or review your saved answers.</p>
-    <Link href="/start/filmmaker" data-testid="link-return-to-worksheet" className="fm-primary" style={{width:'fit-content',marginTop:28}}>Open the worksheet <ArrowRight size={17}/></Link>
-  </div></section>;
-  return <section className="fm"><div className="page-wrap" style={{padding:'clamp(80px,12vw,160px) 0 170px',maxWidth:980}}>
-    <span className="fm-kicker"><Check size={16} style={{display:'inline',marginRight:10}}/>Answers received</span>
-    <h1 className="serif" data-testid="text-confirmation" style={{fontSize:'clamp(65px,9vw,130px)',lineHeight:'.91',letterSpacing:'-.04em',margin:'32px 0'}}>Thank you for<br/><em>starting here.</em></h1>
-    <p style={{fontSize:18,lineHeight:1.75,maxWidth:570,color:'#535b60'}}>{noProject ? 'We received your contact details and your interest in participating in the future. No project information or deal terms were submitted.' : 'We received your project details and your thoughts on the illustrative terms. Your project is not public, and this is not an approval or a funding commitment.'}</p>
-    <div className="fm-note" style={{maxWidth:570,margin:'36px 0'}}>We’re still building this experience. There’s no investment available or money collected here today. If there’s a relevant next step, we’ll reach out using the information you shared.</div>
-    <Link href="/" data-testid="link-done-home" className="fm-primary" style={{width:'fit-content'}}>Back to the site <ArrowRight size={17}/></Link>
   </div></section>;
 }
