@@ -5,4 +5,4 @@
 - [Bounded Bunny uploads](bounded-bunny-uploads.md) — enforce trailer size at the server upload boundary; a signed direct TUS upload alone cannot enforce the stated cap.
 - [Bunny video size semantics](bunny-video-size-semantics.md) — Bunny Stream storageSize is asynchronous encoded output, not the uploaded source byte count.
 - [Shared Bunny media](shared-bunny-media.md) — reuse The AYeList's Bunny resources; keep trailers in the Stream collection and images in the dedicated Storage folder.
-- [Protected Bunny thumbnails](bunny-thumbnail-access.md) — Stream metadata may expose a thumbnail URL that still returns 403; CDN signing uses a separate Pull Zone key.
+- [Stream thumbnail fallback](bunny-thumbnail-access.md) — shared Stream CDN thumbnails stayed blocked; the owner approved poster-or-video-placeholder previews for this MVP.

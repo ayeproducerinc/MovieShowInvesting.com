@@ -1,6 +1,5 @@
-import { TrailerThumbnail } from './trailer-thumbnail';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { ArrowUpRight, RotateCcw, UploadCloud, X } from 'lucide-react';
+import { ArrowUpRight, Play, RotateCcw, UploadCloud, X } from 'lucide-react';
 import {
   getUploadFilmmakerTrailerUrl,
   useGetFilmmakerMediaConfig,
@@ -12,6 +11,26 @@ function safeMediaUrl(value: string | null) {
   if (!value) return null;
   try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? url.href : null; }
   catch { return null; }
+}
+
+function TrailerPreview({ trailerUrl, posterUrl, title }: {
+  trailerUrl: string | null; posterUrl: string | null; title: string | null;
+}) {
+  const [posterFailed, setPosterFailed] = useState(false);
+  const trailer = safeMediaUrl(trailerUrl);
+  const poster = safeMediaUrl(posterUrl);
+  if (!trailer) return null;
+  const showPoster = Boolean(poster && !posterFailed);
+  return <div className="dossier-trailer-card" data-testid="card-trailer-preview">
+    <span className="dossier-kicker">Your trailer</span>
+    <a href={trailer} target="_blank" rel="noopener noreferrer" className="dossier-trailer-cover" aria-label={`Open trailer for ${title || 'your project'} in a new tab`} data-testid="link-trailer-preview">
+      {showPoster
+        ? <img src={poster || ''} alt="" onError={() => setPosterFailed(true)} data-testid="img-trailer-preview"/>
+        : <span className="dossier-trailer-placeholder" data-testid="placeholder-trailer-preview"><small>Trailer available</small><strong>{title || 'Your project'}</strong><small>Open the video to watch</small></span>}
+      <span className="dossier-trailer-play" aria-hidden="true"><Play size={24} fill="currentColor"/></span>
+    </a>
+    <p className="dossier-status">{showPoster ? 'Your poster is shown as the trailer preview.' : 'No poster needed — your video is ready to open.'}</p>
+  </div>;
 }
 
 function ImageUploader({ kind, config, persistedUrl, onSaved }: {
@@ -140,7 +159,6 @@ function TrailerUploader({ config, trailerUrl, onSaved }: {
   return <div className="dossier-media-tile">
     <span className="dossier-kicker">Trailer / direct video upload</span>
     <p className="dossier-status">MP4, WebM or MOV · up to {Math.round(config.trailer_max_bytes / 1048576)} MiB. Uploads are sent in one request and cannot be resumed. Replacing media sends an approved project back to review.</p>
-    {trailerUrl?.startsWith('https://iframe.mediadelivery.net/embed/') && <TrailerThumbnail key={trailerUrl} />}
     {safeMediaUrl(trailerUrl) && <a href={safeMediaUrl(trailerUrl) || undefined} target="_blank" rel="noopener noreferrer" className="dossier-media-link" data-testid="link-current-trailer">View current trailer <ArrowUpRight size={14} style={{ display: 'inline' }}/></a>}
     <label className="dossier-file-label" htmlFor="media-trailer">Choose video<input id="media-trailer" data-testid="input-trailer-file" type="file" accept={config.trailer_types.join(',')} disabled={busy} onChange={select}/></label>
     {file && <p className="dossier-status" data-testid="text-trailer-selected">{file.name} · {(file.size / 1048576).toFixed(1)} MB</p>}
@@ -159,6 +177,7 @@ export function FilmmakerMedia({ result, onSaved }: { result: FilmmakerResult; o
   return <section className="dossier-section" data-testid="section-filmmaker-media">
     <span className="dossier-kicker">Optional / project artwork</span><h2>Give it a first look.</h2>
     <p>These files are public on your link-accessible project page. Only upload media you have permission to share. Editing media resets showcase approval for another review; it does not open investing.</p>
+    <TrailerPreview key={result.poster_url || 'no-poster'} trailerUrl={result.trailer_url} posterUrl={result.poster_url} title={result.title}/>
     {config.isLoading && <div aria-label="Checking media availability"><div className="dossier-skeleton" style={{ width: '75%' }}/><div className="dossier-skeleton" style={{ width: '55%' }}/></div>}
     {config.isError && <div className="dossier-notice">Media setup is unavailable right now. Your external trailer link above still works. <button type="button" className="underline" data-testid="button-retry-media-config" onClick={() => void config.refetch()}><RotateCcw size={14} style={{ display: 'inline' }}/> Check again</button></div>}
     {config.data && <div className="dossier-media-grid">

@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { Readable, Transform } from "node:stream";
 import { finished } from "node:stream/promises";
 import cookieParser from "cookie-parser";
@@ -25,7 +25,6 @@ const VISITOR_COOKIE = "msi_visitor_id";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_TRAILER_BYTES = 500 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 40_000_000;
 const MAX_CONCURRENT_TRAILER_UPLOADS = 4;
 const IMAGE_STORAGE_FOLDER = "Movie Show Investing folder";
@@ -178,88 +177,6 @@ router.get("/filmmakers/media/config", (_req, res): void => {
     image_max_bytes: MAX_IMAGE_BYTES,
     image_types: IMAGE_TYPES,
   }));
-});
-
-router.get("/filmmakers/media/trailer/thumbnail", async (req, res): Promise<void> => {
-  res.setHeader("Cache-Control", "private, no-store");
-  const visitor = visitorId(req);
-  const owner = visitor ? await getOwnedFilmmakerMedia(visitor) : null;
-  const config = readConfig().stream;
-  if (!owner?.bunnyVideoId || !UUID.test(owner.bunnyVideoId) || !config
-    || owner.trailerUrl !== embedUrl(config.libraryId, owner.bunnyVideoId)) {
-    res.status(404).json({ error: "No current uploaded trailer was found." });
-    return;
-  }
-  const tokenKey = process.env.BUNNY_STREAM_CDN_TOKEN_KEY?.trim();
-  if (!tokenKey) {
-    res.status(503).json({ error: "Trailer thumbnail access is not configured." });
-    return;
-  }
-  try {
-    const video = await bunnyRequest(
-      `https://video.bunnycdn.com/library/${encodeURIComponent(config.libraryId)}/videos/${encodeURIComponent(owner.bunnyVideoId)}`,
-      { headers: { AccessKey: config.streamKey, accept: "application/json" } },
-    );
-    if (!video.ok) {
-      req.log.warn({ statusCode: video.status }, "Bunny trailer thumbnail metadata failed");
-      res.status(502).json({ error: "Trailer thumbnail is temporarily unavailable." });
-      return;
-    }
-    const metadata: unknown = await video.json();
-    if (!metadata || typeof metadata !== "object") {
-      res.status(502).json({ error: "Trailer thumbnail metadata is invalid." });
-      return;
-    }
-    const thumbnailCount = "thumbnailCount" in metadata ? metadata.thumbnailCount : null;
-    const thumbnailUrl = "thumbnailUrl" in metadata ? metadata.thumbnailUrl : null;
-    if (thumbnailCount === 0 || !thumbnailUrl) {
-      res.setHeader("Retry-After", "10");
-      res.status(202).json({ status: "processing" });
-      return;
-    }
-    if (typeof thumbnailUrl !== "string" || typeof thumbnailCount !== "number") {
-      res.status(502).json({ error: "Trailer thumbnail metadata is invalid." });
-      return;
-    }
-    const url = new URL(thumbnailUrl);
-    if (url.protocol !== "https:" || !url.hostname.endsWith(".b-cdn.net")
-      || url.username || url.password || url.port || url.search || url.hash
-      || !new RegExp(`^/${owner.bunnyVideoId}/thumbnail(?:_[0-9]+)?\\.jpg$`, "i").test(url.pathname)) {
-      res.status(502).json({ error: "Trailer thumbnail location is invalid." });
-      return;
-    }
-    const expires = Math.floor(Date.now() / 1000) + 120;
-    const token = createHmac("sha256", tokenKey).update(`${url.pathname}${expires}`).digest("base64url");
-    url.searchParams.set("token", `HS256-${token}`);
-    url.searchParams.set("expires", String(expires));
-    const image = await bunnyRequest(url.toString(), { redirect: "error" });
-    if (image.status === 404) {
-      res.setHeader("Retry-After", "10");
-      res.status(202).json({ status: "processing" });
-      return;
-    }
-    if (!image.ok || image.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "image/jpeg"
-      || !image.body) {
-      req.log.warn({ statusCode: image.status }, "Bunny trailer thumbnail delivery failed");
-      res.status(502).json({ error: "Trailer thumbnail is temporarily unavailable." });
-      return;
-    }
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    for await (const chunk of image.body) {
-      total += chunk.byteLength;
-      if (total > MAX_THUMBNAIL_BYTES) {
-        res.status(502).json({ error: "Trailer thumbnail exceeds the supported size." });
-        return;
-      }
-      chunks.push(chunk);
-    }
-    res.setHeader("Cache-Control", "private, max-age=60");
-    res.type("image/jpeg").send(Buffer.concat(chunks));
-  } catch {
-    req.log.warn("Bunny trailer thumbnail request failed");
-    res.status(502).json({ error: "Trailer thumbnail is temporarily unavailable." });
-  }
 });
 
 router.post("/filmmakers/media/trailer", async (req, res): Promise<void> => {
