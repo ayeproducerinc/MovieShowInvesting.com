@@ -25,7 +25,7 @@ These product rules are locked for the MVP. Change them only when the owner expl
 - “I’d need to offer less than $125” is captured as `wants_lower`; the project is still listed at $125.
 - “Other” project stage uses Idea pricing math. Do not silently relabel the filmmaker’s original stage; investor matching/display treatment for this stage remains an open decision.
 - Price-test Group B applies only to Distribution and uses a $15 fee per $100. Assign each visitor once, 50/50, and retain the assignment.
-- Project payback goal is based on the investor offer only. The platform fee is a separate amount owed by the filmmaker.
+- The investor-facing project payback goal is based on the investor offer only. The platform fee is a separate amount owed by the filmmaker.
 
 ## Phase 1 allocation rule
 

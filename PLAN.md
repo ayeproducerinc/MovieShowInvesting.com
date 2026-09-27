@@ -75,7 +75,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 - Mixpanel and Microsoft Clarity events specified in the Prompt Guide.
 - Cloudflare Turnstile and server verification on the filmmaker final submit and Ask form; honeypot fields and request limits.
-- Complete Privacy, Terms, and Disclaimers pages, including AYe Producer, Inc., message-safety review, and the data-deletion contact.
+- Prepare Privacy, Terms, and Disclaimers pages using owner-approved copy for launch, including AYe Producer, Inc., message-safety review, and the data-deletion contact.
 - Production-domain configuration and Firebase authorized-domain setup.
 
 **Gate:** Filmmaker scenarios F1–F11 pass on the launch domain and the filmmaker side is ready to launch.
