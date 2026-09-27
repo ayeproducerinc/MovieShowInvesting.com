@@ -8,6 +8,7 @@ import {
   RecordVisitBody,
   RecordVisitResponse,
 } from "@workspace/api-zod";
+import { getFirebaseWebConfig } from "../lib/firebase-web-config";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -21,16 +22,15 @@ router.get("/stats", async (_req, res): Promise<void> => {
   res.json(GetSiteStatsResponse.parse({ filmmakers }));
 });
 
-router.get("/config", (_req, res): void => {
-  const apiKey = process.env.FIREBASE_API_KEY;
-  const authDomain = process.env.FIREBASE_AUTH_DOMAIN;
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const appId = process.env.FIREBASE_APP_ID;
-  if (!apiKey || !authDomain || !projectId || !appId) {
-    res.status(503).json({ error: "Firebase web configuration has not been supplied." });
-    return;
+router.get("/config", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "no-store");
+  try {
+    const config = await getFirebaseWebConfig();
+    res.json(GetFirebaseConfigResponse.parse(config));
+  } catch (error) {
+    req.log.error({ error: error instanceof Error ? error.message : "Unknown Firebase configuration error" }, "Firebase web configuration unavailable");
+    res.status(503).json({ error: "Firebase web configuration could not be loaded from the project's web app." });
   }
-  res.json(GetFirebaseConfigResponse.parse({ apiKey, authDomain, projectId, appId }));
 });
 
 router.post("/visit", async (req, res): Promise<void> => {

@@ -19,7 +19,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 2 — Data model and admin
 
-**Status:** in progress — data model, progress/price-group APIs, Firebase-protected admin UI and real-data sections are built; the admin allowlist is provisioned, but Firebase rejects the configured web API key, so sign-in gate verification is blocked.
+**Status:** in progress — data model, progress/price-group APIs, Firebase-protected admin UI and real-data sections are built; the admin allowlist is provisioned and the correct web configuration is now read from the Firebase project. Email-link sign-in and the development domain still need to be enabled in Firebase before the admin gate can be verified.
 **Deliverables:**
 
 - Extend the Phase 1 Visitor and Filmmaker tables and add Project, Investor, Pledge, InvestorMinimum, Message, FlowProgress, and EmailLog, including the fields specified in the Prompt Guide.
