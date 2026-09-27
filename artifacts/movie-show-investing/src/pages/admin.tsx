@@ -274,6 +274,8 @@ export default function Admin() {
   const completionInFlight = useRef(false);
   const linkPresent = auth ? isSignInWithEmailLink(auth, window.location.href) && !linkHandled : false;
   const savedEmail = completionEmail;
+  const embedded = window.self !== window.top;
+  const adminUrl = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}/admin`;
 
   useEffect(() => {
     document.title = 'Administration | Movie Show Investing';
@@ -339,15 +341,16 @@ export default function Admin() {
     event.preventDefault();
     if (!auth || !email.trim()) return;
     setBusy(true); setFeedback('');
+    const normalized = email.trim();
+    const previousEmail = window.localStorage.getItem(EMAIL_KEY);
     try {
-      const normalized = email.trim();
-      const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-      await sendSignInLinkToEmail(auth, normalized, {
-        url: `${window.location.origin}${base}/admin`,
-        handleCodeInApp: true,
-      });
+      // Save before requesting the link: the callback can open as soon as it is delivered.
       window.localStorage.setItem(EMAIL_KEY, normalized);
       setCompletionEmail(normalized);
+      await sendSignInLinkToEmail(auth, normalized, {
+        url: adminUrl,
+        handleCodeInApp: true,
+      });
       setSentTo(normalized);
       if (linkPresent) {
         window.history.replaceState({}, '', `${window.location.origin}${window.location.pathname}`);
@@ -355,6 +358,9 @@ export default function Admin() {
       }
       setCompletionAttempted(false);
     } catch (error) {
+      if (previousEmail === null) window.localStorage.removeItem(EMAIL_KEY);
+      else window.localStorage.setItem(EMAIL_KEY, previousEmail);
+      setCompletionEmail(previousEmail);
       setFeedback(emailLinkError(error));
     } finally { setBusy(false); }
   }
@@ -399,14 +405,16 @@ export default function Admin() {
       <div className="admin-auth-panel">
         <div className="admin-auth-card">
           <div className="admin-overline admin-mono">{linkPresent ? 'Complete access' : 'Restricted access'}</div>
-          <h2>{linkPresent ? 'Finish signing in.' : sentTo ? 'Check your inbox.' : 'Welcome back.'}</h2>
+           <h2>{linkPresent ? savedEmail && !completionAttempted ? 'Signing you in.' : 'Finish signing in.' : embedded && !user ? 'Open admin sign-in.' : sentTo ? 'Check your inbox.' : 'Welcome back.'}</h2>
           <p>{linkPresent
-            ? savedEmail ? 'We are verifying your email link. If it does not complete, request a new link below.' : 'This link was opened on a different device or browser. Enter the email address that received it to continue.'
-            : sentTo ? `A sign-in link was sent to ${sentTo}. Open it on this device, or enter that same address if you open it elsewhere.` : 'Enter your email address. We will send a one-time sign-in link; no password is needed.'}</p>
+             ? savedEmail ? 'We are verifying your email link. If it does not complete, request a new link below.' : 'This link cannot access the saved email from where you requested it. Enter the address that received the link to continue.'
+             : embedded && !user ? 'Open this page in a browser tab before requesting your sign-in link. Embedded previews may not share their saved email with the browser tab that opens the link.'
+               : sentTo ? `A sign-in link was sent to ${sentTo}. Open it in this browser and you'll be signed in automatically. A different browser or device will ask for your email once.` : 'Enter your email address. We will send a one-time sign-in link; no password is needed.'}</p>
           {feedback && <p className="admin-feedback" role="alert" data-testid="status-auth-error">{feedback}</p>}
           {sentTo && !linkPresent && !feedback && <p className="admin-feedback success" role="status" data-testid="status-email-sent"><Mail size={15} style={{ display: 'inline', marginRight: 9 }} />Email sent. Check your inbox and spam folder.</p>}
           {busy && linkPresent && <div className="admin-skeleton" role="status" aria-label="Completing sign-in" style={{ height: 50, width: '100%' }} />}
-          {(!linkPresent || !savedEmail || completionAttempted) && <form onSubmit={async event => {
+          {embedded && !linkPresent && !user ? <a className="admin-button" href={adminUrl} target="_blank" rel="noopener noreferrer" data-testid="link-open-admin-tab">Open admin in a new tab <ArrowRight size={16} /></a> :
+          (!linkPresent || !savedEmail || completionAttempted) && <form onSubmit={async event => {
             if (linkPresent && !completionAttempted) {
               event.preventDefault();
               if (email.trim()) {

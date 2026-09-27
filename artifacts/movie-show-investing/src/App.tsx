@@ -56,6 +56,14 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
+function adminEmailLinkTarget() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('mode') !== 'signIn' || !params.has('oobCode')) return null;
+  const adminPath = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/admin`;
+  if (window.location.pathname === adminPath) return null;
+  return `${window.location.origin}${adminPath}${window.location.search}${window.location.hash}`;
+}
+
 function PublicPages() {
   const visit = useVisitAttribution();
   return <>
@@ -89,6 +97,12 @@ function PublicPages() {
 }
 
 function App() {
+  const emailLinkTarget = adminEmailLinkTarget();
+  useEffect(() => {
+    if (emailLinkTarget) window.location.replace(emailLinkTarget);
+  }, [emailLinkTarget]);
+  if (emailLinkTarget) return <div role="status" aria-label="Opening administration sign-in" />;
+
   return <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
