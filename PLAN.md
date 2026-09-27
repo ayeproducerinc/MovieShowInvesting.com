@@ -44,7 +44,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 4 — Project page, result, share, and showcase
 
-**Status:** in progress — result, share, unlisted page, showcase, and media upload code are built; Bunny configuration and live upload verification are pending.  
+**Status:** in progress — result, share, unlisted page, showcase, and media upload code are built. Owner-scoped Bunny Stream and Storage/CDN uploads were verified with temporary media, then cleaned up. Embedded trailer playback still needs a real-browser check after the preview browser reported a codec error; the F6–F8 gate remains open.
 **Deliverables:**
 
 - Filmmaker result screen using the selected offer, a share card without dollar amounts, and share/copy actions.

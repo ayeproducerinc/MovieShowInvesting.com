@@ -30,6 +30,7 @@ const MAX_CONCURRENT_TRAILER_UPLOADS = 4;
 const IMAGE_STORAGE_FOLDER = "Movie Show Investing folder";
 const TRAILER_TYPES = ["video/mp4", "video/webm", "video/quicktime"] as const;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+const ACCEPTED_VIDEO_STATUSES = new Set([1, 2, 3, 4, 7, 8]);
 const STORAGE_HOSTS = new Set([
   "storage.bunnycdn.com",
   "ny.storage.bunnycdn.com",
@@ -353,16 +354,11 @@ router.post("/filmmakers/media/trailer", async (req, res): Promise<void> => {
     }
     const remote: unknown = await verified.json().catch(() => null);
     if (remote === null || typeof remote !== "object" || !("status" in remote)
-      || typeof remote.status !== "number" || !("storageSize" in remote)
-      || typeof remote.storageSize !== "number" || !Number.isFinite(remote.storageSize)) {
+      || typeof remote.status !== "number" || !ACCEPTED_VIDEO_STATUSES.has(remote.status)) {
       throw new BunnyError("Bunny Stream returned an unverifiable upload status.");
     }
-    if (remote.storageSize > MAX_TRAILER_BYTES) {
-      throw new UploadError(413, "Trailer exceeds the 500 MB limit.");
-    }
-    if (remote.storageSize !== contentLength || ![1, 2, 3, 4].includes(remote.status)) {
-      throw new BunnyError("Bunny Stream upload size or processing status did not match.");
-    }
+    // Bunny storageSize is the asynchronously encoded output size, not the uploaded byte count.
+    // The byteGuard above enforces the original-file limit before forwarding bytes to Bunny.
 
     const trailerUrl = embedUrl(config.libraryId, videoId);
     const response = UploadFilmmakerTrailerResponse.parse({

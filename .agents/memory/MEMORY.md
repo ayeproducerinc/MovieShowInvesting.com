@@ -3,3 +3,5 @@
 - [Plain Node and DB package imports](plain-node-db-imports.md) — raw Node ESM cannot directly load the DB package's TypeScript source; the database driver belongs to that package.
 - [International location fallback](international-location-fallback.md) — keep a manual location path beside city suggestions so limited provider coverage or outages do not block intake.
 - [Bounded Bunny uploads](bounded-bunny-uploads.md) — enforce trailer size at the server upload boundary; a signed direct TUS upload alone cannot enforce the stated cap.
+- [Bunny video size semantics](bunny-video-size-semantics.md) — Bunny Stream storageSize is asynchronous encoded output, not the uploaded source byte count.
+- [Shared Bunny media](shared-bunny-media.md) — reuse The AYeList's Bunny resources for this MVP; isolate Movie Show Investing images within the owner-created folder.
