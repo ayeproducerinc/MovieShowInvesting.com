@@ -1,4 +1,4 @@
 - [Firebase Auth config semantics](firebase-auth-config-semantics.md) — a missing passwordRequired field in the Admin API can mean false, not a failed passwordless update.
-- [Firebase email-link handoff](firebase-email-link-handoff.md) — embedded previews and browser tabs may not share pending-email storage; preserve the secure missing-email fallback.
+- [Firebase email-link handoff](firebase-email-link-handoff.md) — keep admin sign-in in the existing tab; embedded previews may partition storage, so retain the secure fallback.
 - [Plain Node and DB package imports](plain-node-db-imports.md) — raw Node ESM cannot directly load the DB package's TypeScript source; the database driver belongs to that package.
 - [International location fallback](international-location-fallback.md) — keep a manual location path beside city suggestions so limited provider coverage or outages do not block intake.
