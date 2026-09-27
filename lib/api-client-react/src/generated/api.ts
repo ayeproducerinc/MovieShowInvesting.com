@@ -33,8 +33,10 @@ import type {
   Flow,
   FlowProgress,
   HealthStatus,
+  LocationSearchPayload,
   PriceGroup,
   SaveProgressInput,
+  SearchLocationsParams,
   SiteStats,
   Visit,
   VisitInput
@@ -287,6 +289,90 @@ export function useGetFirebaseConfig<TData = Awaited<ReturnType<typeof getFireba
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetFirebaseConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSearchLocationsUrl = (params: SearchLocationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/locations?${stringifiedParams}` : `/api/locations`
+}
+
+/**
+ * @summary Search city and region suggestions
+ */
+export const searchLocations = async (params: SearchLocationsParams, options?: Parameters<typeof customFetch>[1]): Promise<LocationSearchPayload> => {
+
+  return customFetch<LocationSearchPayload>(getSearchLocationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchLocationsQueryKey = (params?: SearchLocationsParams,) => {
+    return [
+    `/api/locations`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchLocationsQueryOptions = <TData = Awaited<ReturnType<typeof searchLocations>>, TError = ErrorType<void>>(params: SearchLocationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchLocations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchLocationsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchLocations>>> = ({ signal }) => searchLocations(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchLocations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchLocationsQueryResult = NonNullable<Awaited<ReturnType<typeof searchLocations>>>
+export type SearchLocationsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Search city and region suggestions
+ */
+
+export function useSearchLocations<TData = Awaited<ReturnType<typeof searchLocations>>, TError = ErrorType<void>>(
+ params: SearchLocationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchLocations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchLocationsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

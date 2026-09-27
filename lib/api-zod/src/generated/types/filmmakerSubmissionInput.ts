@@ -42,7 +42,9 @@ export interface FilmmakerSubmissionInput {
   /** @minLength 1 */
   city: string;
   /** @minLength 1 */
-  state: string;
+  state?: string;
+  /** @pattern ^[A-Z]{2}$ */
+  country?: string;
   favorite_genres: string[];
   chat_opt_in: boolean;
   phone?: string;

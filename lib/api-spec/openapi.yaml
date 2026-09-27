@@ -16,6 +16,8 @@ tags:
     description: Saved flow progress and visitor assignment
   - name: filmmakers
     description: Filmmaker submissions
+  - name: locations
+    description: International city and region suggestions
   - name: admin
     description: Firebase-protected administration
 paths:
@@ -58,6 +60,32 @@ paths:
                 $ref: "#/components/schemas/FirebaseConfig"
         "503":
           description: Firebase has not been configured yet
+  /locations:
+    get:
+      operationId: searchLocations
+      tags: [locations]
+      summary: Search city and region suggestions
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 80
+      responses:
+        "200":
+          description: Matching city and region suggestions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationSearchPayload"
+        "400":
+          description: Invalid location search query
+        "502":
+          description: Location provider returned an invalid response
+        "503":
+          description: Location provider is temporarily unavailable
   /visit:
     post:
       operationId: recordVisit
@@ -317,7 +345,7 @@ components:
     FilmmakerSubmissionInput:
       type: object
       additionalProperties: false
-      required: [no_project_yet, name, email, city, state, favorite_genres, chat_opt_in]
+      required: [no_project_yet, name, email, city, favorite_genres, chat_opt_in]
       properties:
         no_project_yet: { type: boolean }
         stage: { type: string, enum: [distribution, production, idea, other] }
@@ -347,11 +375,30 @@ components:
         email: { type: string, format: email }
         city: { type: string, minLength: 1 }
         state: { type: string, minLength: 1 }
+        country:
+          type: string
+          pattern: "^[A-Z]{2}$"
         favorite_genres:
           type: array
           items: { type: string }
         chat_opt_in: { type: boolean }
         phone: { type: string }
+    LocationSearchPayload:
+      type: object
+      required: [locations]
+      properties:
+        locations:
+          type: array
+          items:
+            $ref: "#/components/schemas/LocationSuggestion"
+    LocationSuggestion:
+      type: object
+      required: [city, region, country, country_code]
+      properties:
+        city: { type: string, minLength: 1 }
+        region: { type: string }
+        country: { type: string, minLength: 1 }
+        country_code: { type: string, pattern: "^[A-Z]{2}$" }
     FilmmakerSubmission:
       type: object
       required: [filmmaker_id, project_id]

@@ -157,7 +157,8 @@ export type FilmmakerSubmissionData = {
   name: string;
   email: string;
   city: string;
-  state: string;
+  state?: string;
+  country?: string;
   favorite_genres: string[];
   chat_opt_in: boolean;
   phone?: string;
@@ -223,6 +224,7 @@ export async function createFilmmakerSubmission(input: {
       phone: input.data.phone,
       city: input.data.city,
       state: input.data.state,
+      country: input.data.country,
       favoriteGenres: input.data.favorite_genres,
       chatOptIn: input.data.chat_opt_in,
       noProjectYet: input.data.no_project_yet,

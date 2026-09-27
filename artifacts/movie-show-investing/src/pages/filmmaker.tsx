@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Check, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { getGetFlowProgressQueryKey, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
 import type { FilmmakerSubmissionInput } from '@workspace/api-client-react';
+import { LocationPicker } from '../components/location-picker';
 import { calculateDeal, examples, money, phase, restoreWorksheet, standardOffer, validListedOffer, type Format, type Stage } from './filmmaker-calculator';
 
 type Answers = {
@@ -12,13 +13,13 @@ type Answers = {
   offer_per100: number | null; offer_choice: string; offer_other_text: string; wants_lower: boolean;
   payback_terms: 'works' | 'need_some' | 'other' | null; payback_terms_other: string;
   funding_sources: string[]; funding_other: string; reached_goal: boolean | null; funding_experience: string;
-  name: string; email: string; phone: string; city: string; state: string; favorite_genres: string[]; chat_opt_in: boolean;
+  name: string; email: string; phone: string; city: string; state: string; country: string; location_manual: boolean; favorite_genres: string[]; chat_opt_in: boolean;
 };
 const initial: Answers = {
   stage:null, stage_other:'', no_project_yet:false, title:'', format:'movie', genre:'', genre_other:'', logline:'', trailer_url:'', pilot_url:'',
   budget:0, budget_mode:'example', deal_answer:null, offer_per100:null, offer_choice:'', offer_other_text:'', wants_lower:false,
   payback_terms:null, payback_terms_other:'', funding_sources:[], funding_other:'', reached_goal:null, funding_experience:'',
-  name:'', email:'', phone:'', city:'', state:'', favorite_genres:[], chat_opt_in:false,
+  name:'', email:'', phone:'', city:'', state:'', country:'', location_manual:false, favorite_genres:[], chat_opt_in:false,
 };
 const genres = ['Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Other'] as const;
 const funding = ['Own money','Friends & family','Kickstarter / Indiegogo / Seed&Spark','Grants','Investors','Studios','Haven’t yet','Other'];
@@ -47,7 +48,7 @@ function Field({ label, id, value, onChange, required=false, type='text', placeh
 }
 function validUrl(value:string) { if (!value.trim()) return true; try { const u = new URL(value); return u.protocol === 'https:' || u.protocol === 'http:'; } catch { return false; } }
 function payload(a:Answers):FilmmakerSubmissionInput {
-  const contact = { no_project_yet:a.no_project_yet, name:a.name.trim(), email:a.email.trim(), phone:a.phone.trim() || undefined, city:a.city.trim(), state:a.state.trim(), favorite_genres:a.favorite_genres, chat_opt_in:a.chat_opt_in };
+  const contact = { no_project_yet:a.no_project_yet, name:a.name.trim(), email:a.email.trim(), phone:a.phone.trim() || undefined, city:a.city.trim(), state:a.state.trim() || undefined, country:a.country || undefined, favorite_genres:a.favorite_genres, chat_opt_in:a.chat_opt_in };
   if (a.no_project_yet) return contact;
   return {
     ...contact, stage:a.stage ?? undefined, stage_other:a.stage === 'other' ? a.stage_other.trim() : undefined,
@@ -153,7 +154,7 @@ export default function Filmmaker() {
     if (step === 3 && (!budgetValid || !a.deal_answer)) return 'Choose a positive whole-dollar budget and tell us how the example deal feels.';
     if (step === 4 && (!a.offer_choice || !validListedOffer(a.offer_per100) || (a.offer_choice === 'other' && !a.wants_lower && (!a.offer_other_text.trim() || otherOfferError)) || !a.payback_terms || (a.payback_terms === 'other' && !a.payback_terms_other.trim()))) return 'Choose an offer of at least $125 per $100 and answer the payback question.';
     if (step === 5 && (a.funding_sources.length === 0 || (a.funding_sources.includes('Other') && !a.funding_other.trim()) || a.reached_goal === null || !a.funding_experience.trim())) return 'Tell us how you funded work, whether you reached your goal, and what happened.';
-    if (step === 6 && (!a.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim()) || !a.city.trim() || !a.state.trim() || a.favorite_genres.length === 0)) return 'Add your name, a valid email, city, state, and at least one favorite genre.';
+    if (step === 6 && (!a.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim()) || !a.city.trim() || !a.country || a.favorite_genres.length === 0)) return 'Add your name, a valid email, city and country, and at least one favorite genre. Choose a city from the suggestions or enter your location manually.';
     return '';
   }
   async function advance(next:number, updated=a) {
@@ -293,7 +294,8 @@ export default function Filmmaker() {
           <Field id="name" label="Your name" value={a.name} onChange={v=>change('name',v)} required/>
           <Field id="email" label="Email address" value={a.email} onChange={v=>change('email',v)} type="email" required/>
           <Field id="phone" label="Phone number" value={a.phone} onChange={v=>change('phone',v)} type="tel"/>
-          <div className="fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}><Field id="city" label="City" value={a.city} onChange={v=>change('city',v)} required/><Field id="state" label="State" value={a.state} onChange={v=>change('state',v)} required/></div>
+          <LocationPicker value={{ city:a.city, state:a.state, country:a.country, location_manual:a.location_manual }}
+            onChange={location=>{ setA(current=>({...current,...location})); setValidation(''); }} />
            <div className="fm-section"><p className="fm-label">Favorite genres · select any</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{genres.map(g=><Choice id={`favorite-${g}`} name="favorite-genre" multiple key={g} selected={a.favorite_genres.includes(g)} onClick={()=>toggleArray('favorite_genres',g)}>{g}</Choice>)}</div></div>
           <label className="fm-check fm-section"><input type="checkbox" data-testid="checkbox-chat-opt-in" checked={a.chat_opt_in} onChange={e=>change('chat_opt_in',e.target.checked)}/><span>I’m open to a quick 15-minute chat about my experience.</span></label>
           <p className="fm-small">By submitting, you’re sharing information for this prelaunch conversation. This does not create a project listing or an investment opportunity. See our <Link href="/privacy" className="underline" data-testid="link-flow-privacy">privacy policy</Link>.</p>

@@ -41,6 +41,33 @@ export const GetFirebaseConfigResponse = zod.object({
 
 
 /**
+ * @summary Search city and region suggestions
+ */
+export const searchLocationsQueryQueryMin = 2;
+export const searchLocationsQueryQueryMax = 80;
+
+
+
+export const SearchLocationsQueryParams = zod.object({
+  "query": zod.coerce.string().min(searchLocationsQueryQueryMin).max(searchLocationsQueryQueryMax)
+})
+
+
+
+export const searchLocationsResponseLocationsItemCountryCodeRegExp = new RegExp('^[A-Z]{2}$');
+
+
+export const SearchLocationsResponse = zod.object({
+  "locations": zod.array(zod.object({
+  "city": zod.string().min(1),
+  "region": zod.string(),
+  "country": zod.string().min(1),
+  "country_code": zod.string().regex(searchLocationsResponseLocationsItemCountryCodeRegExp)
+}))
+})
+
+
+/**
  * @summary Persist a visitor and their first campaign attribution
  */
 export const recordVisitBodyUtmSourceMax = 200;
@@ -121,6 +148,7 @@ export const submitFilmmakerBodyOfferPer100Min = 125;
 
 
 
+export const submitFilmmakerBodyCountryRegExp = new RegExp('^[A-Z]{2}$');
 
 
 export const SubmitFilmmakerBody = zod.object({
@@ -149,7 +177,8 @@ export const SubmitFilmmakerBody = zod.object({
   "name": zod.string().min(1),
   "email": zod.string().email(),
   "city": zod.string().min(1),
-  "state": zod.string().min(1),
+  "state": zod.string().min(1).optional(),
+  "country": zod.string().regex(submitFilmmakerBodyCountryRegExp).optional(),
   "favorite_genres": zod.array(zod.string()),
   "chat_opt_in": zod.boolean(),
   "phone": zod.string().optional()

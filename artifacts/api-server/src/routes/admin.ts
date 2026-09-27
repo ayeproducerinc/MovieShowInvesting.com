@@ -181,27 +181,27 @@ async function getAdminTable(section: Section): Promise<AdminTable> {
   }
 
   if (section === "location") {
-    type Location = { state: string; city: string; investors: Set<number>; filmmakers: Set<number>; pledged: number };
+    type Location = { country: string; state: string; city: string; investors: Set<number>; filmmakers: Set<number>; pledged: number };
     const locations = new Map<string, Location>();
-    const ensureLocation = (state: string | null, city: string | null): Location => {
-      const key = `${state ?? ""}\u0000${city ?? ""}`;
+    const ensureLocation = (country: string | null, state: string | null, city: string | null): Location => {
+      const key = `${country ?? ""}\u0000${state ?? ""}\u0000${city ?? ""}`;
       let location = locations.get(key);
       if (!location) {
-        location = { state: state ?? "", city: city ?? "", investors: new Set(), filmmakers: new Set(), pledged: 0 };
+        location = { country: country ?? "", state: state ?? "", city: city ?? "", investors: new Set(), filmmakers: new Set(), pledged: 0 };
         locations.set(key, location);
       }
       return location;
     };
-    investors.forEach((investor) => ensureLocation(investor.state, investor.city).investors.add(investor.id));
-    filmmakers.forEach((filmmaker) => ensureLocation(filmmaker.state, filmmaker.city).filmmakers.add(filmmaker.id));
+    investors.forEach((investor) => ensureLocation(null, investor.state, investor.city).investors.add(investor.id));
+    filmmakers.forEach((filmmaker) => ensureLocation(filmmaker.country, filmmaker.state, filmmaker.city).filmmakers.add(filmmaker.id));
     for (const pledge of confirmedPledges) {
       const investor = pledge.investorId == null ? undefined : investorById.get(pledge.investorId);
-      if (investor) ensureLocation(investor.state, investor.city).pledged += pledge.amount;
+      if (investor) ensureLocation(null, investor.state, investor.city).pledged += pledge.amount;
     }
     const rows = [...locations.values()]
-      .sort((a, b) => a.state.localeCompare(b.state) || a.city.localeCompare(b.city))
-      .map((location) => [location.state, location.city, location.investors.size, location.pledged, location.filmmakers.size]);
-    return buildTable(section, ["State", "City", "Investors", "Confirmed pledged", "Filmmakers"], rows);
+      .sort((a, b) => a.country.localeCompare(b.country) || a.state.localeCompare(b.state) || a.city.localeCompare(b.city))
+      .map((location) => [location.country, location.state, location.city, location.investors.size, location.pledged, location.filmmakers.size]);
+    return buildTable(section, ["Country", "Region / State", "City", "Investors", "Confirmed pledged", "Filmmakers"], rows);
   }
 
   if (section === "funnels") {

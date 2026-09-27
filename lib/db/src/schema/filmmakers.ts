@@ -10,6 +10,7 @@ export const filmmakersTable = pgTable("filmmakers", {
   phone: text("phone"),
   city: text("city"),
   state: text("state"),
+  country: text("country"),
   favoriteGenres: text("favorite_genres").array(),
   chatOptIn: boolean("chat_opt_in"),
   noProjectYet: boolean("no_project_yet"),

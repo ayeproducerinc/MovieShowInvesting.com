@@ -20,7 +20,7 @@ const INPUT_FIELDS = new Set([
   "logline", "trailer_url", "pilot_url", "budget", "budget_from_example", "deal_answer",
   "offer_per100", "offer_other_text", "wants_lower", "payback_terms", "payback_terms_other",
   "funding_sources", "funding_other", "reached_goal", "funding_experience", "name", "email",
-  "city", "state", "favorite_genres", "chat_opt_in", "phone",
+  "city", "state", "country", "favorite_genres", "chat_opt_in", "phone",
 ]);
 
 function hasText(value: unknown): boolean {

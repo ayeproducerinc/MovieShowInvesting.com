@@ -149,10 +149,26 @@ export interface FilmmakerSubmissionInput {
   /** @minLength 1 */
   city: string;
   /** @minLength 1 */
-  state: string;
+  state?: string;
+  /** @pattern ^[A-Z]{2}$ */
+  country?: string;
   favorite_genres: string[];
   chat_opt_in: boolean;
   phone?: string;
+}
+
+export interface LocationSuggestion {
+  /** @minLength 1 */
+  city: string;
+  region: string;
+  /** @minLength 1 */
+  country: string;
+  /** @pattern ^[A-Z]{2}$ */
+  country_code: string;
+}
+
+export interface LocationSearchPayload {
+  locations: LocationSuggestion[];
 }
 
 export interface FilmmakerSubmission {
@@ -231,4 +247,12 @@ export interface AdminMessageReview {
   id: number;
   hidden: boolean;
 }
+
+export type SearchLocationsParams = {
+/**
+ * @minLength 2
+ * @maxLength 80
+ */
+query: string;
+};
 
