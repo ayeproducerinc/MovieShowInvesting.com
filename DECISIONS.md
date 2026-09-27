@@ -41,6 +41,7 @@ These product rules are locked for the MVP. Change them only when the owner expl
 - Use “Payback goal: $X for every $100” for project offers and “Payback goal: $X back on your $Y” for a specific pledge.
 - Do not describe a payback goal as a return, earnings, an expectation, or a realistic outcome. Never imply that a payback is guaranteed.
 - Required risk disclosure: **“Returns aren’t guaranteed. You may get back less, or nothing.”** This exact disclosure is permitted wherever the prohibition above would otherwise rule out the word “returns.”
+- Questions about fixed payback versus profit share collect preferences for research; they do not create live investment terms. Do not promise a profit share that has not been decided.
 - Place the required risk disclosure next to investor-facing pledge and payback figures, including in results, emails, project pages, Explore, and lineup views.
 - Securities notice at the top of Explore and every project page: **“Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.”**
 - Footer on every page: **“Pledges are non-binding. No money is collected. This is not an offer to sell securities.”**
@@ -70,4 +71,5 @@ These product rules are locked for the MVP. Change them only when the owner expl
 - Idea Slate example budgets ($50,000 feature and $65,000 series are provisional examples).
 - Pass thresholds for the six demand tests.
 - How an “Other” project stage is labeled and matched to investor preferences.
+- Investor-facing “Returns” motivation and the longer project-page disclaimer in the guides conflict with the banned investor wording. The exact required short risk disclosure above remains the exception; do not silently adopt the conflicting copy or invent replacements.
 - Any later profit-share terms, rate tiers, or payment waterfall beyond the current MVP rules.

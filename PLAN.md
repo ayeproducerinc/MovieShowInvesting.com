@@ -12,6 +12,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 - Mobile-first shared shell, header, required footer, and `/privacy`, `/terms`, `/disclaimers`, and `/faq` pages.
 - Firebase web configuration returned by `/api/config`; initialize Firebase Auth without building sign-in screens yet.
 - A one-year visitor ID cookie and capture of `utm_source`, `utm_medium`, `utm_campaign`, and `ref` codes.
+- Persist a minimal Visitor record in PostgreSQL for scenario S1, plus only the empty Filmmaker table needed for a genuine `/api/stats` count. Phase 2 extends these tables and adds the remaining models; do not count unsaved browser-only visits as database records.
 - All API routes use `/api`; all data counts come from the database.
 
 **Gate:** Home and shared pages load; visitor and campaign data are recorded; the setup scenarios in the Visual Guide pass.
@@ -21,7 +22,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 **Status:** not started  
 **Deliverables:**
 
-- PostgreSQL models for Visitor, Filmmaker, Project, Investor, Pledge, InvestorMinimum, Message, FlowProgress, and EmailLog, including the fields specified in the Prompt Guide.
+- Extend the Phase 1 Visitor and Filmmaker tables and add Project, Investor, Pledge, InvestorMinimum, Message, FlowProgress, and EmailLog, including the fields specified in the Prompt Guide.
 - Progress-save API and one-time visitor price-group assignment.
 - Password-protected `/admin` with ten sections: Summary; Pledges by project; By location; Funnels; Market; Price test; Queues; Messages; Channels; Email log.
 - CSV export for every admin table; approval and hide controls; real database counts.
@@ -37,9 +38,9 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 - Project stage, project details, budget tabs, standard-deal calculator, deal response, offer selection, financing history, and contact information.
 - Enforce the $125 offer floor; save `wants_lower` while listing the offer at $125.
 - Implement the approved Phase 1 pool calculation, showing the investor target, fee, combined amount, and filmmaker share as separate values.
-- Create filmmaker and project records on submission; support “I don't have a project yet.”
+- Create filmmaker and project records on a project submission. “I don't have a project yet” creates a Filmmaker only and bypasses project-dependent calculations and sharing.
 
-**Gate:** Visual Guide scenarios F1–F5 pass, including pricing math, Group B pricing, offer floor, no-project path, and resume.
+**Gate:** Visual Guide scenarios F1–F5 pass for pricing math, Group B pricing, offer floor, no-project path, and resume. F1’s finished result screen belongs to Phase 4; in Phase 3, verify the submitted data and show an honest interim confirmation instead of a dead-end or a fake result.
 
 ## Phase 4 — Project page, result, share, and showcase
 
@@ -48,12 +49,13 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 - Filmmaker result screen using the selected offer, a share card without dollar amounts, and share/copy actions.
 - Unlisted project page with the securities notice, project details, required investor disclosures, and confirmed pledge totals only.
+- Do not present “I'm interested” or “Ask the filmmaker” as working actions until their Phase 7 and Phase 5 flows exist; explain that investor pledges open later during the filmmaker-only launch. “Private” means unlisted, not restricted to signed-in users.
 - Showcase request and optional synopsis, team links, money-use, distribution-plan, trailer, and poster fields.
 - Bunny Stream uploads for trailers and Bunny Storage/CDN for posters and share images, with the documented size and file-type limits.
 - Social link-preview metadata; unapproved pages are noindex. Only approved, non-hidden projects may appear in Explore.
 - YouTube/Vimeo oEmbed thumbnails where applicable.
 
-**Gate:** Visual Guide scenarios F6–F8 pass: chosen-offer numbers, share image/preview, approval queue, Explore visibility, and upload limits.
+**Gate:** Visual Guide scenarios F6–F8 pass for chosen-offer numbers, share image/preview, approval queue, and upload limits. F7’s Explore visibility check waits for Phase 7, when Explore exists; approval and hide state must already work in admin.
 
 ## Phase 5 — Email, sign-in, verification, and filmmaker questions
 
@@ -115,6 +117,28 @@ Use these five questions and answers on `/faq`:
 3. **How will money flow when investment opens?** Viewers rent, buy, or license the film → our affiliated distribution platform collects the revenue (payment processing fees come off first) → automated revenue splits pay investors, the filmmaker, and the platform according to the project's terms.
 4. **Who's the distribution platform?** Movie Show Investing and The AYeList are both run by AYe Producer, Inc. The AYeList is our distribution channel, with on-demand streaming and automated revenue splits.
 5. **How are my ideas protected?** Share loglines and synopses, not full scripts. Consider registering your script with the U.S. Copyright Office or the WGA registry before sharing widely.
+
+## Lean market-test boundaries
+
+- The first market test is the filmmaker launch after Phase 6; the investor launch follows Phases 7–8, once real approved projects are available. Phases 1–5 are internal build gates, not public launch claims.
+- Preserve the agreed six-test hypotheses and the eight phase gates. Do not invent pass thresholds: set them with the owner before marketing begins, then measure only real responses, submissions, confirmations, and meetings.
+- The recap mentions a separate “slates page,” but none of the phase prompts specifies one. For the first test, show slate information in the existing flow and project pages; ask before adding another page.
+- Visual Guide example names, project counts, and admin totals are test fixtures, not launch data. Do not seed them into public pages. Before opening the investor side, obtain permission for two or three real projects and approve them through the normal queue.
+- A scenario that requires a later phase is **blocked until that phase**, not a failure of the current phase. In particular, F1’s result display waits for Phase 4, F7’s Explore listing waits for Phase 7, and I6’s repeat-email link delivery waits for Phase 8. Do not expose nonfunctional “placeholder” actions to real users.
+
+## Logic and experience choices for owner review
+
+These are recommendations, **not approved changes** to locked terms or permission to add features:
+
+| Gap | Why it matters | Smallest recommendation |
+|---|---|---|
+| The recap and Screen 4 mockup say all Phase 1 receipts go to investors, but the approved working rule also funds the platform fee. | The filmmaker calculator and the explanation would disagree; the “$10,000 a month = 12 months” example also reads like a forecast. | Keep the separate investor target, fee, and combined total. Replace “all goes to investors” with a plain-language explanation that net receipts are split proportionally toward both targets; label any month estimate as illustrative or omit it. Approve the final copy before launch. |
+| The guides ask investors about “Returns” as a motivation and use a longer disclaimer containing “earns less than expected,” while the locked investor wording bans those terms except the exact required short disclosure. | Investor pages would contradict the agreed copy rule. | Keep the exact required short disclosure. Choose owner-approved alternate wording for the motivation and any longer disclaimer before those pages are built. |
+| The investor terms page starts with nothing selected, while a code helper treats an unanswered minimum as a match. | An investor could see a “Matches your terms” badge without having chosen terms. | Do not badge unanswered terms as matches. Confirm whether all three slate rows must be answered or whether unanswered rows simply produce no match. |
+| Project pages precede the Ask and investor flows; the home page links to `/invest` before investor launch. | A filmmaker's shared link or the home CTA could lead to a dead end and feel unfinished. | Until each flow opens, use a clear “opening later” state rather than a working-looking button; keep the future route only if it explains what is available now. |
+| “Other” project stage uses Idea math, but the investor has only three slate minimums. | Match badges and market comparisons would have no agreed category. | Decide the mapping before the investor flow, without changing the filmmaker's original stage label or inventing a fourth slate. |
+| Post-payback residual shares and Idea example budgets remain unsettled. | A calculator could imply a full split or present provisional budget examples as approved. | Display only the agreed filmmaker share; do not assign the remainder. Confirm Idea examples before presenting them as defaults. |
+| The project-page guide labels some revenue channels “Live,” but the MVP takes no money, and the investor share card says “I've pledged to invest” before a pledge is confirmed. | Users could mistake a future process or an unconfirmed expression of interest for a live investment. | Confirm which distribution channels are actually live before using that label; describe unconfirmed pledges as interest, or wait to offer the share card until confirmation. Approve any changed copy before launch. |
 
 ## Service and launch dependencies
 
