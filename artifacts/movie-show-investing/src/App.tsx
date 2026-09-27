@@ -8,6 +8,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
 import { useVisitAttribution } from '@/hooks/use-public-site';
 import Home from '@/pages/home';
+import Admin from '@/pages/admin';
 import FAQ from '@/pages/faq';
 import Legal from '@/pages/legal';
 import OpeningLater from '@/pages/opening-later';
@@ -78,7 +79,10 @@ function App() {
   return <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-        <PublicPages />
+        <Switch>
+          <Route path="/admin" component={Admin} />
+          <Route>{() => <PublicPages />}</Route>
+        </Switch>
       </WouterRouter>
       <Toaster />
     </TooltipProvider>

@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { check, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -11,7 +12,9 @@ export const visitorsTable = pgTable("visitors", {
   priceGroup: text("price_group"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  check("visitors_price_group_check", sql`${table.priceGroup} is null or ${table.priceGroup} in ('A', 'B')`),
+]);
 
 export const insertVisitorSchema = createInsertSchema(visitorsTable).omit({
   createdAt: true,

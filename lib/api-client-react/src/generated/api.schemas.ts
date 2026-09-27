@@ -36,3 +36,103 @@ export interface Visit {
   visitor_id: string;
 }
 
+export type PriceGroupGroup = typeof PriceGroupGroup[keyof typeof PriceGroupGroup];
+
+
+export const PriceGroupGroup = {
+  A: 'A',
+  B: 'B',
+} as const;
+
+export interface PriceGroup {
+  group: PriceGroupGroup;
+}
+
+export type Flow = typeof Flow[keyof typeof Flow];
+
+
+export const Flow = {
+  filmmaker: 'filmmaker',
+  investor: 'investor',
+} as const;
+
+export type SaveProgressInputAnswers = { [key: string]: unknown };
+
+export interface SaveProgressInput {
+  flow: Flow;
+  /**
+     * @minimum 1
+     * @maximum 6
+     */
+  last_screen: number;
+  answers: SaveProgressInputAnswers;
+  completed?: boolean;
+}
+
+export type FlowProgressAnswers = { [key: string]: unknown };
+
+export interface FlowProgress {
+  flow: Flow;
+  last_screen: number;
+  answers: FlowProgressAnswers;
+  completed: boolean;
+  updated_at: string;
+}
+
+export type AdminIdentityRole = typeof AdminIdentityRole[keyof typeof AdminIdentityRole];
+
+
+export const AdminIdentityRole = {
+  admin: 'admin',
+} as const;
+
+export interface AdminIdentity {
+  email: string;
+  role: AdminIdentityRole;
+}
+
+export type AdminSection = typeof AdminSection[keyof typeof AdminSection];
+
+
+export const AdminSection = {
+  summary: 'summary',
+  pledges: 'pledges',
+  location: 'location',
+  funnels: 'funnels',
+  market: 'market',
+  'price-test': 'price-test',
+  queues: 'queues',
+  messages: 'messages',
+  channels: 'channels',
+  'email-log': 'email-log',
+} as const;
+
+export interface AdminTable {
+  section: AdminSection;
+  title: string;
+  columns: string[];
+  rows: string[][];
+  /** @minimum 0 */
+  total: number;
+}
+
+export interface AdminProjectReviewInput {
+  approved?: boolean;
+  hidden?: boolean;
+}
+
+export interface AdminProjectReview {
+  id: number;
+  approved: boolean;
+  hidden: boolean;
+}
+
+export interface AdminMessageReviewInput {
+  hidden: boolean;
+}
+
+export interface AdminMessageReview {
+  id: number;
+  hidden: boolean;
+}
+

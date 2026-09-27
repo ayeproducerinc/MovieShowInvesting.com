@@ -19,15 +19,15 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 2 — Data model and admin
 
-**Status:** not started  
+**Status:** in progress — data model, progress/price-group APIs, Firebase-protected admin UI and real-data sections are built; admin allowlist provisioning and sign-in gate verification remain.  
 **Deliverables:**
 
 - Extend the Phase 1 Visitor and Filmmaker tables and add Project, Investor, Pledge, InvestorMinimum, Message, FlowProgress, and EmailLog, including the fields specified in the Prompt Guide.
 - Progress-save API and one-time visitor price-group assignment.
-- Password-protected `/admin` with ten sections: Summary; Pledges by project; By location; Funnels; Market; Price test; Queues; Messages; Channels; Email log.
+- Firebase email-link sign-in brought forward for `/admin`, with Firebase ID tokens verified by the server and an explicitly provisioned admin allowlist. Ten sections: Summary; Pledges by project; By location; Funnels; Market; Price test; Queues; Messages; Channels; Email log.
 - CSV export for every admin table; approval and hide controls; real database counts.
 
-**Gate:** Visual Guide scenario S2 passes: wrong admin password is refused, empty sections show zeroes, and all CSV exports include headers.
+**Gate:** Adapted Visual Guide scenario S2 passes: a signed-out or non-admin Firebase user is refused, an authorized admin sees real zeroes in empty sections, and all CSV exports include headers. The original wrong-password step no longer applies because the owner chose Firebase sign-in instead.
 
 ## Phase 3 — Filmmaker flow
 
@@ -63,7 +63,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 **Deliverables:**
 
 - Mailjet email sending and logging.
-- Firebase email-link sign-in, private `/me` filmmaker page, and phone verification.
+- Reuse Phase 2 Firebase email-link sign-in for the private `/me` filmmaker page, and add phone verification.
 - Branded filmmaker submission emails with project/share links and the filmmaker Calendly link when opted in.
 - Ask-the-filmmaker relay with Turnstile, hashed answer tokens, email relay that does not expose either party’s email address, report link, and rate limits.
 - Unanswered questions first on `/me`; filmmaker can answer from `/me` or the private answer link.
@@ -144,7 +144,7 @@ These are recommendations, **not approved changes** to locked terms or permissio
 
 - Prompt 0 requires no credentials.
 - Before Phase 1: enable project PostgreSQL and provide the Firebase web configuration and Firebase service-account JSON. The project database supplies `DATABASE_URL`.
-- Before Phase 2: provide the admin password and configure the existing backend’s session secret (`SESSION_SECRET`).
+- Before the Phase 2 admin gate: enable Firebase email-link sign-in, authorize the app domain, and provide the admin's account identifier securely for the server allowlist. The previously supplied `ADMIN_PASSWORD` is not used.
 - Before Phase 4: provide Bunny Stream and Bunny Storage/CDN credentials and the site URL.
 - Before Phase 5: provide Mailjet credentials/sender and the filmmaker Calendly link.
 - Before Phase 6: provide Cloudflare Turnstile and analytics configuration; configure the production domain.

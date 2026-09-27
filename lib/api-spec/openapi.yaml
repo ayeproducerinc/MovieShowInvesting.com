@@ -12,6 +12,10 @@ tags:
     description: Health operations
   - name: site
     description: Public site setup and visitor tracking
+  - name: progress
+    description: Saved flow progress and visitor assignment
+  - name: admin
+    description: Firebase-protected administration
 paths:
   /healthz:
     get:
@@ -70,7 +74,170 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Visit"
+  /price-group:
+    get:
+      operationId: getPriceGroup
+      tags: [progress]
+      summary: Assign a visitor once to price-test group A or B
+      responses:
+        "200":
+          description: Persisted assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceGroup"
+  /progress/{flow}:
+    get:
+      operationId: getFlowProgress
+      tags: [progress]
+      summary: Read the current visitor's saved flow progress
+      parameters:
+        - in: path
+          name: flow
+          required: true
+          schema:
+            $ref: "#/components/schemas/Flow"
+      responses:
+        "200":
+          description: Saved progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowProgress"
+        "404":
+          description: No progress saved
+  /progress:
+    post:
+      operationId: saveFlowProgress
+      tags: [progress]
+      summary: Save the current visitor's in-progress answers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveProgressInput"
+      responses:
+        "200":
+          description: Saved progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlowProgress"
+        "400":
+          description: Invalid input or missing visitor
+  /admin/me:
+    get:
+      operationId: getAdminMe
+      tags: [admin]
+      summary: Check verified Firebase admin access
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Administrator identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminIdentity"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Not an admin
+        "503":
+          description: Admin account not provisioned
+  /admin/tables/{section}:
+    get:
+      operationId: getAdminTable
+      tags: [admin]
+      summary: Read one real-data admin table for display and CSV export
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: section
+          required: true
+          schema:
+            $ref: "#/components/schemas/AdminSection"
+      responses:
+        "200":
+          description: Table data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTable"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Not an admin
+  /admin/projects/{projectId}:
+    patch:
+      operationId: reviewAdminProject
+      tags: [admin]
+      summary: Approve or hide a project
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminProjectReviewInput"
+      responses:
+        "200":
+          description: Updated project moderation state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminProjectReview"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Not an admin
+        "404":
+          description: Project not found
+  /admin/messages/{messageId}:
+    patch:
+      operationId: reviewAdminMessage
+      tags: [admin]
+      summary: Hide or unhide a question
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: messageId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminMessageReviewInput"
+      responses:
+        "200":
+          description: Updated message moderation state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMessageReview"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Not an admin
+        "404":
+          description: Message not found
 components:
+  securitySchemes:
+    firebaseBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase ID token
   schemas:
     HealthStatus:
       type: object
@@ -106,4 +273,83 @@ components:
       required: [visitor_id]
       properties:
         visitor_id: { type: string }
+    PriceGroup:
+      type: object
+      required: [group]
+      properties:
+        group: { type: string, enum: [A, B] }
+    Flow:
+      type: string
+      enum: [filmmaker, investor]
+    SaveProgressInput:
+      type: object
+      required: [flow, last_screen, answers]
+      properties:
+        flow:
+          $ref: "#/components/schemas/Flow"
+        last_screen: { type: integer, minimum: 1, maximum: 6 }
+        answers:
+          type: object
+          additionalProperties: true
+        completed: { type: boolean }
+    FlowProgress:
+      type: object
+      required: [flow, last_screen, answers, completed, updated_at]
+      properties:
+        flow:
+          $ref: "#/components/schemas/Flow"
+        last_screen: { type: integer }
+        answers:
+          type: object
+          additionalProperties: true
+        completed: { type: boolean }
+        updated_at: { type: string, format: date-time }
+    AdminIdentity:
+      type: object
+      required: [email, role]
+      properties:
+        email: { type: string, format: email }
+        role: { type: string, enum: [admin] }
+    AdminSection:
+      type: string
+      enum: [summary, pledges, location, funnels, market, price-test, queues, messages, channels, email-log]
+    AdminTable:
+      type: object
+      required: [section, title, columns, rows, total]
+      properties:
+        section:
+          $ref: "#/components/schemas/AdminSection"
+        title: { type: string }
+        columns:
+          type: array
+          items: { type: string }
+        rows:
+          type: array
+          items:
+            type: array
+            items: { type: string }
+        total: { type: integer, minimum: 0 }
+    AdminProjectReviewInput:
+      type: object
+      properties:
+        approved: { type: boolean }
+        hidden: { type: boolean }
+    AdminProjectReview:
+      type: object
+      required: [id, approved, hidden]
+      properties:
+        id: { type: integer }
+        approved: { type: boolean }
+        hidden: { type: boolean }
+    AdminMessageReviewInput:
+      type: object
+      required: [hidden]
+      properties:
+        hidden: { type: boolean }
+    AdminMessageReview:
+      type: object
+      required: [id, hidden]
+      properties:
+        id: { type: integer }
+        hidden: { type: boolean }
 

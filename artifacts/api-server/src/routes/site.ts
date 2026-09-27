@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
 import cookieParser from "cookie-parser";
-import { count } from "drizzle-orm";
-import { db, filmmakersTable, visitorsTable } from "@workspace/db";
+import { getFilmmakerCount, recordVisitorAttribution } from "@workspace/db";
 import {
   GetFirebaseConfigResponse,
   GetSiteStatsResponse,
@@ -18,7 +17,7 @@ const ONE_YEAR = 365 * 24 * 60 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 router.get("/stats", async (_req, res): Promise<void> => {
-  const [{ filmmakers }] = await db.select({ filmmakers: count() }).from(filmmakersTable);
+  const filmmakers = await getFilmmakerCount();
   res.json(GetSiteStatsResponse.parse({ filmmakers }));
 });
 
@@ -44,13 +43,13 @@ router.post("/visit", async (req, res): Promise<void> => {
   const candidate = req.cookies?.[VISITOR_COOKIE];
   const visitorId = typeof candidate === "string" && UUID.test(candidate) ? candidate : randomUUID();
   const { utm_source, utm_medium, utm_campaign, ref } = parsed.data;
-  await db.insert(visitorsTable).values({
+  await recordVisitorAttribution({
     visitorId,
     utmSource: utm_source || null,
     utmMedium: utm_medium || null,
     utmCampaign: utm_campaign || null,
     refCodeUsed: ref || null,
-  }).onConflictDoNothing();
+  });
 
   res.cookie(VISITOR_COOKIE, visitorId, {
     maxAge: ONE_YEAR,

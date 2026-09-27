@@ -62,6 +62,7 @@ These product rules are locked for the MVP. Change them only when the owner expl
 - Use the existing project’s React/Vite frontend and Express API with PostgreSQL/Drizzle. Do not add a Flask server or a second API server.
 - Keep the API contract OpenAPI-first and use the generated client/schema packages already in the project.
 - Firebase is for authentication only: email-link sign-in and phone verification. Store all other application data in PostgreSQL.
+- The admin area uses Firebase email-link sign-in with a server-verified admin allowlist, not a separate admin password. A valid Firebase login alone does not grant admin access. The previously supplied admin password is unused.
 - Use Replit Secrets for credentials and environment-specific configuration; never put secret values in source files or ask the user to paste them into chat.
 - Save flow progress as the user proceeds so funnel drop-off and pricing answers can be analyzed.
 

@@ -65,3 +65,121 @@ export const RecordVisitResponse = zod.object({
 })
 
 
+/**
+ * @summary Assign a visitor once to price-test group A or B
+ */
+export const GetPriceGroupResponse = zod.object({
+  "group": zod.enum(['A', 'B'])
+})
+
+
+/**
+ * @summary Read the current visitor's saved flow progress
+ */
+export const GetFlowProgressParams = zod.object({
+  "flow": zod.enum(['filmmaker', 'investor'])
+})
+
+export const GetFlowProgressResponse = zod.object({
+  "flow": zod.enum(['filmmaker', 'investor']),
+  "last_screen": zod.number().int(),
+  "answers": zod.record(zod.string(), zod.unknown()),
+  "completed": zod.boolean(),
+  "updated_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Save the current visitor's in-progress answers
+ */
+export const saveFlowProgressBodyLastScreenMax = 6;
+
+
+
+export const SaveFlowProgressBody = zod.object({
+  "flow": zod.enum(['filmmaker', 'investor']),
+  "last_screen": zod.number().int().min(1).max(saveFlowProgressBodyLastScreenMax),
+  "answers": zod.record(zod.string(), zod.unknown()),
+  "completed": zod.boolean().optional()
+})
+
+export const SaveFlowProgressResponse = zod.object({
+  "flow": zod.enum(['filmmaker', 'investor']),
+  "last_screen": zod.number().int(),
+  "answers": zod.record(zod.string(), zod.unknown()),
+  "completed": zod.boolean(),
+  "updated_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Check verified Firebase admin access
+ */
+export const GetAdminMeResponse = zod.object({
+  "email": zod.string().email(),
+  "role": zod.enum(['admin'])
+})
+
+
+/**
+ * @summary Read one real-data admin table for display and CSV export
+ */
+export const GetAdminTableParams = zod.object({
+  "section": zod.enum(['summary', 'pledges', 'location', 'funnels', 'market', 'price-test', 'queues', 'messages', 'channels', 'email-log'])
+})
+
+export const getAdminTableResponseTotalMin = 0;
+
+
+
+export const GetAdminTableResponse = zod.object({
+  "section": zod.enum(['summary', 'pledges', 'location', 'funnels', 'market', 'price-test', 'queues', 'messages', 'channels', 'email-log']),
+  "title": zod.string(),
+  "columns": zod.array(zod.string()),
+  "rows": zod.array(zod.array(zod.string())),
+  "total": zod.number().int().min(getAdminTableResponseTotalMin)
+})
+
+
+/**
+ * @summary Approve or hide a project
+ */
+
+
+
+export const ReviewAdminProjectParams = zod.object({
+  "projectId": zod.coerce.number().int().min(1)
+})
+
+export const ReviewAdminProjectBody = zod.object({
+  "approved": zod.boolean().optional(),
+  "hidden": zod.boolean().optional()
+})
+
+export const ReviewAdminProjectResponse = zod.object({
+  "id": zod.number().int(),
+  "approved": zod.boolean(),
+  "hidden": zod.boolean()
+})
+
+
+/**
+ * @summary Hide or unhide a question
+ */
+
+
+
+export const ReviewAdminMessageParams = zod.object({
+  "messageId": zod.coerce.number().int().min(1)
+})
+
+export const ReviewAdminMessageBody = zod.object({
+  "hidden": zod.boolean()
+})
+
+export const ReviewAdminMessageResponse = zod.object({
+  "id": zod.number().int(),
+  "hidden": zod.boolean()
+})
+
+
