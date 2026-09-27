@@ -1,4 +1,4 @@
-import { boolean, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { visitorsTable } from "./visitors";
@@ -24,7 +24,9 @@ export const filmmakersTable = pgTable("filmmakers", {
   reachedGoal: boolean("reached_goal"),
   fundingExperience: text("funding_experience"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("filmmakers_firebase_uid_idx").on(table.firebaseUid),
+]);
 
 export const insertFilmmakerSchema = createInsertSchema(filmmakersTable).omit({
   id: true,

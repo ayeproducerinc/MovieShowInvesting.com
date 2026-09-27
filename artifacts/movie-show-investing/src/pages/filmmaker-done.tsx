@@ -3,6 +3,7 @@ import { ArrowRight, Check, RotateCcw } from 'lucide-react';
 import { Link } from 'wouter';
 import { getGetFilmmakerResultQueryKey, useGetFilmmakerResult, useUpdateFilmmakerShowcase } from '@workspace/api-client-react';
 import type { FilmmakerResult, FilmmakerShowcaseUpdate } from '@workspace/api-client-react';
+import { useFirebaseSessionReady } from '@/components/firebase-bootstrap';
 import { ProjectShare } from '@/components/project-share';
 import { FilmmakerMedia } from '@/components/filmmaker-media';
 import { calculateDeal, money, phase, type Stage } from './filmmaker-calculator';
@@ -18,7 +19,7 @@ function validLinks(value: string) {
 }
 
 function ShowcaseForm({ result, onSaved }: { result: FilmmakerResult; onSaved: () => void }) {
-  const update = useUpdateFilmmakerShowcase();
+  const update = useUpdateFilmmakerShowcase({ request: { headers: result.project_id ? { 'X-MSI-Project-Id': String(result.project_id) } : {} } });
   const [synopsis, setSynopsis] = useState(result.synopsis || '');
   const [links, setLinks] = useState(result.team_links.join('\n'));
   const [moneyUse, setMoneyUse] = useState(result.money_use || '');
@@ -71,7 +72,8 @@ function safeTrailerUrl(value: string) {
 }
 
 export default function FilmmakerDone() {
-  const result = useGetFilmmakerResult({ query: { queryKey: getGetFilmmakerResultQueryKey(), retry: (count, error) => error.status !== 404 && count < 2 } });
+  const authReady = useFirebaseSessionReady();
+  const result = useGetFilmmakerResult({ query: { queryKey: getGetFilmmakerResultQueryKey(), enabled: authReady, retry: (count, error) => error.status !== 404 && count < 2 } });
   const data = result.data;
   useEffect(() => {
     if (data?.completed) sessionStorage.removeItem('filmmaker-submitted-no-project');
@@ -79,7 +81,7 @@ export default function FilmmakerDone() {
   if (result.isLoading) return <section className="dossier"><div className="page-wrap dossier-hero" aria-label="Loading your saved submission"><p className="dossier-kicker">Retrieving your submission</p><div className="dossier-skeleton" style={{ width: 'min(90%, 660px)', height: 95 }} /><div className="dossier-skeleton" style={{ width: 'min(60%, 420px)' }} /></div></section>;
   if (result.isError && result.error?.status !== 404) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Connection interrupted</p><h1 className="dossier-title">Your story is <em>still here.</em></h1><p className="dossier-lead" role="alert">We couldn’t retrieve your saved submission right now. Please try again.</p><button type="button" className="dossier-button" data-testid="button-retry-result" style={{ marginTop: 30 }} onClick={() => void result.refetch()}><RotateCcw size={16}/> Try again</button></div></section>;
   if (!data?.completed) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Filmmaker worksheet</p><h1 className="dossier-title">The beginning<br/><em>comes first.</em></h1><p className="dossier-lead">There’s no completed submission attached to this visit. Open the worksheet to get started or continue your saved answers.</p><Link href="/start/filmmaker" data-testid="link-return-to-worksheet" className="dossier-button" style={{ marginTop: 32 }}>Open the worksheet <ArrowRight size={17}/></Link></div></section>;
-  if (data.no_project_yet) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker"><Check size={15} style={{ display: 'inline', marginRight: 9 }}/> Answers received / No project yet</p><h1 className="dossier-title" data-testid="text-confirmation">There’s room<br/><em>for what’s next.</em></h1><p className="dossier-lead">We received your contact details and your interest in participating in the future. No project or deal terms were submitted.</p><div className="dossier-notice" style={{ maxWidth: 680, marginTop: 42 }}>We’re still building this experience. There’s no investment available or money collected here today. If there’s a relevant next step, we’ll reach out using the information you shared.</div><Link href="/" data-testid="link-done-home" className="dossier-button" style={{ marginTop: 38 }}>Back to the site <ArrowRight size={17}/></Link></div></section>;
+  if (data.no_project_yet) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker"><Check size={15} style={{ display: 'inline', marginRight: 9 }}/> Answers received / No project yet</p><h1 className="dossier-title" data-testid="text-confirmation">There’s room<br/><em>for what’s next.</em></h1><p className="dossier-lead">We received your contact details and your interest in participating in the future. No project or deal terms were submitted.</p><div className="dossier-notice" style={{ maxWidth: 680, marginTop: 42 }}>We’re still building this experience. There’s no investment available or money collected here today. If there’s a relevant next step, we’ll reach out using the information you shared.</div><div className="dossier-actions" style={{ marginTop: 38 }}><Link href="/me/projects" data-testid="link-start-another-project" className="dossier-button">Start a project <ArrowRight size={17}/></Link><Link href="/" data-testid="link-done-home" className="dossier-button dossier-button-outline">Back to the site <ArrowRight size={17}/></Link></div></div></section>;
   const stage = (['distribution', 'production', 'idea', 'other'].includes(data.stage || '') ? data.stage : 'other') as Stage;
   const deal = data.budget && data.offer_per100 && data.price_group ? calculateDeal(data.budget, stage, data.price_group, data.offer_per100) : null;
   return <section className="dossier"><div className="page-wrap">
@@ -100,7 +102,7 @@ export default function FilmmakerDone() {
         {data.project_slug && !data.hidden && <ShowcaseForm key={data.project_slug} result={data} onSaved={() => void result.refetch()} />}
         {data.project_slug && !data.hidden && <FilmmakerMedia result={data} onSaved={() => void result.refetch()} />}
       </div>
-      <aside className="dossier-side"><div className="dossier-sticky"><div className="dossier-dark"><span className="dossier-kicker">Where things stand</span><div className="dossier-value" data-testid="status-project-review">{data.hidden ? 'Hidden.' : data.approved ? 'Approved.' : data.showcase_requested ? 'In review.' : 'Unlisted.'}</div><p>{data.hidden ? 'This project page is unavailable. Contact us if you believe this is an error.' : data.approved ? 'Showcase review is approved. The page is still viewable by anyone with its link.' : data.showcase_requested ? 'Your showcase request is pending review. The project page can still be viewed by anyone with the link.' : 'Your project page is accessible to anyone with its link, but it is not listed for discovery.'}</p><p className="dossier-line">Filmmakers are here first. Investor signup and pledges open later, after approved projects are available. No money is collected now.</p></div><p className="dossier-status">Keep this page bookmarked to revisit your saved submission and edit showcase details.</p></div></aside>
+       <aside className="dossier-side"><div className="dossier-sticky"><div className="dossier-dark"><span className="dossier-kicker">Where things stand</span><div className="dossier-value" data-testid="status-project-review">{data.hidden ? 'Hidden.' : data.approved ? 'Approved.' : data.showcase_requested ? 'In review.' : 'Unlisted.'}</div><p>{data.hidden ? 'This project page is unavailable. Contact us if you believe this is an error.' : data.approved ? 'Showcase review is approved. The page is still viewable by anyone with the link.' : data.showcase_requested ? 'Your showcase request is pending review. The project page can still be viewed by anyone with the link.' : 'Your project page is accessible to anyone with its link, but it is not listed for discovery.'}</p><p className="dossier-line">Filmmakers are here first. Investor signup and pledges open later, after approved projects are available. No money is collected now.</p></div><Link href="/me/projects" data-testid="link-start-another-project" className="dossier-button" style={{ marginTop: 22 }}>Start another project <ArrowRight size={17}/></Link><p className="dossier-status">Your saved projects will be available after email sign-in. Keep this page bookmarked until you connect your account.</p></div></aside>
     </div>
   </div></section>;
 }

@@ -27,8 +27,13 @@ import type {
   AdminProjectReviewInput,
   AdminSection,
   AdminTable,
+  FilmmakerAccountLeave,
+  FilmmakerDraftState,
   FilmmakerImageUpload,
   FilmmakerMediaConfig,
+  FilmmakerProjectClaim,
+  FilmmakerProjectSelection,
+  FilmmakerProjects,
   FilmmakerResult,
   FilmmakerShowcase,
   FilmmakerShowcaseUpdate,
@@ -567,6 +572,7 @@ export const getGetFlowProgressUrl = (flow: Flow,) => {
 }
 
 /**
+ * Unlinked visitor progress remains cookie-accessible. A filmmaker visitor linked to Firebase UID requires a verified Bearer token matching that UID.
  * @summary Read the current visitor's saved flow progress
  */
 export const getFlowProgress = async (flow: Flow, options?: Parameters<typeof customFetch>[1]): Promise<FlowProgress> => {
@@ -644,6 +650,7 @@ export const getSaveFlowProgressUrl = () => {
 }
 
 /**
+ * Unlinked visitor progress remains cookie-accessible. A filmmaker visitor linked to Firebase UID requires a verified Bearer token matching that UID; investor progress keeps its existing behavior.
  * @summary Save the current visitor's in-progress answers
  */
 export const saveFlowProgress = async (saveProgressInput: SaveProgressInput, options?: Parameters<typeof customFetch>[1]): Promise<FlowProgress> => {
@@ -732,6 +739,7 @@ export const getSubmitFilmmakerUrl = () => {
 }
 
 /**
+ * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID.
  * @summary Submit the filmmaker flow
  */
 export const submitFilmmaker = async (filmmakerSubmissionInput: FilmmakerSubmissionInput, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerSubmission> => {
@@ -820,6 +828,7 @@ export const getGetFilmmakerResultUrl = () => {
 }
 
 /**
+ * Unlinked guest results remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
  * @summary Read the current visitor's completed filmmaker result
  */
 export const getFilmmakerResult = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerResult> => {
@@ -888,6 +897,457 @@ export function useGetFilmmakerResult<TData = Awaited<ReturnType<typeof getFilmm
 
 
 
+export const getGetFilmmakerProjectsUrl = () => {
+
+
+
+
+  return `/api/filmmakers/projects`
+}
+
+/**
+ * Requires a verified Firebase account token. Project ownership is based on linked Firebase UID, never the submitted email alone.
+ * @summary List projects and draft state for the signed-in filmmaker
+ */
+export const getFilmmakerProjects = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerProjects> => {
+
+  return customFetch<FilmmakerProjects>(getGetFilmmakerProjectsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFilmmakerProjectsQueryKey = () => {
+    return [
+    `/api/filmmakers/projects`
+    ] as const;
+    }
+
+
+export const getGetFilmmakerProjectsQueryOptions = <TData = Awaited<ReturnType<typeof getFilmmakerProjects>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFilmmakerProjectsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFilmmakerProjects>>> = ({ signal }) => getFilmmakerProjects({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjects>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFilmmakerProjectsQueryResult = NonNullable<Awaited<ReturnType<typeof getFilmmakerProjects>>>
+export type GetFilmmakerProjectsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List projects and draft state for the signed-in filmmaker
+ */
+
+export function useGetFilmmakerProjects<TData = Awaited<ReturnType<typeof getFilmmakerProjects>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFilmmakerProjectsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getClaimFilmmakerProjectUrl = () => {
+
+
+
+
+  return `/api/filmmakers/projects/claim`
+}
+
+/**
+ * Requires the current visitor cookie. A completed legacy submission can only be claimed if its stored email matches the verified account email and it is not linked to another UID. A non-empty unlinked guest draft cannot be claimed while a different active draft exists for the account; the guest cookie and answers are preserved on conflict.
+ * @summary Link the current visitor draft or legacy submission to a verified account
+ */
+export const claimFilmmakerProject = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerProjectClaim> => {
+
+  return customFetch<FilmmakerProjectClaim>(getClaimFilmmakerProjectUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getClaimFilmmakerProjectMutationKey = () => ['claimFilmmakerProject'] as const;
+
+export const getClaimFilmmakerProjectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimFilmmakerProject>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimFilmmakerProject>>, TError,void, TContext> => {
+
+const mutationKey = getClaimFilmmakerProjectMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimFilmmakerProject>>, void> = () => {
+
+
+          return  claimFilmmakerProject(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimFilmmakerProjectMutationResult = NonNullable<Awaited<ReturnType<typeof claimFilmmakerProject>>>
+
+    export type ClaimFilmmakerProjectMutationError = ErrorType<void>
+
+
+    /**
+ * @summary Link the current visitor draft or legacy submission to a verified account
+ */
+export const useClaimFilmmakerProject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimFilmmakerProject>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimFilmmakerProject>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClaimFilmmakerProjectMutationOptions(options));
+    }
+
+export const getStartFilmmakerProjectUrl = () => {
+
+
+
+
+  return `/api/filmmakers/projects/start`
+}
+
+/**
+ * Preserves earlier projects, copies the account's stable price-test group, and rotates the httpOnly visitor cookie to the account draft. An unclaimed completed legacy result must be claimed before starting. A non-empty guest draft is left untouched and returns 409 when the account already has another active draft.
+ * @summary Create or resume the account's single active filmmaker draft
+ */
+export const startFilmmakerProject = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerDraftState> => {
+
+  return customFetch<FilmmakerDraftState>(getStartFilmmakerProjectUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getStartFilmmakerProjectMutationKey = () => ['startFilmmakerProject'] as const;
+
+export const getStartFilmmakerProjectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startFilmmakerProject>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startFilmmakerProject>>, TError,void, TContext> => {
+
+const mutationKey = getStartFilmmakerProjectMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startFilmmakerProject>>, void> = () => {
+
+
+          return  startFilmmakerProject(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartFilmmakerProjectMutationResult = NonNullable<Awaited<ReturnType<typeof startFilmmakerProject>>>
+
+    export type StartFilmmakerProjectMutationError = ErrorType<void>
+
+
+    /**
+ * @summary Create or resume the account's single active filmmaker draft
+ */
+export const useStartFilmmakerProject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startFilmmakerProject>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startFilmmakerProject>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getStartFilmmakerProjectMutationOptions(options));
+    }
+
+export const getResumeFilmmakerProjectUrl = () => {
+
+
+
+
+  return `/api/filmmakers/projects/resume`
+}
+
+/**
+ * @summary Restore the signed-in filmmaker's active draft visitor cookie
+ */
+export const resumeFilmmakerProject = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerDraftState> => {
+
+  return customFetch<FilmmakerDraftState>(getResumeFilmmakerProjectUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getResumeFilmmakerProjectMutationKey = () => ['resumeFilmmakerProject'] as const;
+
+export const getResumeFilmmakerProjectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resumeFilmmakerProject>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resumeFilmmakerProject>>, TError,void, TContext> => {
+
+const mutationKey = getResumeFilmmakerProjectMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resumeFilmmakerProject>>, void> = () => {
+
+
+          return  resumeFilmmakerProject(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResumeFilmmakerProjectMutationResult = NonNullable<Awaited<ReturnType<typeof resumeFilmmakerProject>>>
+
+    export type ResumeFilmmakerProjectMutationError = ErrorType<void>
+
+
+    /**
+ * @summary Restore the signed-in filmmaker's active draft visitor cookie
+ */
+export const useResumeFilmmakerProject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resumeFilmmakerProject>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resumeFilmmakerProject>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getResumeFilmmakerProjectMutationOptions(options));
+    }
+
+export const getLeaveFilmmakerAccountUrl = () => {
+
+
+
+
+  return `/api/filmmakers/projects/leave`
+}
+
+/**
+ * Requires a verified Firebase account. Rotates the cookie only when its visitor is linked to this Firebase UID. Preserves unclaimed guest or another account's visitor cookie without deleting or modifying any project or draft.
+ * @summary Rotate the current project visitor cookie before account sign-out
+ */
+export const leaveFilmmakerAccount = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerAccountLeave> => {
+
+  return customFetch<FilmmakerAccountLeave>(getLeaveFilmmakerAccountUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getLeaveFilmmakerAccountMutationKey = () => ['leaveFilmmakerAccount'] as const;
+
+export const getLeaveFilmmakerAccountMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveFilmmakerAccount>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof leaveFilmmakerAccount>>, TError,void, TContext> => {
+
+const mutationKey = getLeaveFilmmakerAccountMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof leaveFilmmakerAccount>>, void> = () => {
+
+
+          return  leaveFilmmakerAccount(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LeaveFilmmakerAccountMutationResult = NonNullable<Awaited<ReturnType<typeof leaveFilmmakerAccount>>>
+
+    export type LeaveFilmmakerAccountMutationError = ErrorType<void>
+
+
+    /**
+ * @summary Rotate the current project visitor cookie before account sign-out
+ */
+export const useLeaveFilmmakerAccount = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveFilmmakerAccount>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof leaveFilmmakerAccount>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLeaveFilmmakerAccountMutationOptions(options));
+    }
+
+export const getSelectFilmmakerProjectUrl = (projectId: number,) => {
+
+
+
+
+  return `/api/filmmakers/projects/${projectId}/select`
+}
+
+/**
+ * @summary Select an account-owned project for the existing visitor-scoped editing routes
+ */
+export const selectFilmmakerProject = async (projectId: number, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerProjectSelection> => {
+
+  return customFetch<FilmmakerProjectSelection>(getSelectFilmmakerProjectUrl(projectId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSelectFilmmakerProjectMutationKey = () => ['selectFilmmakerProject'] as const;
+
+export const getSelectFilmmakerProjectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof selectFilmmakerProject>>, TError,SelectFilmmakerProjectMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof selectFilmmakerProject>>, TError,SelectFilmmakerProjectMutationVariables, TContext> => {
+
+const mutationKey = getSelectFilmmakerProjectMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof selectFilmmakerProject>>, SelectFilmmakerProjectMutationVariables> = (props) => {
+          const {projectId} = props ?? {};
+
+          return  selectFilmmakerProject(projectId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SelectFilmmakerProjectMutationResult = NonNullable<Awaited<ReturnType<typeof selectFilmmakerProject>>>
+
+    export type SelectFilmmakerProjectMutationError = ErrorType<void>
+    export type SelectFilmmakerProjectMutationVariables = {projectId: number}
+
+    /**
+ * @summary Select an account-owned project for the existing visitor-scoped editing routes
+ */
+export const useSelectFilmmakerProject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof selectFilmmakerProject>>, TError,SelectFilmmakerProjectMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof selectFilmmakerProject>>,
+        TError,
+        SelectFilmmakerProjectMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSelectFilmmakerProjectMutationOptions(options));
+    }
+
 export const getUpdateFilmmakerShowcaseUrl = () => {
 
 
@@ -897,6 +1357,7 @@ export const getUpdateFilmmakerShowcaseUrl = () => {
 }
 
 /**
+ * Unlinked guest visits remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
  * @summary Request showcase and update the current visitor's project showcase details
  */
 export const updateFilmmakerShowcase = async (filmmakerShowcaseUpdate: FilmmakerShowcaseUpdate, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerShowcase> => {
@@ -1062,6 +1523,7 @@ export const getUploadFilmmakerTrailerUrl = () => {
 }
 
 /**
+ * Unlinked guest uploads remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
  * @summary Bounded streaming upload of a trailer to Bunny Stream for the visitor-owned project
  */
 export const uploadFilmmakerTrailer = async (uploadFilmmakerTrailerBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerTrailerUpload> => {
@@ -1157,6 +1619,7 @@ export const getUploadFilmmakerImageUrl = (params: UploadFilmmakerImageParams,) 
 }
 
 /**
+ * Unlinked guest uploads remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
  * @summary Upload an owned poster or share image to Bunny Storage
  */
 export const uploadFilmmakerImage = async (uploadFilmmakerImageBody: Blob,

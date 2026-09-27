@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { and, count, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import pg from "pg";
 import * as schema from "./schema";
 import {
   flowProgressTable,
+  filmmakerAccountVisitorsTable,
   filmmakersTable,
   projectsTable,
   visitorsTable,
@@ -47,7 +48,12 @@ export async function recordVisitorAttribution(input: {
 }
 
 export async function getFilmmakerCount(): Promise<number> {
-  const [result] = await db.select({ total: count() }).from(schema.filmmakersTable);
+  const [result] = await db.select({
+    total: sql<number>`count(distinct case
+      when ${filmmakersTable.firebaseUid} is not null then 'uid:' || ${filmmakersTable.firebaseUid}
+      else 'filmmaker:' || ${filmmakersTable.id}::text
+    end)::int`,
+  }).from(filmmakersTable);
   return result.total;
 }
 
@@ -171,8 +177,43 @@ export class FilmmakerSubmissionError extends Error {
   }
 }
 
+export type FilmmakerAccountErrorCode =
+  | "visitor_not_found"
+  | "visitor_owned_by_another_account"
+  | "verified_email_mismatch"
+  | "account_draft_conflict"
+  | "completed_submission_unclaimed"
+  | "submission_not_found"
+  | "draft_not_found"
+  | "project_not_found";
+
+export class FilmmakerAccountError extends Error {
+  constructor(readonly code: FilmmakerAccountErrorCode, message: string) {
+    super(message);
+    this.name = "FilmmakerAccountError";
+  }
+}
+
+function normalizedEmail(value: string | null | undefined): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function storedSubmissionReference(answers: Record<string, unknown>): {
+  filmmakerId: number;
+  projectId: number | null;
+} | null {
+  const stored = answers._submission;
+  if (!stored || typeof stored !== "object") return null;
+  const submission = stored as { filmmaker_id?: unknown; project_id?: unknown };
+  if (typeof submission.filmmaker_id !== "number"
+    || (submission.project_id !== null && typeof submission.project_id !== "number")) return null;
+  return { filmmakerId: submission.filmmaker_id, projectId: submission.project_id };
+}
+
 export async function createFilmmakerSubmission(input: {
   visitorId: string;
+  firebaseUid?: string;
+  firebaseEmail?: string;
   data: FilmmakerSubmissionData;
 }): Promise<{ filmmakerId: number; projectId: number | null }> {
   return db.transaction(async (tx) => {
@@ -181,6 +222,20 @@ export async function createFilmmakerSubmission(input: {
       .for("update");
     if (!visitor) {
       throw new FilmmakerSubmissionError("Visitor must be recorded before submitting.");
+    }
+    const [accountLink] = await tx.select().from(filmmakerAccountVisitorsTable)
+      .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId))
+      .for("update");
+    if (accountLink && accountLink.firebaseUid !== input.firebaseUid) {
+      throw new FilmmakerSubmissionError("This visitor is linked to a different filmmaker account.");
+    }
+    const verifiedEmailMatchesContact = Boolean(
+      input.firebaseUid
+      && input.firebaseEmail
+      && normalizedEmail(input.firebaseEmail) === normalizedEmail(input.data.email),
+    );
+    if (accountLink && !verifiedEmailMatchesContact) {
+      throw new FilmmakerSubmissionError("The verified account email must match the submitted contact email.");
     }
     if (!input.data.no_project_yet && visitor.priceGroup !== "A" && visitor.priceGroup !== "B") {
       throw new FilmmakerSubmissionError("A price group is required before project submission.");
@@ -191,31 +246,43 @@ export async function createFilmmakerSubmission(input: {
       eq(flowProgressTable.flow, "filmmaker"),
     ));
     if (existingProgress?.completed) {
-      const stored = existingProgress.answers._submission;
-      if (stored && typeof stored === "object") {
-        const submission = stored as { filmmaker_id?: unknown; project_id?: unknown };
-        if (typeof submission.filmmaker_id === "number"
-          && (submission.project_id === null || typeof submission.project_id === "number")) {
-          const [priorFilmmaker] = await tx.select({ id: filmmakersTable.id })
-            .from(filmmakersTable)
-            .where(and(
-              eq(filmmakersTable.id, submission.filmmaker_id),
-              eq(filmmakersTable.visitorId, input.visitorId),
-            ));
-          const [priorProject] = submission.project_id === null
-            ? [undefined]
-            : await tx.select({ id: projectsTable.id }).from(projectsTable).where(and(
-              eq(projectsTable.id, submission.project_id),
-              eq(projectsTable.filmmakerId, submission.filmmaker_id),
-            ));
-          if (priorFilmmaker && (submission.project_id === null || priorProject)) {
-            return {
-              filmmakerId: priorFilmmaker.id,
-              projectId: priorProject?.id ?? null,
-            };
-          }
-        }
+      const reference = storedSubmissionReference(existingProgress.answers);
+      if (!reference) {
+        throw new FilmmakerSubmissionError("A completed submission already exists and cannot be replaced.");
       }
+      const [priorFilmmaker] = await tx.select({ id: filmmakersTable.id })
+        .from(filmmakersTable)
+        .where(and(
+          eq(filmmakersTable.id, reference.filmmakerId),
+          eq(filmmakersTable.visitorId, input.visitorId),
+        ));
+      const [priorProject] = reference.projectId === null
+        ? [undefined]
+        : await tx.select({ id: projectsTable.id }).from(projectsTable).where(and(
+          eq(projectsTable.id, reference.projectId),
+          eq(projectsTable.filmmakerId, reference.filmmakerId),
+        ));
+      if (!priorFilmmaker || (reference.projectId !== null && !priorProject)) {
+        throw new FilmmakerSubmissionError("A completed submission already exists and cannot be replaced.");
+      }
+      return {
+        filmmakerId: priorFilmmaker.id,
+        projectId: priorProject?.id ?? null,
+      };
+    }
+
+    let accountUid = accountLink?.firebaseUid ?? null;
+    if (verifiedEmailMatchesContact && input.firebaseUid && !accountLink) {
+      await tx.insert(filmmakerAccountVisitorsTable).values({
+        visitorId: input.visitorId,
+        firebaseUid: input.firebaseUid,
+      }).onConflictDoNothing();
+      const [linked] = await tx.select().from(filmmakerAccountVisitorsTable)
+        .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId));
+      if (!linked || linked.firebaseUid !== input.firebaseUid) {
+        throw new FilmmakerSubmissionError("This visitor is linked to a different filmmaker account.");
+      }
+      accountUid = linked.firebaseUid;
     }
 
     const [filmmaker] = await tx.insert(filmmakersTable).values({
@@ -229,6 +296,7 @@ export async function createFilmmakerSubmission(input: {
       chatOptIn: input.data.chat_opt_in,
       noProjectYet: input.data.no_project_yet,
       visitorId: input.visitorId,
+      firebaseUid: accountUid,
       fundingSources: input.data.funding_sources,
       fundingOther: input.data.funding_other,
       reachedGoal: input.data.reached_goal,
@@ -295,6 +363,324 @@ export async function createFilmmakerSubmission(input: {
 
     return { filmmakerId: filmmaker.id, projectId };
   });
+}
+
+export async function claimFilmmakerVisitor(input: {
+  visitorId: string;
+  firebaseUid: string;
+  verifiedEmail: string;
+}): Promise<{ submissionClaimed: boolean; projectId: number | null }> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.firebaseUid}))`);
+    const [visitor] = await tx.select().from(visitorsTable)
+      .where(eq(visitorsTable.visitorId, input.visitorId))
+      .for("update");
+    if (!visitor) {
+      throw new FilmmakerAccountError("visitor_not_found", "The current visitor record was not found.");
+    }
+
+    const [existingLink] = await tx.select().from(filmmakerAccountVisitorsTable)
+      .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId))
+      .for("update");
+    if (existingLink && existingLink.firebaseUid !== input.firebaseUid) {
+      throw new FilmmakerAccountError("visitor_owned_by_another_account", "This project belongs to a different filmmaker account.");
+    }
+
+    const [progress] = await tx.select().from(flowProgressTable).where(and(
+      eq(flowProgressTable.visitorId, input.visitorId),
+      eq(flowProgressTable.flow, "filmmaker"),
+    )).for("update");
+
+    if (!existingLink && !progress?.completed && Object.keys(progress?.answers ?? {}).length > 0) {
+      const [activeDraft] = await tx.select({ visitorId: filmmakerAccountVisitorsTable.visitorId })
+        .from(filmmakerAccountVisitorsTable)
+        .innerJoin(flowProgressTable, and(
+          eq(flowProgressTable.visitorId, filmmakerAccountVisitorsTable.visitorId),
+          eq(flowProgressTable.flow, "filmmaker"),
+          eq(flowProgressTable.completed, false),
+        ))
+        .where(and(
+          eq(filmmakerAccountVisitorsTable.firebaseUid, input.firebaseUid),
+          ne(filmmakerAccountVisitorsTable.visitorId, input.visitorId),
+        ))
+        .limit(1);
+      if (activeDraft) {
+        throw new FilmmakerAccountError(
+          "account_draft_conflict",
+          "This browser has an unfinished guest draft, and this account already has a different active draft. Resume the account draft or resolve the guest draft before claiming it.",
+        );
+      }
+    }
+
+    let submissionClaimed = false;
+    let projectId: number | null = null;
+    if (progress?.completed) {
+      const reference = storedSubmissionReference(progress.answers);
+      if (!reference) {
+        throw new FilmmakerAccountError("submission_not_found", "The completed submission could not be verified.");
+      }
+      const [filmmaker] = await tx.select().from(filmmakersTable).where(and(
+        eq(filmmakersTable.id, reference.filmmakerId),
+        eq(filmmakersTable.visitorId, input.visitorId),
+      )).for("update");
+      if (!filmmaker) {
+        throw new FilmmakerAccountError("submission_not_found", "The completed submission could not be verified.");
+      }
+      if (filmmaker.firebaseUid && filmmaker.firebaseUid !== input.firebaseUid) {
+        throw new FilmmakerAccountError("visitor_owned_by_another_account", "This project belongs to a different filmmaker account.");
+      }
+      if (normalizedEmail(filmmaker.email) !== normalizedEmail(input.verifiedEmail)) {
+        throw new FilmmakerAccountError("verified_email_mismatch", "The verified account email must match the email on the existing submission.");
+      }
+      if (reference.projectId !== null) {
+        const [project] = await tx.select({ id: projectsTable.id }).from(projectsTable).where(and(
+          eq(projectsTable.id, reference.projectId),
+          eq(projectsTable.filmmakerId, filmmaker.id),
+        ));
+        if (!project) {
+          throw new FilmmakerAccountError("submission_not_found", "The completed submission could not be verified.");
+        }
+      } else if (!filmmaker.noProjectYet) {
+        throw new FilmmakerAccountError("submission_not_found", "The completed submission could not be verified.");
+      }
+      if (filmmaker.firebaseUid !== input.firebaseUid) {
+        await tx.update(filmmakersTable).set({ firebaseUid: input.firebaseUid })
+          .where(eq(filmmakersTable.id, filmmaker.id));
+      }
+      submissionClaimed = true;
+      projectId = reference.projectId;
+    }
+
+    if (!existingLink) {
+      await tx.insert(filmmakerAccountVisitorsTable).values({
+        visitorId: input.visitorId,
+        firebaseUid: input.firebaseUid,
+      }).onConflictDoNothing();
+      const [linked] = await tx.select().from(filmmakerAccountVisitorsTable)
+        .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId));
+      if (!linked || linked.firebaseUid !== input.firebaseUid) {
+        throw new FilmmakerAccountError("visitor_owned_by_another_account", "This project belongs to a different filmmaker account.");
+      }
+    }
+
+    return { submissionClaimed, projectId };
+  });
+}
+
+export async function getFilmmakerAccountVisitorUid(visitorId: string): Promise<string | null> {
+  const [link] = await db.select({ firebaseUid: filmmakerAccountVisitorsTable.firebaseUid })
+    .from(filmmakerAccountVisitorsTable)
+    .where(eq(filmmakerAccountVisitorsTable.visitorId, visitorId))
+    .limit(1);
+  return link?.firebaseUid ?? null;
+}
+
+export async function listFilmmakerAccountProjects(firebaseUid: string): Promise<{
+  projects: Array<{
+    id: number;
+    slug: string | null;
+    title: string | null;
+    reviewState: "pending" | "approved" | "hidden";
+    createdAt: Date;
+  }>;
+  hasResumableDraft: boolean;
+}> {
+  const projects = await db.select({
+    id: projectsTable.id,
+    slug: projectsTable.slug,
+    title: projectsTable.title,
+    approved: projectsTable.approved,
+    hidden: projectsTable.hidden,
+    createdAt: projectsTable.createdAt,
+  }).from(projectsTable)
+    .innerJoin(filmmakersTable, eq(projectsTable.filmmakerId, filmmakersTable.id))
+    .where(eq(filmmakersTable.firebaseUid, firebaseUid))
+    .orderBy(desc(projectsTable.createdAt), desc(projectsTable.id));
+
+  const [draft] = await db.select({ visitorId: filmmakerAccountVisitorsTable.visitorId })
+    .from(filmmakerAccountVisitorsTable)
+    .innerJoin(flowProgressTable, and(
+      eq(flowProgressTable.visitorId, filmmakerAccountVisitorsTable.visitorId),
+      eq(flowProgressTable.flow, "filmmaker"),
+      eq(flowProgressTable.completed, false),
+    ))
+    .where(eq(filmmakerAccountVisitorsTable.firebaseUid, firebaseUid))
+    .limit(1);
+
+  return {
+    projects: projects.map((project) => ({
+      id: project.id,
+      slug: project.slug,
+      title: project.title,
+      reviewState: project.hidden ? "hidden" : project.approved ? "approved" : "pending",
+      createdAt: project.createdAt,
+    })),
+    hasResumableDraft: Boolean(draft),
+  };
+}
+
+export async function startOrResumeFilmmakerAccountDraft(input: {
+  firebaseUid: string;
+  currentVisitorId: string | null;
+}): Promise<{ visitorId: string; status: "created" | "resumed"; lastScreen: number; updatedAt: Date }> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.firebaseUid}))`);
+    let currentVisitor: typeof visitorsTable.$inferSelect | undefined;
+    if (input.currentVisitorId) {
+      const [visitor] = await tx.select().from(visitorsTable)
+        .where(eq(visitorsTable.visitorId, input.currentVisitorId))
+        .for("update");
+      if (!visitor) {
+        throw new FilmmakerAccountError("visitor_not_found", "The current visitor record was not found.");
+      }
+      currentVisitor = visitor;
+
+      const [link] = await tx.select().from(filmmakerAccountVisitorsTable)
+        .where(eq(filmmakerAccountVisitorsTable.visitorId, input.currentVisitorId))
+        .for("update");
+      if (link && link.firebaseUid !== input.firebaseUid) {
+        throw new FilmmakerAccountError("visitor_owned_by_another_account", "This visitor is linked to a different filmmaker account.");
+      }
+
+      const [progress] = await tx.select().from(flowProgressTable).where(and(
+        eq(flowProgressTable.visitorId, input.currentVisitorId),
+        eq(flowProgressTable.flow, "filmmaker"),
+      )).for("update");
+      if (!link && !progress?.completed && Object.keys(progress?.answers ?? {}).length > 0) {
+        const [activeDraft] = await tx.select({ visitorId: filmmakerAccountVisitorsTable.visitorId })
+          .from(filmmakerAccountVisitorsTable)
+          .innerJoin(flowProgressTable, and(
+            eq(flowProgressTable.visitorId, filmmakerAccountVisitorsTable.visitorId),
+            eq(flowProgressTable.flow, "filmmaker"),
+            eq(flowProgressTable.completed, false),
+          ))
+          .where(and(
+            eq(filmmakerAccountVisitorsTable.firebaseUid, input.firebaseUid),
+            ne(filmmakerAccountVisitorsTable.visitorId, input.currentVisitorId),
+          ))
+          .limit(1);
+        if (activeDraft) {
+          throw new FilmmakerAccountError(
+            "account_draft_conflict",
+            "This browser has an unfinished guest draft, and this account already has a different active draft. Resume the account draft or resolve the guest draft before starting another project.",
+          );
+        }
+      }
+      if (progress?.completed) {
+        const reference = storedSubmissionReference(progress.answers);
+        const [filmmaker] = reference
+          ? await tx.select({ firebaseUid: filmmakersTable.firebaseUid })
+            .from(filmmakersTable)
+            .where(and(
+              eq(filmmakersTable.id, reference.filmmakerId),
+              eq(filmmakersTable.visitorId, input.currentVisitorId),
+            )).for("update")
+          : [undefined];
+        if (!filmmaker || filmmaker.firebaseUid !== input.firebaseUid || !link) {
+          throw new FilmmakerAccountError(
+            "completed_submission_unclaimed",
+            "Claim the current completed submission before starting another project.",
+          );
+        }
+      } else if (!link) {
+        await tx.insert(filmmakerAccountVisitorsTable).values({
+          visitorId: input.currentVisitorId,
+          firebaseUid: input.firebaseUid,
+        }).onConflictDoNothing();
+        const [linked] = await tx.select().from(filmmakerAccountVisitorsTable)
+          .where(eq(filmmakerAccountVisitorsTable.visitorId, input.currentVisitorId));
+        if (!linked || linked.firebaseUid !== input.firebaseUid) {
+          throw new FilmmakerAccountError("visitor_owned_by_another_account", "This visitor is linked to a different filmmaker account.");
+        }
+      }
+    }
+
+    const [existingDraft] = await tx.select({
+      visitorId: filmmakerAccountVisitorsTable.visitorId,
+      lastScreen: flowProgressTable.lastScreen,
+      updatedAt: flowProgressTable.updatedAt,
+    }).from(filmmakerAccountVisitorsTable)
+      .innerJoin(flowProgressTable, and(
+        eq(flowProgressTable.visitorId, filmmakerAccountVisitorsTable.visitorId),
+        eq(flowProgressTable.flow, "filmmaker"),
+        eq(flowProgressTable.completed, false),
+      ))
+      .where(eq(filmmakerAccountVisitorsTable.firebaseUid, input.firebaseUid))
+      .orderBy(desc(flowProgressTable.updatedAt))
+      .limit(1);
+    if (existingDraft) {
+      return {
+        visitorId: existingDraft.visitorId,
+        status: "resumed",
+        lastScreen: existingDraft.lastScreen,
+        updatedAt: existingDraft.updatedAt,
+      };
+    }
+
+    const linkedVisitors = await tx.select({ priceGroup: visitorsTable.priceGroup })
+      .from(filmmakerAccountVisitorsTable)
+      .innerJoin(visitorsTable, eq(visitorsTable.visitorId, filmmakerAccountVisitorsTable.visitorId))
+      .where(eq(filmmakerAccountVisitorsTable.firebaseUid, input.firebaseUid))
+      .orderBy(asc(filmmakerAccountVisitorsTable.linkedAt));
+    const stableGroup = linkedVisitors.find(({ priceGroup }) => priceGroup === "A" || priceGroup === "B")?.priceGroup
+      ?? (currentVisitor?.priceGroup === "A" || currentVisitor?.priceGroup === "B" ? currentVisitor.priceGroup : null);
+    const visitorId = randomUUID();
+    await tx.insert(visitorsTable).values({ visitorId, priceGroup: stableGroup }).onConflictDoNothing();
+    await tx.insert(filmmakerAccountVisitorsTable).values({
+      visitorId,
+      firebaseUid: input.firebaseUid,
+    });
+    const [progress] = await tx.insert(flowProgressTable).values({
+      visitorId,
+      flow: "filmmaker",
+      lastScreen: 1,
+      answers: {},
+      completed: false,
+    }).returning({ lastScreen: flowProgressTable.lastScreen, updatedAt: flowProgressTable.updatedAt });
+    return {
+      visitorId,
+      status: "created",
+      lastScreen: progress.lastScreen,
+      updatedAt: progress.updatedAt,
+    };
+  });
+}
+
+export async function resumeFilmmakerAccountDraft(firebaseUid: string): Promise<{
+  visitorId: string;
+  lastScreen: number;
+  updatedAt: Date;
+} | null> {
+  const [draft] = await db.select({
+    visitorId: filmmakerAccountVisitorsTable.visitorId,
+    lastScreen: flowProgressTable.lastScreen,
+    updatedAt: flowProgressTable.updatedAt,
+  }).from(filmmakerAccountVisitorsTable)
+    .innerJoin(flowProgressTable, and(
+      eq(flowProgressTable.visitorId, filmmakerAccountVisitorsTable.visitorId),
+      eq(flowProgressTable.flow, "filmmaker"),
+      eq(flowProgressTable.completed, false),
+    ))
+    .where(eq(filmmakerAccountVisitorsTable.firebaseUid, firebaseUid))
+    .orderBy(desc(flowProgressTable.updatedAt))
+    .limit(1);
+  return draft ?? null;
+}
+
+export async function getFilmmakerAccountProjectVisitor(
+  firebaseUid: string,
+  projectId: number,
+): Promise<string | null> {
+  const [owner] = await db.select({ visitorId: filmmakersTable.visitorId })
+    .from(projectsTable)
+    .innerJoin(filmmakersTable, eq(filmmakersTable.id, projectsTable.filmmakerId))
+    .innerJoin(filmmakerAccountVisitorsTable, eq(filmmakerAccountVisitorsTable.visitorId, filmmakersTable.visitorId))
+    .where(and(
+      eq(projectsTable.id, projectId),
+      eq(filmmakersTable.firebaseUid, firebaseUid),
+      eq(filmmakerAccountVisitorsTable.firebaseUid, firebaseUid),
+    ));
+  return owner?.visitorId ?? null;
 }
 
 export async function updateProjectReview(

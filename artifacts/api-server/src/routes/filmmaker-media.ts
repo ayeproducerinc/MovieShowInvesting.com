@@ -17,6 +17,10 @@ import {
   UploadFilmmakerImageQueryParams,
   UploadFilmmakerImageResponse,
 } from "@workspace/api-zod";
+import {
+  authorizeFilmmakerVisitor,
+  requireMatchingFilmmakerContext,
+} from "../lib/filmmaker-auth";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -208,11 +212,15 @@ router.post("/filmmakers/media/trailer", async (req, res): Promise<void> => {
     res.status(400).json({ error: "A recorded visitor cookie is required." });
     return;
   }
+  const access = await authorizeFilmmakerVisitor(req, res, ownerId);
+  if (!access.allowed) return;
   const owner = await getOwnedFilmmakerMedia(ownerId);
   if (!owner) {
     res.status(404).json({ error: "No completed filmmaker project was found." });
     return;
   }
+  if (access.identity
+    && !requireMatchingFilmmakerContext(req, res, "X-MSI-Project-Id", owner.id, "project")) return;
   const config = readConfig().stream;
   if (!config) {
     res.status(503).json({ error: "Bunny Stream is not configured." });
@@ -413,11 +421,15 @@ router.post(
       res.status(400).json({ error: "A recorded visitor cookie is required." });
       return;
     }
+    const access = await authorizeFilmmakerVisitor(req, res, ownerId);
+    if (!access.allowed) return;
     const owner = await getOwnedFilmmakerMedia(ownerId);
     if (!owner) {
       res.status(404).json({ error: "No completed filmmaker project was found." });
       return;
     }
+    if (access.identity
+      && !requireMatchingFilmmakerContext(req, res, "X-MSI-Project-Id", owner.id, "project")) return;
     const config = readConfig().storage;
     if (!config) {
       res.status(503).json({ error: "Bunny Storage is not configured." });

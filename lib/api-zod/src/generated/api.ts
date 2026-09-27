@@ -101,14 +101,19 @@ export const GetPriceGroupResponse = zod.object({
 
 
 /**
+ * Unlinked visitor progress remains cookie-accessible. A filmmaker visitor linked to Firebase UID requires a verified Bearer token matching that UID.
  * @summary Read the current visitor's saved flow progress
  */
 export const GetFlowProgressParams = zod.object({
   "flow": zod.enum(['filmmaker', 'investor'])
 })
 
+
+
+
 export const GetFlowProgressResponse = zod.object({
   "flow": zod.enum(['filmmaker', 'investor']),
+  "draft_id": zod.number().int().min(1).optional(),
   "last_screen": zod.number().int(),
   "answers": zod.record(zod.string(), zod.unknown()),
   "completed": zod.boolean(),
@@ -117,8 +122,16 @@ export const GetFlowProgressResponse = zod.object({
 
 
 /**
+ * Unlinked visitor progress remains cookie-accessible. A filmmaker visitor linked to Firebase UID requires a verified Bearer token matching that UID; investor progress keeps its existing behavior.
  * @summary Save the current visitor's in-progress answers
  */
+
+
+
+export const SaveFlowProgressHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1).optional().describe('Required for account-linked filmmaker visitors; must match the current filmmaker flow_progress.id.')
+})
+
 export const saveFlowProgressBodyLastScreenMax = 6;
 
 
@@ -130,8 +143,12 @@ export const SaveFlowProgressBody = zod.object({
   "completed": zod.boolean().optional()
 })
 
+
+
+
 export const SaveFlowProgressResponse = zod.object({
   "flow": zod.enum(['filmmaker', 'investor']),
+  "draft_id": zod.number().int().min(1).optional(),
   "last_screen": zod.number().int(),
   "answers": zod.record(zod.string(), zod.unknown()),
   "completed": zod.boolean(),
@@ -140,8 +157,16 @@ export const SaveFlowProgressResponse = zod.object({
 
 
 /**
+ * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID.
  * @summary Submit the filmmaker flow
  */
+
+
+
+export const SubmitFilmmakerHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1).optional().describe('Required for account-linked visitors; must match the current filmmaker flow_progress.id.')
+})
+
 
 export const submitFilmmakerBodyOfferPer100Min = 125;
 
@@ -195,11 +220,16 @@ export const SubmitFilmmakerResponse = zod.object({
 
 
 /**
+ * Unlinked guest results remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
  * @summary Read the current visitor's completed filmmaker result
  */
+
+
+
 export const GetFilmmakerResultResponse = zod.object({
   "completed": zod.literal(true),
   "no_project_yet": zod.boolean(),
+  "project_id": zod.number().int().min(1).nullable(),
   "project_slug": zod.string().nullable(),
   "stage": zod.string().nullable(),
   "stage_other": zod.string().nullable(),
@@ -231,8 +261,105 @@ export const GetFilmmakerResultResponse = zod.object({
 
 
 /**
+ * Requires a verified Firebase account token. Project ownership is based on linked Firebase UID, never the submitted email alone.
+ * @summary List projects and draft state for the signed-in filmmaker
+ */
+
+
+
+export const GetFilmmakerProjectsResponse = zod.object({
+  "projects": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "slug": zod.string().nullable(),
+  "title": zod.string().nullable(),
+  "review_state": zod.enum(['pending', 'approved', 'hidden']),
+  "created_at": zod.coerce.date()
+})),
+  "has_resumable_draft": zod.boolean()
+})
+
+
+/**
+ * Requires the current visitor cookie. A completed legacy submission can only be claimed if its stored email matches the verified account email and it is not linked to another UID. A non-empty unlinked guest draft cannot be claimed while a different active draft exists for the account; the guest cookie and answers are preserved on conflict.
+ * @summary Link the current visitor draft or legacy submission to a verified account
+ */
+
+
+
+export const ClaimFilmmakerProjectResponse = zod.object({
+  "claimed": zod.boolean(),
+  "submission_claimed": zod.boolean(),
+  "project_id": zod.number().int().min(1).nullable()
+})
+
+
+/**
+ * Preserves earlier projects, copies the account's stable price-test group, and rotates the httpOnly visitor cookie to the account draft. An unclaimed completed legacy result must be claimed before starting. A non-empty guest draft is left untouched and returns 409 when the account already has another active draft.
+ * @summary Create or resume the account's single active filmmaker draft
+ */
+export const startFilmmakerProjectResponseLastScreenMax = 6;
+
+
+
+export const StartFilmmakerProjectResponse = zod.object({
+  "status": zod.enum(['created', 'resumed']),
+  "last_screen": zod.number().int().min(1).max(startFilmmakerProjectResponseLastScreenMax),
+  "updated_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Restore the signed-in filmmaker's active draft visitor cookie
+ */
+export const resumeFilmmakerProjectResponseLastScreenMax = 6;
+
+
+
+export const ResumeFilmmakerProjectResponse = zod.object({
+  "status": zod.enum(['created', 'resumed']),
+  "last_screen": zod.number().int().min(1).max(resumeFilmmakerProjectResponseLastScreenMax),
+  "updated_at": zod.coerce.date()
+})
+
+
+/**
+ * Requires a verified Firebase account. Rotates the cookie only when its visitor is linked to this Firebase UID. Preserves unclaimed guest or another account's visitor cookie without deleting or modifying any project or draft.
+ * @summary Rotate the current project visitor cookie before account sign-out
+ */
+export const LeaveFilmmakerAccountResponse = zod.object({
+  "visitor_cookie_rotated": zod.boolean()
+})
+
+
+/**
+ * @summary Select an account-owned project for the existing visitor-scoped editing routes
+ */
+
+
+
+export const SelectFilmmakerProjectParams = zod.object({
+  "project_id": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const SelectFilmmakerProjectResponse = zod.object({
+  "project_id": zod.number().int().min(1)
+})
+
+
+/**
+ * Unlinked guest visits remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
  * @summary Request showcase and update the current visitor's project showcase details
  */
+
+
+
+export const UpdateFilmmakerShowcaseHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1).optional().describe('Required for account-linked visitors; must match the completed project resolved from the current visitor cookie.')
+})
+
 export const updateFilmmakerShowcaseBodySynopsisMax = 5000;
 
 export const updateFilmmakerShowcaseBodyTeamLinksItemMax = 500;
@@ -287,13 +414,16 @@ export const GetFilmmakerMediaConfigResponse = zod.object({
 
 
 /**
+ * Unlinked guest uploads remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
  * @summary Bounded streaming upload of a trailer to Bunny Stream for the visitor-owned project
  */
+
 export const uploadFilmmakerTrailerHeaderContentLengthMax = 524288000;
 
 
 
 export const UploadFilmmakerTrailerHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1).optional().describe('Required for account-linked visitors; must match the completed project resolved from the current visitor cookie.'),
   "Content-Length": zod.number().int().min(1).max(uploadFilmmakerTrailerHeaderContentLengthMax)
 })
 
@@ -306,10 +436,18 @@ export const UploadFilmmakerTrailerResponse = zod.object({
 
 
 /**
+ * Unlinked guest uploads remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
  * @summary Upload an owned poster or share image to Bunny Storage
  */
 export const UploadFilmmakerImageQueryParams = zod.object({
   "kind": zod.enum(['poster', 'share'])
+})
+
+
+
+
+export const UploadFilmmakerImageHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1).optional().describe('Required for account-linked visitors; must match the completed project resolved from the current visitor cookie.')
 })
 
 export const UploadFilmmakerImageResponse = zod.object({

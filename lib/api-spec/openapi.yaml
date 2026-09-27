@@ -123,6 +123,10 @@ paths:
       operationId: getFlowProgress
       tags: [progress]
       summary: Read the current visitor's saved flow progress
+      description: Unlinked visitor progress remains cookie-accessible. A filmmaker visitor linked to Firebase UID requires a verified Bearer token matching that UID.
+      security:
+        - firebaseBearer: []
+        - {}
       parameters:
         - in: path
           name: flow
@@ -138,11 +142,27 @@ paths:
                 $ref: "#/components/schemas/FlowProgress"
         "404":
           description: No progress saved
+        "401":
+          description: Verified sign-in required for an account-linked filmmaker visitor
+        "403":
+          description: Firebase UID does not own this visitor
+        "503":
+          description: Firebase verification is unavailable
   /progress:
     post:
       operationId: saveFlowProgress
       tags: [progress]
       summary: Save the current visitor's in-progress answers
+      description: Unlinked visitor progress remains cookie-accessible. A filmmaker visitor linked to Firebase UID requires a verified Bearer token matching that UID; investor progress keeps its existing behavior.
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: false
+          description: Required for account-linked filmmaker visitors; must match the current filmmaker flow_progress.id.
+          schema: { type: integer, minimum: 1 }
       requestBody:
         required: true
         content:
@@ -158,11 +178,29 @@ paths:
                 $ref: "#/components/schemas/FlowProgress"
         "400":
           description: Invalid input or missing visitor
+        "401":
+          description: Verified sign-in required for an account-linked filmmaker visitor
+        "403":
+          description: Firebase UID does not own this visitor
+        "503":
+          description: Firebase verification is unavailable
+        "409":
+          description: Draft context header is missing or does not match the current draft
   /filmmakers:
     post:
       operationId: submitFilmmaker
       tags: [filmmakers]
       summary: Submit the filmmaker flow
+      description: Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID.
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: false
+          description: Required for account-linked visitors; must match the current filmmaker flow_progress.id.
+          schema: { type: integer, minimum: 1 }
       requestBody:
         required: true
         content:
@@ -177,12 +215,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/FilmmakerSubmission"
         "400":
-          description: Invalid submission or missing visitor
+          description: Invalid submission, missing visitor, or linked visitor contact email does not match its verified account email
+        "401":
+          description: Verified sign-in required for an account-linked visitor
+        "403":
+          description: Firebase UID does not own this visitor
+        "503":
+          description: Firebase verification is unavailable
+        "409":
+          description: Draft context header is missing or does not match the current draft
   /filmmakers/result:
     get:
       operationId: getFilmmakerResult
       tags: [filmmakers]
       summary: Read the current visitor's completed filmmaker result
+      description: Unlinked guest results remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
+      security:
+        - firebaseBearer: []
+        - {}
       responses:
         "200":
           description: Completed submission result, including a no-project result
@@ -192,11 +242,170 @@ paths:
                 $ref: "#/components/schemas/FilmmakerResult"
         "404":
           description: No completed filmmaker submission for this visitor
+        "401":
+          description: Verified sign-in required for an account-linked visitor
+        "403":
+          description: Firebase UID does not own this visitor
+        "503":
+          description: Firebase verification is unavailable
+  /filmmakers/projects:
+    get:
+      operationId: getFilmmakerProjects
+      tags: [filmmakers]
+      summary: List projects and draft state for the signed-in filmmaker
+      description: Requires a verified Firebase account token. Project ownership is based on linked Firebase UID, never the submitted email alone.
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Account-owned projects and whether an active draft can be resumed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerProjects"
+        "401":
+          description: Verified sign-in required
+        "403":
+          description: Firebase email must be verified
+        "503":
+          description: Firebase verification is unavailable
+  /filmmakers/projects/claim:
+    post:
+      operationId: claimFilmmakerProject
+      tags: [filmmakers]
+      summary: Link the current visitor draft or legacy submission to a verified account
+      description: Requires the current visitor cookie. A completed legacy submission can only be claimed if its stored email matches the verified account email and it is not linked to another UID. A non-empty unlinked guest draft cannot be claimed while a different active draft exists for the account; the guest cookie and answers are preserved on conflict.
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Current draft or submission is linked to this account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerProjectClaim"
+        "400":
+          description: A recorded visitor cookie is required
+        "401":
+          description: Verified sign-in required
+        "403":
+          description: Verified email does not match the submission or visitor belongs to another account
+        "409":
+          description: An unfinished guest draft conflicts with a different active account draft
+        "404":
+          description: Visitor record was not found
+        "503":
+          description: Firebase verification is unavailable
+  /filmmakers/projects/start:
+    post:
+      operationId: startFilmmakerProject
+      tags: [filmmakers]
+      summary: Create or resume the account's single active filmmaker draft
+      description: Preserves earlier projects, copies the account's stable price-test group, and rotates the httpOnly visitor cookie to the account draft. An unclaimed completed legacy result must be claimed before starting. A non-empty guest draft is left untouched and returns 409 when the account already has another active draft.
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Account draft created or resumed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerDraftState"
+        "401":
+          description: Verified sign-in required
+        "403":
+          description: Current visitor is linked to another account
+        "409":
+          description: Claim the current completed submission or resolve the conflicting guest draft before starting another project
+        "404":
+          description: Current visitor record was not found
+        "503":
+          description: Firebase verification is unavailable
+  /filmmakers/projects/resume:
+    post:
+      operationId: resumeFilmmakerProject
+      tags: [filmmakers]
+      summary: Restore the signed-in filmmaker's active draft visitor cookie
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Active draft cookie restored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerDraftState"
+        "401":
+          description: Verified sign-in required
+        "404":
+          description: No resumable draft exists
+        "503":
+          description: Firebase verification is unavailable
+  /filmmakers/projects/leave:
+    post:
+      operationId: leaveFilmmakerAccount
+      tags: [filmmakers]
+      summary: Rotate the current project visitor cookie before account sign-out
+      description: Requires a verified Firebase account. Rotates the cookie only when its visitor is linked to this Firebase UID. Preserves unclaimed guest or another account's visitor cookie without deleting or modifying any project or draft.
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Whether the visitor cookie was rotated to a fresh guest visitor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerAccountLeave"
+        "401":
+          description: Verified sign-in required
+        "403":
+          description: Firebase email must be verified
+        "503":
+          description: Firebase verification is unavailable
+  /filmmakers/projects/{project_id}/select:
+    post:
+      operationId: selectFilmmakerProject
+      tags: [filmmakers]
+      summary: Select an account-owned project for the existing visitor-scoped editing routes
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Project visitor cookie selected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerProjectSelection"
+        "400":
+          description: Invalid project ID
+        "401":
+          description: Verified sign-in required
+        "404":
+          description: Project is not available to this account
+        "503":
+          description: Firebase verification is unavailable
   /filmmakers/showcase:
     patch:
       operationId: updateFilmmakerShowcase
       tags: [filmmakers]
       summary: Request showcase and update the current visitor's project showcase details
+      description: Unlinked guest visits remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: false
+          description: Required for account-linked visitors; must match the completed project resolved from the current visitor cookie.
+          schema: { type: integer, minimum: 1 }
       requestBody:
         required: true
         content:
@@ -214,6 +423,14 @@ paths:
           description: Invalid showcase details or missing visitor
         "404":
           description: No completed project submission for this visitor
+        "401":
+          description: Verified sign-in required for an account-linked visitor
+        "403":
+          description: Firebase UID does not own this visitor
+        "503":
+          description: Firebase verification is unavailable
+        "409":
+          description: Project context header is missing or does not match the current project
   /filmmakers/media/config:
     get:
       operationId: getFilmmakerMediaConfig
@@ -231,7 +448,16 @@ paths:
       operationId: uploadFilmmakerTrailer
       tags: [filmmakers]
       summary: Bounded streaming upload of a trailer to Bunny Stream for the visitor-owned project
+      description: Unlinked guest uploads remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
+      security:
+        - firebaseBearer: []
+        - {}
       parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: false
+          description: Required for account-linked visitors; must match the completed project resolved from the current visitor cookie.
+          schema: { type: integer, minimum: 1 }
         - name: Content-Length
           in: header
           required: true
@@ -267,14 +493,29 @@ paths:
           description: Trailer upload concurrency limit reached
         "502":
           description: Bunny Stream upload or verification failed
+        "401":
+          description: Verified sign-in required for an account-linked visitor
+        "403":
+          description: Firebase UID does not own this visitor
         "503":
-          description: Bunny Stream is not configured
+          description: Bunny Stream or Firebase verification is unavailable
+        "409":
+          description: Project context header is missing or does not match the current project
   /filmmakers/media/image:
     post:
       operationId: uploadFilmmakerImage
       tags: [filmmakers]
       summary: Upload an owned poster or share image to Bunny Storage
+      description: Unlinked guest uploads remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
+      security:
+        - firebaseBearer: []
+        - {}
       parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: false
+          description: Required for account-linked visitors; must match the completed project resolved from the current visitor cookie.
+          schema: { type: integer, minimum: 1 }
         - name: kind
           in: query
           required: true
@@ -303,8 +544,14 @@ paths:
           description: No completed owned project
         "502":
           description: Bunny Storage upload failed
+        "401":
+          description: Verified sign-in required for an account-linked visitor
+        "403":
+          description: Firebase UID does not own this visitor
         "503":
-          description: Bunny Storage is not configured
+          description: Bunny Storage or Firebase verification is unavailable
+        "409":
+          description: Project context header is missing or does not match the current project
   /projects/{slug}:
     get:
       operationId: getPublicProject
@@ -574,10 +821,11 @@ components:
     FilmmakerResult:
       type: object
       additionalProperties: false
-      required: [completed, no_project_yet, project_slug, stage, stage_other, title, format, genre, genre_other, logline, offer_per100, offer_other_text, wants_lower, budget, budget_from_example, price_group, deal_answer, payback_terms, payback_terms_other, showcase_requested, approved, hidden, synopsis, team_links, money_use, distribution_plan, trailer_url, poster_url, share_image_url]
+      required: [completed, no_project_yet, project_id, project_slug, stage, stage_other, title, format, genre, genre_other, logline, offer_per100, offer_other_text, wants_lower, budget, budget_from_example, price_group, deal_answer, payback_terms, payback_terms_other, showcase_requested, approved, hidden, synopsis, team_links, money_use, distribution_plan, trailer_url, poster_url, share_image_url]
       properties:
         completed: { type: boolean, enum: [true] }
         no_project_yet: { type: boolean }
+        project_id: { type: ["integer", "null"], minimum: 1 }
         project_slug: { type: ["string", "null"] }
         stage: { type: ["string", "null"] }
         stage_other: { type: ["string", "null"] }
@@ -607,6 +855,58 @@ components:
         trailer_url: { type: ["string", "null"], format: uri }
         poster_url: { type: ["string", "null"], format: uri }
         share_image_url: { type: ["string", "null"], format: uri }
+    FilmmakerProjects:
+      type: object
+      additionalProperties: false
+      required: [projects, has_resumable_draft]
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilmmakerProjectListItem"
+        has_resumable_draft: { type: boolean }
+    FilmmakerProjectListItem:
+      type: object
+      additionalProperties: false
+      required: [id, slug, title, review_state, created_at]
+      properties:
+        id: { type: integer, minimum: 1 }
+        slug: { type: ["string", "null"] }
+        title: { type: ["string", "null"] }
+        review_state:
+          type: string
+          enum: [pending, approved, hidden]
+        created_at: { type: string, format: date-time }
+    FilmmakerProjectClaim:
+      type: object
+      additionalProperties: false
+      required: [claimed, submission_claimed, project_id]
+      properties:
+        claimed: { type: boolean }
+        submission_claimed: { type: boolean }
+        project_id: { type: ["integer", "null"], minimum: 1 }
+    FilmmakerDraftState:
+      type: object
+      additionalProperties: false
+      required: [status, last_screen, updated_at]
+      properties:
+        status:
+          type: string
+          enum: [created, resumed]
+        last_screen: { type: integer, minimum: 1, maximum: 6 }
+        updated_at: { type: string, format: date-time }
+    FilmmakerProjectSelection:
+      type: object
+      additionalProperties: false
+      required: [project_id]
+      properties:
+        project_id: { type: integer, minimum: 1 }
+    FilmmakerAccountLeave:
+      type: object
+      additionalProperties: false
+      required: [visitor_cookie_rotated]
+      properties:
+        visitor_cookie_rotated: { type: boolean }
     FilmmakerShowcaseUpdate:
       type: object
       additionalProperties: false
@@ -706,6 +1006,7 @@ components:
       properties:
         flow:
           $ref: "#/components/schemas/Flow"
+        draft_id: { type: integer, minimum: 1 }
         last_screen: { type: integer }
         answers:
           type: object

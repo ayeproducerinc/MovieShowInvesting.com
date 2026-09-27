@@ -6,6 +6,7 @@ import {
   useUploadFilmmakerImage,
 } from '@workspace/api-client-react';
 import type { FilmmakerMediaConfig, FilmmakerResult, FilmmakerTrailerUpload } from '@workspace/api-client-react';
+import { getInitializedAuth } from './firebase-bootstrap';
 
 function safeMediaUrl(value: string | null) {
   if (!value) return null;
@@ -33,15 +34,18 @@ function TrailerPreview({ trailerUrl, posterUrl, title }: {
   </div>;
 }
 
-function ImageUploader({ kind, config, persistedUrl, onSaved }: {
-  kind: 'poster' | 'share'; config: FilmmakerMediaConfig; persistedUrl: string | null; onSaved: () => void;
+function ImageUploader({ kind, config, persistedUrl, projectId, onSaved }: {
+  kind: 'poster' | 'share'; config: FilmmakerMediaConfig; persistedUrl: string | null; projectId: number | null; onSaved: () => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   // Orval defaults to image/jpeg for raw Blob requests. Override for PNG/WebP.
-  const upload = useUploadFilmmakerImage({ request: { headers: { 'Content-Type': file?.type || 'image/jpeg' } } });
+  const upload = useUploadFilmmakerImage({ request: { headers: {
+    'Content-Type': file?.type || 'image/jpeg',
+    ...(projectId ? { 'X-MSI-Project-Id': String(projectId) } : {}),
+  } } });
   useEffect(() => {
     if (!file) { setPreview(''); return; }
     const url = URL.createObjectURL(file);
@@ -85,8 +89,8 @@ function ImageUploader({ kind, config, persistedUrl, onSaved }: {
   </div>;
 }
 
-function TrailerUploader({ config, trailerUrl, onSaved }: {
-  config: FilmmakerMediaConfig; trailerUrl: string | null; onSaved: () => void;
+function TrailerUploader({ config, trailerUrl, projectId, onSaved }: {
+  config: FilmmakerMediaConfig; trailerUrl: string | null; projectId: number | null; onSaved: () => void;
 }) {
   // XHR is used only for the binary POST so upload progress and cancellation are available.
   // The path comes from the generated client; cookies are sent through the shared proxy.
@@ -110,16 +114,19 @@ function TrailerUploader({ config, trailerUrl, onSaved }: {
     }
     setFile(selected);
   }
-  function start() {
+  async function start() {
     if (!file || status === 'uploading' || status === 'finalizing') return;
     const attempt = ++run.current;
     setStatus('uploading'); setError(''); setProgress(0);
     try {
+      const token = await getInitializedAuth()?.currentUser?.getIdToken();
       const xhr = new XMLHttpRequest();
       xhr.open('POST', getUploadFilmmakerTrailerUrl());
       xhr.withCredentials = true;
       xhr.responseType = 'json';
       xhr.setRequestHeader('Content-Type', file.type);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      if (projectId) xhr.setRequestHeader('X-MSI-Project-Id', String(projectId));
       // Do not set Content-Length; the browser supplies it for the File body.
       xhr.upload.onprogress = event => {
         if (attempt === run.current && event.lengthComputable) setProgress(Math.round(event.loaded / event.total * 100));
@@ -181,10 +188,10 @@ export function FilmmakerMedia({ result, onSaved }: { result: FilmmakerResult; o
     {config.isLoading && <div aria-label="Checking media availability"><div className="dossier-skeleton" style={{ width: '75%' }}/><div className="dossier-skeleton" style={{ width: '55%' }}/></div>}
     {config.isError && <div className="dossier-notice">Media setup is unavailable right now. Your external trailer link above still works. <button type="button" className="underline" data-testid="button-retry-media-config" onClick={() => void config.refetch()}><RotateCcw size={14} style={{ display: 'inline' }}/> Check again</button></div>}
     {config.data && <div className="dossier-media-grid">
-      {config.data.stream_available ? <TrailerUploader config={config.data} trailerUrl={result.trailer_url} onSaved={onSaved}/> : <div className="dossier-media-tile"><span className="dossier-kicker">Trailer upload unavailable</span><p className="dossier-status">Video uploads are not configured yet. You can still save an external trailer URL above.</p></div>}
+      {config.data.stream_available ? <TrailerUploader config={config.data} trailerUrl={result.trailer_url} projectId={result.project_id} onSaved={onSaved}/> : <div className="dossier-media-tile"><span className="dossier-kicker">Trailer upload unavailable</span><p className="dossier-status">Video uploads are not configured yet. You can still save an external trailer URL above.</p></div>}
       {config.data.storage_available ? <>
-        <ImageUploader kind="poster" config={config.data} persistedUrl={result.poster_url} onSaved={onSaved}/>
-        <ImageUploader kind="share" config={config.data} persistedUrl={result.share_image_url} onSaved={onSaved}/>
+        <ImageUploader kind="poster" config={config.data} persistedUrl={result.poster_url} projectId={result.project_id} onSaved={onSaved}/>
+        <ImageUploader kind="share" config={config.data} persistedUrl={result.share_image_url} projectId={result.project_id} onSaved={onSaved}/>
       </> : <div className="dossier-media-tile"><span className="dossier-kicker">Image upload unavailable</span><p className="dossier-status">Poster and share-image uploads are not configured yet.</p></div>}
     </div>}
   </section>;

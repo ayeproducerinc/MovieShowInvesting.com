@@ -15,6 +15,7 @@ import Legal from '@/pages/legal';
 import OpeningLater from '@/pages/opening-later';
 import Filmmaker from '@/pages/filmmaker';
 import FilmmakerDone from '@/pages/filmmaker-done';
+import FilmmakerProjects from '@/pages/filmmaker-projects';
 import Project from '@/pages/project';
 import NotFound from '@/pages/not-found';
 
@@ -28,6 +29,7 @@ const metadata: Record<string, [string, string]> = {
   '/invest': ['For investors | Movie Show Investing', 'Investor signup and non-binding pledges will open later, after approved projects are available.'],
    '/start/filmmaker': ['Filmmaker worksheet | Movie Show Investing', 'Share your project and explore illustrative terms in a guided prelaunch worksheet.'],
    '/start/filmmaker/done': ['Thank you | Movie Show Investing', 'Your filmmaker answers have been received.'],
+    '/me/projects': ['My projects | Movie Show Investing', 'Manage your filmmaker projects and start another submission.'],
 };
 
 function PageMetadata() {
@@ -61,9 +63,19 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 function adminEmailLinkTarget() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('mode') !== 'signIn' || !params.has('oobCode')) return null;
-  const adminPath = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/admin`;
-  if (window.location.pathname === adminPath) return null;
-  return `${window.location.origin}${adminPath}${window.location.search}${window.location.hash}`;
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const adminPath = `${base}/admin`;
+  const projectsPath = `${base}/me/projects`;
+  if (window.location.pathname === adminPath || window.location.pathname === projectsPath) return null;
+  let path = adminPath;
+  try {
+    const continuation = params.get('continueUrl');
+    if (continuation) {
+      const target = new URL(continuation);
+      if (target.origin === window.location.origin && target.pathname === projectsPath) path = projectsPath;
+    }
+  } catch { /* Unknown email-link continuation keeps the existing admin fallback. */ }
+  return `${window.location.origin}${path}${window.location.search}${window.location.hash}`;
 }
 
 function PublicPages() {
@@ -81,6 +93,7 @@ function PublicPages() {
         <Route path="/disclaimers">{() => <Legal kind="disclaimers" />}</Route>
         <Route path="/invest">{() => <OpeningLater audience="investor" />}</Route>
           <Route path="/start/filmmaker/done" component={FilmmakerDone} />
+          <Route path="/me/projects" component={FilmmakerProjects} />
           <Route path="/project/:slug" component={Project} />
          <Route path="/start/filmmaker">{() => visit.status === 'ready'
            ? <Filmmaker />

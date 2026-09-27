@@ -195,6 +195,11 @@ export const FilmmakerResultPriceGroup = {
 export interface FilmmakerResult {
   completed: true;
   no_project_yet: boolean;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  project_id: number | null;
   /** @nullable */
   project_slug: string | null;
   /** @nullable */
@@ -248,6 +253,68 @@ export interface FilmmakerResult {
   poster_url: string | null;
   /** @nullable */
   share_image_url: string | null;
+}
+
+export type FilmmakerProjectListItemReviewState = typeof FilmmakerProjectListItemReviewState[keyof typeof FilmmakerProjectListItemReviewState];
+
+
+export const FilmmakerProjectListItemReviewState = {
+  pending: 'pending',
+  approved: 'approved',
+  hidden: 'hidden',
+} as const;
+
+export interface FilmmakerProjectListItem {
+  /** @minimum 1 */
+  id: number;
+  /** @nullable */
+  slug: string | null;
+  /** @nullable */
+  title: string | null;
+  review_state: FilmmakerProjectListItemReviewState;
+  created_at: string;
+}
+
+export interface FilmmakerProjects {
+  projects: FilmmakerProjectListItem[];
+  has_resumable_draft: boolean;
+}
+
+export interface FilmmakerProjectClaim {
+  claimed: boolean;
+  submission_claimed: boolean;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  project_id: number | null;
+}
+
+export type FilmmakerDraftStateStatus = typeof FilmmakerDraftStateStatus[keyof typeof FilmmakerDraftStateStatus];
+
+
+export const FilmmakerDraftStateStatus = {
+  created: 'created',
+  resumed: 'resumed',
+} as const;
+
+export interface FilmmakerDraftState {
+  status: FilmmakerDraftStateStatus;
+  /**
+     * @minimum 1
+     * @maximum 6
+     */
+  last_screen: number;
+  updated_at: string;
+}
+
+export interface FilmmakerProjectSelection {
+  /** @minimum 1 */
+  project_id: number;
+}
+
+export interface FilmmakerAccountLeave {
+  visitor_cookie_rotated: boolean;
 }
 
 export interface FilmmakerShowcaseUpdate {
@@ -382,6 +449,8 @@ export type FlowProgressAnswers = { [key: string]: unknown };
 
 export interface FlowProgress {
   flow: Flow;
+  /** @minimum 1 */
+  draft_id?: number;
   last_screen: number;
   answers: FlowProgressAnswers;
   completed: boolean;

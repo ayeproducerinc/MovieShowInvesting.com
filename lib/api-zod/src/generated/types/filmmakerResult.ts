@@ -10,6 +10,11 @@ import type { FilmmakerResultPriceGroup } from './filmmakerResultPriceGroup';
 export interface FilmmakerResult {
   completed: true;
   no_project_yet: boolean;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  project_id: number | null;
   /** @nullable */
   project_slug: string | null;
   /** @nullable */

@@ -4,6 +4,7 @@ import {
   createFilmmakerSubmission,
   FilmmakerSubmissionError,
   getCompletedFilmmakerResult,
+  findVisitorFlowProgress,
   updateOwnedFilmmakerShowcase,
   type FilmmakerSubmissionData,
 } from "@workspace/db";
@@ -14,6 +15,11 @@ import {
   UpdateFilmmakerShowcaseBody,
   UpdateFilmmakerShowcaseResponse,
 } from "@workspace/api-zod";
+import {
+  authenticateFilmmaker,
+  authorizeFilmmakerVisitor,
+  requireMatchingFilmmakerContext,
+} from "../lib/filmmaker-auth";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -53,6 +59,17 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     res.status(400).json({ error: "A recorded visitor cookie is required to submit." });
     return;
   }
+  const access = await authorizeFilmmakerVisitor(req, res, cookieId);
+  if (!access.allowed) return;
+  if (access.identity) {
+    const draft = await findVisitorFlowProgress(cookieId, "filmmaker");
+    if (!draft) {
+      res.status(409).json({ error: "No current filmmaker draft was found for this visitor." });
+      return;
+    }
+    if (!requireMatchingFilmmakerContext(req, res, "X-MSI-Draft-Id", draft.id, "draft")) return;
+  }
+  const identity = access.identity ?? await authenticateFilmmaker(req, res, false);
 
   const data = parsed.data;
   if (!data.no_project_yet) {
@@ -86,6 +103,8 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
   try {
     const result = await createFilmmakerSubmission({
       visitorId: cookieId,
+      firebaseUid: identity?.uid,
+      firebaseEmail: identity?.email,
       data: data as FilmmakerSubmissionData,
     });
     res.status(201).json(SubmitFilmmakerResponse.parse({
@@ -107,6 +126,8 @@ router.get("/filmmakers/result", async (req, res): Promise<void> => {
     res.status(404).json({ error: "No completed filmmaker submission was found." });
     return;
   }
+  const access = await authorizeFilmmakerVisitor(req, res, cookieId);
+  if (!access.allowed) return;
   const result = await getCompletedFilmmakerResult(cookieId);
   if (!result) {
     res.status(404).json({ error: "No completed filmmaker submission was found." });
@@ -123,6 +144,7 @@ router.get("/filmmakers/result", async (req, res): Promise<void> => {
   const response = {
     completed: true as const,
     no_project_yet: !project,
+    project_id: project?.id ?? null,
     project_slug: project?.slug ?? null,
     stage: project?.stage ?? stringAnswer("stage"),
     stage_other: project?.stageOther ?? stringAnswer("stage_other"),
@@ -197,6 +219,15 @@ router.patch("/filmmakers/showcase", async (req, res): Promise<void> => {
     res.status(400).json({ error: "A recorded visitor cookie is required." });
     return;
   }
+  const access = await authorizeFilmmakerVisitor(req, res, cookieId);
+  if (!access.allowed) return;
+  const current = await getCompletedFilmmakerResult(cookieId);
+  if (!current?.project) {
+    res.status(404).json({ error: "No completed filmmaker project was found." });
+    return;
+  }
+  if (access.identity
+    && !requireMatchingFilmmakerContext(req, res, "X-MSI-Project-Id", current.project.id, "project")) return;
   const project = await updateOwnedFilmmakerShowcase({
     visitorId: cookieId,
     changes: parsed.data,

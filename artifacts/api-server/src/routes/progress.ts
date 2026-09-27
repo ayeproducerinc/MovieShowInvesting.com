@@ -16,6 +16,10 @@ import {
   SaveFlowProgressBody,
   SaveFlowProgressResponse,
 } from "@workspace/api-zod";
+import {
+  authorizeFilmmakerVisitor,
+  requireMatchingFilmmakerContext,
+} from "../lib/filmmaker-auth";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -68,6 +72,10 @@ router.get("/progress/:flow", async (req, res): Promise<void> => {
     res.status(404).json({ error: "No progress saved." });
     return;
   }
+  if (parsedParams.data.flow === "filmmaker") {
+    const access = await authorizeFilmmakerVisitor(req, res, cookieId);
+    if (!access.allowed) return;
+  }
 
   const record = await findVisitorFlowProgress(cookieId, parsedParams.data.flow);
   if (!record) {
@@ -77,6 +85,7 @@ router.get("/progress/:flow", async (req, res): Promise<void> => {
 
   res.json(GetFlowProgressResponse.parse({
     flow: record.flow,
+    ...(record.flow === "filmmaker" ? { draft_id: record.id } : {}),
     last_screen: record.lastScreen,
     answers: record.answers,
     completed: record.completed,
@@ -104,6 +113,19 @@ router.post("/progress", async (req, res): Promise<void> => {
   if (parsed.data.last_screen > screenLimit) {
     res.status(400).json({ error: `Screen must be between 1 and ${screenLimit} for this flow.` });
     return;
+  }
+
+  if (parsed.data.flow === "filmmaker") {
+    const access = await authorizeFilmmakerVisitor(req, res, cookieId);
+    if (!access.allowed) return;
+    if (access.identity) {
+      const draft = await findVisitorFlowProgress(cookieId, "filmmaker");
+      if (!draft) {
+        res.status(409).json({ error: "No current filmmaker draft was found for this visitor." });
+        return;
+      }
+      if (!requireMatchingFilmmakerContext(req, res, "X-MSI-Draft-Id", draft.id, "draft")) return;
+    }
   }
 
   if (!await visitorExists(cookieId)) {

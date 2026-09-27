@@ -10,6 +10,8 @@ import type { FlowProgressAnswers } from './flowProgressAnswers';
 
 export interface FlowProgress {
   flow: Flow;
+  /** @minimum 1 */
+  draft_id?: number;
   last_screen: number;
   answers: FlowProgressAnswers;
   completed: boolean;

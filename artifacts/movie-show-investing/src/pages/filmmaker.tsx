@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey, useGetFilmmakerResult, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
 import type { FilmmakerSubmissionInput } from '@workspace/api-client-react';
+import { useFirebaseSessionReady } from '@/components/firebase-bootstrap';
 import { LocationPicker } from '../components/location-picker';
 import { calculateDeal, examples, money, phase, restoreWorksheet, standardOffer, validListedOffer, type Format, type Stage } from './filmmaker-calculator';
 
@@ -64,12 +65,14 @@ function payload(a:Answers):FilmmakerSubmissionInput {
 
 export default function Filmmaker() {
   const [, navigate] = useLocation();
-  const completedResult = useGetFilmmakerResult({ query:{ queryKey:getGetFilmmakerResultQueryKey(), retry:(count,error)=>error.status !== 404 && count < 2 } });
+  const authReady = useFirebaseSessionReady();
+  const completedResult = useGetFilmmakerResult({ query:{ queryKey:getGetFilmmakerResultQueryKey(), enabled:authReady, retry:(count,error)=>error.status !== 404 && count < 2 } });
   useEffect(() => { if (completedResult.data?.completed) navigate('/start/filmmaker/done'); }, [completedResult.data?.completed, navigate]);
-  const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:getGetFlowProgressQueryKey('filmmaker'), retry:(count,error)=>error.status !== 404 && count < 2 } });
+  const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:getGetFlowProgressQueryKey('filmmaker'), enabled:authReady, retry:(count,error)=>error.status !== 404 && count < 2 } });
   const group = useGetPriceGroup();
-  const save = useSaveFlowProgress();
-  const submit = useSubmitFilmmaker();
+  const draftHeaders: Record<string, string> = progress.data?.draft_id ? { 'X-MSI-Draft-Id': String(progress.data.draft_id) } : {};
+  const save = useSaveFlowProgress({ request: { headers: draftHeaders } });
+  const submit = useSubmitFilmmaker({ request: { headers: draftHeaders } });
   const [a, setA] = useState<Answers>(initial);
   const [screen, setScreen] = useState(1);
   const [hydrated, setHydrated] = useState(false);
@@ -120,7 +123,7 @@ export default function Filmmaker() {
     operation.then(() => {
       lastSaved.current = serialized;
       setSaveError('');
-    }).catch(() => setSaveError('Your changes could not be saved. Check your connection and try again.')).finally(() => {
+    }).catch(() => setSaveError('Your changes could not be saved. If you opened another project in a different tab, return to your project desk and reopen this draft.')).finally(() => {
       if (queue.current === operation) setSaving(false);
     });
     return operation;
@@ -183,7 +186,7 @@ export default function Filmmaker() {
       await persist(6, a);
       await submit.mutateAsync({ data:payload(a) });
       navigate('/start/filmmaker/done');
-    } catch { setSaveError('We could not submit your information. Nothing has been confirmed. Please try again.'); }
+    } catch { setSaveError('We could not submit your information. If you switched projects in another tab, return to your project desk and reopen this draft. Nothing has been confirmed.'); }
   }
   function selectStage(value:Stage) {
     const next = { ...a, stage:value, budget:examples(value,a.format)[0], budget_mode:'example' as const, offer_per100:null, offer_choice:'', wants_lower:false };
