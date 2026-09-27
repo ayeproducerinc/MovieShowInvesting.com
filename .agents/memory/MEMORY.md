@@ -4,4 +4,4 @@
 - [International location fallback](international-location-fallback.md) — keep a manual location path beside city suggestions so limited provider coverage or outages do not block intake.
 - [Bounded Bunny uploads](bounded-bunny-uploads.md) — enforce trailer size at the server upload boundary; a signed direct TUS upload alone cannot enforce the stated cap.
 - [Bunny video size semantics](bunny-video-size-semantics.md) — Bunny Stream storageSize is asynchronous encoded output, not the uploaded source byte count.
-- [Shared Bunny media](shared-bunny-media.md) — reuse The AYeList's Bunny resources for this MVP; isolate Movie Show Investing images within the owner-created folder.
+- [Shared Bunny media](shared-bunny-media.md) — reuse The AYeList's Bunny resources; keep trailers in the Stream collection and images in the dedicated Storage folder.

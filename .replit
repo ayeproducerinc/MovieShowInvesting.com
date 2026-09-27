@@ -21,3 +21,8 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+BUNNY_STREAM_COLLECTION_ID = "345d7a2b-be09-40c1-8713-e7ca5e9e99a0"

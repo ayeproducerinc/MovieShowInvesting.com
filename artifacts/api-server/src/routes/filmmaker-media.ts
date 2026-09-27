@@ -48,6 +48,7 @@ let reportedStorageConfigIssue = false;
 type BunnyConfig = {
   streamKey: string;
   libraryId: string;
+  collectionId: string;
   storageKey: string;
   storageZone: string;
   storageHost: string;
@@ -65,6 +66,7 @@ class BunnyError extends Error {}
 function readConfig(): { stream: BunnyConfig | null; storage: BunnyConfig | null } {
   const streamKey = process.env.BUNNY_STREAM_API_KEY?.trim();
   const libraryId = process.env.BUNNY_STREAM_LIBRARY_ID?.trim();
+  const collectionId = process.env.BUNNY_STREAM_COLLECTION_ID?.trim();
   const storageKey = process.env.BUNNY_STORAGE_API_KEY?.trim();
   const storageZone = process.env.BUNNY_STORAGE_ZONE?.trim();
   const rawStorageHost = process.env.BUNNY_STORAGE_HOST?.trim();
@@ -97,11 +99,11 @@ function readConfig(): { stream: BunnyConfig | null; storage: BunnyConfig | null
     }
   }
 
-  const stream = streamKey && libraryId
-    ? { streamKey, libraryId, storageKey: "", storageZone: "", storageHost: "", cdnBaseUrl: "" }
+  const stream = streamKey && libraryId && collectionId && UUID.test(collectionId)
+    ? { streamKey, libraryId, collectionId, storageKey: "", storageZone: "", storageHost: "", cdnBaseUrl: "" }
     : null;
   const storage = storageKey && storageZone && storageHost && cdnBaseUrl
-    ? { streamKey: "", libraryId: "", storageKey, storageZone, storageHost, cdnBaseUrl }
+    ? { streamKey: "", libraryId: "", collectionId: "", storageKey, storageZone, storageHost, cdnBaseUrl }
     : null;
   if (!storage && !reportedStorageConfigIssue
     && (storageKey || storageZone || rawStorageHost || rawCdnBaseUrl)) {
@@ -264,7 +266,7 @@ router.post("/filmmakers/media/trailer", async (req, res): Promise<void> => {
       {
         method: "POST",
         headers: { AccessKey: config.streamKey, "Content-Type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ title: owner.title ?? "Film trailer" }),
+        body: JSON.stringify({ title: owner.title ?? "Film trailer", collectionId: config.collectionId }),
       },
     );
     const createdBody: unknown = await created.json().catch(() => null);
