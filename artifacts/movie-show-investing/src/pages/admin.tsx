@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { getApp, getApps, initializeApp } from 'firebase/app';
+import { FirebaseError, getApp, getApps, initializeApp } from 'firebase/app';
 import {
   getAuth, isSignInWithEmailLink, onAuthStateChanged, sendSignInLinkToEmail,
   signInWithEmailLink, signOut, type Auth, type User,
@@ -27,6 +27,34 @@ const SECTIONS: { id: AdminSection; label: string; description: string }[] = [
 ];
 const EMAIL_KEY = 'msi_admin_email_link_address';
 const APP_NAME = 'movie-show-investing';
+
+function emailLinkError(error: unknown): string {
+  const code = error instanceof FirebaseError ? error.code : null;
+  switch (code) {
+    case 'auth/operation-not-allowed':
+      return 'Email-link sign-in is not enabled in Firebase. In Firebase Authentication → Sign-in method, enable Email/Password and Email link (passwordless sign-in).';
+    case 'auth/configuration-not-found':
+      return 'Firebase Authentication is not set up for this project. Enable Authentication and Email link (passwordless sign-in) in the Firebase console.';
+    case 'auth/unauthorized-domain':
+    case 'auth/unauthorized-continue-uri':
+    case 'auth/invalid-continue-uri':
+      return 'Firebase has not authorized this app’s return address. Add this preview domain under Firebase Authentication → Settings → Authorized domains.';
+    case 'auth/invalid-email':
+      return 'Firebase says this email address is not valid. Check the spelling and try again.';
+    case 'auth/invalid-api-key':
+    case 'auth/app-not-authorized':
+    case 'auth/project-not-found':
+      return `The Firebase web configuration needs attention (${code}). The site owner must check that the configured keys belong to the intended Firebase project.`;
+    case 'auth/too-many-requests':
+      return 'Firebase has temporarily limited sign-in requests. Please wait before trying again.';
+    case 'auth/network-request-failed':
+      return 'The request to Firebase could not connect. Check your connection and try again.';
+    default:
+      return code
+        ? `Firebase could not send the sign-in link (${code}). Please share this error code so we can fix the setup.`
+        : 'Firebase could not send the sign-in link. Please share what happened so we can investigate.';
+  }
+}
 
 function clearPrivateData(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.cancelQueries({ queryKey: getGetAdminMeQueryKey() });
@@ -326,8 +354,8 @@ export default function Admin() {
         setLinkHandled(true);
       }
       setCompletionAttempted(false);
-    } catch {
-      setFeedback('We could not send the sign-in link. Check the address and try again. If this continues, contact the site owner.');
+    } catch (error) {
+      setFeedback(emailLinkError(error));
     } finally { setBusy(false); }
   }
 
