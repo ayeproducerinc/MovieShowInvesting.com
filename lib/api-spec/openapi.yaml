@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: site
+    description: Public site setup and visitor tracking
 paths:
   /healthz:
     get:
@@ -24,6 +26,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /stats:
+    get:
+      operationId: getSiteStats
+      tags: [site]
+      summary: Database-backed home page count
+      responses:
+        "200":
+          description: Current filmmaker total
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SiteStats"
+  /config:
+    get:
+      operationId: getFirebaseConfig
+      tags: [site]
+      summary: Public Firebase web configuration
+      responses:
+        "200":
+          description: Configuration available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirebaseConfig"
+        "503":
+          description: Firebase has not been configured yet
+  /visit:
+    post:
+      operationId: recordVisit
+      tags: [site]
+      summary: Persist a visitor and their first campaign attribution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisitInput"
+      responses:
+        "200":
+          description: Existing or new visitor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Visit"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +79,31 @@ components:
           type: string
       required:
         - status
+    SiteStats:
+      type: object
+      required: [filmmakers]
+      properties:
+        filmmakers:
+          type: integer
+          minimum: 0
+    FirebaseConfig:
+      type: object
+      required: [apiKey, authDomain, projectId, appId]
+      properties:
+        apiKey: { type: string }
+        authDomain: { type: string }
+        projectId: { type: string }
+        appId: { type: string }
+    VisitInput:
+      type: object
+      properties:
+        utm_source: { type: string, maxLength: 200 }
+        utm_medium: { type: string, maxLength: 200 }
+        utm_campaign: { type: string, maxLength: 200 }
+        ref: { type: string, maxLength: 200 }
+    Visit:
+      type: object
+      required: [visitor_id]
+      properties:
+        visitor_id: { type: string }
 

@@ -4,7 +4,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 1 — Setup and shell
 
-**Status:** not started  
+**Status:** in progress — public shell and visitor tracking built; Firebase configuration is still needed to verify Auth initialization and close the gate.  
 **Deliverables:**
 
 - React/Vite and Tailwind frontend integrated with the existing Express API and PostgreSQL/Drizzle setup.

@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Movie Show Investing"
+description = "A mobile-first filmmaker and investor matching site for non-binding interest in films and shows."
+version = "1.0.0"
+id = "artifacts/movie-show-investing"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19237
+
+[services.development]
+run = "pnpm --filter @workspace/movie-show-investing run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/movie-show-investing", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/movie-show-investing/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19237"
+BASE_PATH = "/"
