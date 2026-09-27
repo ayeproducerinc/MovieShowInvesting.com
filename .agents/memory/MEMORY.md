@@ -1,0 +1,1 @@
+- [Firebase Auth config semantics](firebase-auth-config-semantics.md) — a missing passwordRequired field in the Admin API can mean false, not a failed passwordless update.
