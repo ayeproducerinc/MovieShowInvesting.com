@@ -1,1 +1,2 @@
 - [Firebase Auth config semantics](firebase-auth-config-semantics.md) — a missing passwordRequired field in the Admin API can mean false, not a failed passwordless update.
+- [Plain Node and DB package imports](plain-node-db-imports.md) — raw Node ESM cannot directly load the DB package's TypeScript source; the database driver belongs to that package.

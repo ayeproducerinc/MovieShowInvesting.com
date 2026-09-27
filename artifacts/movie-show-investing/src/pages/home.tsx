@@ -10,11 +10,11 @@ export default function Home() {
       <div className="page-wrap grid min-h-[680px] gap-10 pt-14 pb-14 md:min-h-[710px] md:grid-cols-[1.03fr_.97fr] md:items-center md:gap-14 md:pt-20 md:pb-24">
         <div className="relative z-10 reveal">
           <div className="mb-8 flex items-center gap-3"><span className="h-[1px] w-7 bg-[#943c55]"/><p className="eyebrow text-[#943c55]">A new path for independent film</p></div>
-          <h1 data-testid="text-home-headline" className="serif max-w-[780px] text-[clamp(4.2rem,8vw,8.5rem)] leading-[.87] tracking-[-.045em]">Fund your next film with investors, <em className="text-[#943c55]">not T-shirts.</em></h1>
-          <p className="mt-8 max-w-[485px] text-[16px] leading-[1.7] text-[#535b60] md:mt-10 md:text-[18px]">A place for filmmakers to share what they’re making, and for future investors to discover the stories behind it. We’re building the first steps now.</p>
+           <h1 data-testid="text-home-headline" className="serif max-w-[780px] text-[clamp(4.2rem,8vw,8.5rem)] leading-[.87] tracking-[-.045em]">Your film has a story. <em className="text-[#943c55]">So does its future.</em></h1>
+           <p className="mt-8 max-w-[485px] text-[16px] leading-[1.7] text-[#535b60] md:mt-10 md:text-[18px]">Tell us where your project stands and explore what a future path could look like. This is an early conversation, with no money collected and no decisions required.</p>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row md:mt-11">
             <ArrowButton href="/start/filmmaker" testId="link-home-filmmaker">I'm a filmmaker</ArrowButton>
-            <ArrowButton href="/invest" testId="link-home-invest" outline>I want to invest</ArrowButton>
+             <ArrowButton href="/invest" testId="link-home-invest" outline>For future investors</ArrowButton>
           </div>
           {stats.isLoading && <div aria-label="Loading filmmaker count" className="mt-10 h-4 w-44 animate-pulse bg-[#d9d1c3]"/>}
           {stats.isError && <div className="mt-7 text-xs text-[#64696b]">Community count is temporarily unavailable. <button type="button" data-testid="button-retry-stats" onClick={() => stats.refetch()} className="underline underline-offset-4 hover:text-[#943c55]">Try again</button></div>}
@@ -43,8 +43,8 @@ export default function Home() {
             <span className="mono text-[11px] text-[#943c55]">01 — FOR THE MAKERS</span>
             <Clapperboard className="mt-11 text-[#943c55]" size={32} strokeWidth={1.3}/>
             <h3 className="serif mt-5 text-[43px] leading-none">Bring your story.</h3>
-            <p className="mt-5 max-w-[400px] text-sm leading-[1.75] text-[#555c5e]">The filmmaker experience is being prepared first. When it opens, filmmakers will be able to share a project or simply tell us they’re here.</p>
-            <Link href="/start/filmmaker" data-testid="link-section-filmmaker" className="arrow-link mt-8 border-b border-[#943c55] pb-2 text-sm font-bold text-[#943c55]">See what’s coming <ArrowRight size={17}/></Link>
+             <p className="mt-5 max-w-[400px] text-sm leading-[1.75] text-[#555c5e]">Tell us where your project stands, explore illustrative terms, or simply let us know you’d like to be part of what comes next.</p>
+             <Link href="/start/filmmaker" data-testid="link-section-filmmaker" className="arrow-link mt-8 border-b border-[#943c55] pb-2 text-sm font-bold text-[#943c55]">Start the filmmaker worksheet <ArrowRight size={17}/></Link>
           </div>
           <div className="py-10 md:pl-16 md:py-14">
             <span className="mono text-[11px] text-[#943c55]">02 — FOR THE CURIOUS</span>
@@ -80,7 +80,7 @@ export default function Home() {
     <section className="border-t hairline bg-[#dcb17d] py-20 md:py-28">
       <div className="page-wrap flex flex-col gap-10 md:flex-row md:items-end md:justify-between">
         <div><p className="eyebrow text-[#733c45]">The opening frame</p><h2 className="serif mt-6 max-w-[740px] text-[clamp(3.6rem,7vw,7.7rem)] leading-[.9] tracking-[-.04em]">Your story is<br/><em>the starting point.</em></h2></div>
-        <div className="flex flex-col items-start gap-4"><ArrowButton href="/start/filmmaker" testId="link-bottom-filmmaker">For filmmakers</ArrowButton><p className="max-w-[255px] text-xs leading-relaxed text-[#5a4a47]">The filmmaker flow is opening later. See where things stand today.</p></div>
+         <div className="flex flex-col items-start gap-4"><ArrowButton href="/start/filmmaker" testId="link-bottom-filmmaker">Start the worksheet</ArrowButton><p className="max-w-[255px] text-xs leading-relaxed text-[#5a4a47]">Explore the early-stage questions at your own pace. No money is collected.</p></div>
       </div>
     </section>
   </>;

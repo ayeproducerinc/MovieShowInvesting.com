@@ -69,6 +69,102 @@ export interface SaveProgressInput {
   completed?: boolean;
 }
 
+export type FilmmakerSubmissionInputStage = typeof FilmmakerSubmissionInputStage[keyof typeof FilmmakerSubmissionInputStage];
+
+
+export const FilmmakerSubmissionInputStage = {
+  distribution: 'distribution',
+  production: 'production',
+  idea: 'idea',
+  other: 'other',
+} as const;
+
+export type FilmmakerSubmissionInputFormat = typeof FilmmakerSubmissionInputFormat[keyof typeof FilmmakerSubmissionInputFormat];
+
+
+export const FilmmakerSubmissionInputFormat = {
+  movie: 'movie',
+  show: 'show',
+} as const;
+
+export type FilmmakerSubmissionInputGenre = typeof FilmmakerSubmissionInputGenre[keyof typeof FilmmakerSubmissionInputGenre];
+
+
+export const FilmmakerSubmissionInputGenre = {
+  Horror: 'Horror',
+  Drama: 'Drama',
+  Comedy: 'Comedy',
+  Thriller: 'Thriller',
+  Documentary: 'Documentary',
+  'Sci-Fi': 'Sci-Fi',
+  Other: 'Other',
+} as const;
+
+export type FilmmakerSubmissionInputDealAnswer = typeof FilmmakerSubmissionInputDealAnswer[keyof typeof FilmmakerSubmissionInputDealAnswer];
+
+
+export const FilmmakerSubmissionInputDealAnswer = {
+  yes: 'yes',
+  maybe: 'maybe',
+  no: 'no',
+} as const;
+
+export type FilmmakerSubmissionInputPaybackTerms = typeof FilmmakerSubmissionInputPaybackTerms[keyof typeof FilmmakerSubmissionInputPaybackTerms];
+
+
+export const FilmmakerSubmissionInputPaybackTerms = {
+  works: 'works',
+  need_some: 'need_some',
+  other: 'other',
+} as const;
+
+export interface FilmmakerSubmissionInput {
+  no_project_yet: boolean;
+  stage?: FilmmakerSubmissionInputStage;
+  stage_other?: string;
+  title?: string;
+  format?: FilmmakerSubmissionInputFormat;
+  genre?: FilmmakerSubmissionInputGenre;
+  genre_other?: string;
+  logline?: string;
+  trailer_url?: string;
+  pilot_url?: string;
+  /** @minimum 1 */
+  budget?: number;
+  budget_from_example?: boolean;
+  deal_answer?: FilmmakerSubmissionInputDealAnswer;
+  /** @minimum 125 */
+  offer_per100?: number;
+  offer_other_text?: string;
+  wants_lower?: boolean;
+  payback_terms?: FilmmakerSubmissionInputPaybackTerms;
+  payback_terms_other?: string;
+  funding_sources?: string[];
+  funding_other?: string;
+  reached_goal?: boolean;
+  funding_experience?: string;
+  /** @minLength 1 */
+  name: string;
+  email: string;
+  /** @minLength 1 */
+  city: string;
+  /** @minLength 1 */
+  state: string;
+  favorite_genres: string[];
+  chat_opt_in: boolean;
+  phone?: string;
+}
+
+export interface FilmmakerSubmission {
+  /** @minimum 1 */
+  filmmaker_id: number;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  project_id: number | null;
+}
+
 export type FlowProgressAnswers = { [key: string]: unknown };
 
 export interface FlowProgress {

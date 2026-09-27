@@ -14,6 +14,8 @@ tags:
     description: Public site setup and visitor tracking
   - name: progress
     description: Saved flow progress and visitor assignment
+  - name: filmmakers
+    description: Filmmaker submissions
   - name: admin
     description: Firebase-protected administration
 paths:
@@ -126,6 +128,26 @@ paths:
                 $ref: "#/components/schemas/FlowProgress"
         "400":
           description: Invalid input or missing visitor
+  /filmmakers:
+    post:
+      operationId: submitFilmmaker
+      tags: [filmmakers]
+      summary: Submit the filmmaker flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FilmmakerSubmissionInput"
+      responses:
+        "201":
+          description: Filmmaker submission created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerSubmission"
+        "400":
+          description: Invalid submission or missing visitor
   /admin/me:
     get:
       operationId: getAdminMe
@@ -292,6 +314,50 @@ components:
           type: object
           additionalProperties: true
         completed: { type: boolean }
+    FilmmakerSubmissionInput:
+      type: object
+      additionalProperties: false
+      required: [no_project_yet, name, email, city, state, favorite_genres, chat_opt_in]
+      properties:
+        no_project_yet: { type: boolean }
+        stage: { type: string, enum: [distribution, production, idea, other] }
+        stage_other: { type: string }
+        title: { type: string }
+        format: { type: string, enum: [movie, show] }
+        genre: { type: string, enum: [Horror, Drama, Comedy, Thriller, Documentary, Sci-Fi, Other] }
+        genre_other: { type: string }
+        logline: { type: string }
+        trailer_url: { type: string }
+        pilot_url: { type: string }
+        budget: { type: integer, minimum: 1 }
+        budget_from_example: { type: boolean }
+        deal_answer: { type: string, enum: [yes, maybe, no] }
+        offer_per100: { type: integer, minimum: 125 }
+        offer_other_text: { type: string }
+        wants_lower: { type: boolean }
+        payback_terms: { type: string, enum: [works, need_some, other] }
+        payback_terms_other: { type: string }
+        funding_sources:
+          type: array
+          items: { type: string }
+        funding_other: { type: string }
+        reached_goal: { type: boolean }
+        funding_experience: { type: string }
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        city: { type: string, minLength: 1 }
+        state: { type: string, minLength: 1 }
+        favorite_genres:
+          type: array
+          items: { type: string }
+        chat_opt_in: { type: boolean }
+        phone: { type: string }
+    FilmmakerSubmission:
+      type: object
+      required: [filmmaker_id, project_id]
+      properties:
+        filmmaker_id: { type: integer, minimum: 1 }
+        project_id: { type: ["integer", "null"], minimum: 1 }
     FlowProgress:
       type: object
       required: [flow, last_screen, answers, completed, updated_at]

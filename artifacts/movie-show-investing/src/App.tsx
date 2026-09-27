@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { RotateCcw } from 'lucide-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -12,6 +13,7 @@ import Admin from '@/pages/admin';
 import FAQ from '@/pages/faq';
 import Legal from '@/pages/legal';
 import OpeningLater from '@/pages/opening-later';
+import Filmmaker, { FilmmakerDone } from '@/pages/filmmaker';
 import NotFound from '@/pages/not-found';
 
 const queryClient = new QueryClient();
@@ -22,7 +24,8 @@ const metadata: Record<string, [string, string]> = {
   '/terms': ['Terms | Movie Show Investing', 'Prelaunch terms for the Movie Show Investing informational site.'],
   '/disclaimers': ['Disclaimers | Movie Show Investing', 'Important context about non-binding interest, securities, and investment risk.'],
   '/invest': ['For investors | Movie Show Investing', 'Investor signup and non-binding pledges will open later, after approved projects are available.'],
-  '/start/filmmaker': ['For filmmakers | Movie Show Investing', 'The filmmaker experience is being prepared and project submissions are not yet open.'],
+   '/start/filmmaker': ['Filmmaker worksheet | Movie Show Investing', 'Share your project and explore illustrative terms in a guided prelaunch worksheet.'],
+   '/start/filmmaker/done': ['Thank you | Movie Show Investing', 'Your filmmaker answers have been received.'],
 };
 
 function PageMetadata() {
@@ -54,7 +57,7 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 }
 
 function PublicPages() {
-  useVisitAttribution();
+  const visit = useVisitAttribution();
   return <>
     <FirebaseBootstrap />
     <SiteShell>
@@ -67,7 +70,17 @@ function PublicPages() {
         <Route path="/terms">{() => <Legal kind="terms" />}</Route>
         <Route path="/disclaimers">{() => <Legal kind="disclaimers" />}</Route>
         <Route path="/invest">{() => <OpeningLater audience="investor" />}</Route>
-        <Route path="/start/filmmaker">{() => <OpeningLater audience="filmmaker" />}</Route>
+         <Route path="/start/filmmaker/done" component={FilmmakerDone} />
+         <Route path="/start/filmmaker">{() => visit.status === 'ready'
+           ? <Filmmaker />
+           : <section className="fm"><div className="page-wrap" style={{padding:'clamp(80px,10vw,150px) 0 160px'}}>
+             {visit.status === 'error' ? <>
+               <p className="fm-kicker">Connection interrupted</p>
+               <h1 className="serif" style={{fontSize:'clamp(54px,7vw,94px)',lineHeight:'.95',margin:'24px 0'}}>We can’t open your worksheet yet.</h1>
+               <p className="fm-small" role="alert" data-testid="error-visit">We couldn’t establish your visit, so your answers would not be saved reliably. Please retry before continuing.</p>
+               <button type="button" data-testid="button-retry-visit" className="fm-primary" style={{marginTop:28}} onClick={visit.retry}><RotateCcw size={17}/> Try again</button>
+             </> : <div aria-label="Preparing your visit"><p className="fm-kicker">Preparing your worksheet</p><div className="fm-skeleton" style={{maxWidth:430,height:76,marginTop:28}}/><div className="fm-skeleton" style={{maxWidth:600,height:190}}/></div>}
+           </div></section>}</Route>
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>

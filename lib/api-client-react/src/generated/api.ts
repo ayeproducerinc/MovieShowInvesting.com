@@ -27,6 +27,8 @@ import type {
   AdminProjectReviewInput,
   AdminSection,
   AdminTable,
+  FilmmakerSubmission,
+  FilmmakerSubmissionInput,
   FirebaseConfig,
   Flow,
   FlowProgress,
@@ -625,6 +627,94 @@ export const useSaveFlowProgress = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getSaveFlowProgressMutationOptions(options));
+    }
+
+export const getSubmitFilmmakerUrl = () => {
+
+
+
+
+  return `/api/filmmakers`
+}
+
+/**
+ * @summary Submit the filmmaker flow
+ */
+export const submitFilmmaker = async (filmmakerSubmissionInput: FilmmakerSubmissionInput, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerSubmission> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerSubmission>(getSubmitFilmmakerUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(filmmakerSubmissionInput)
+  }
+);}
+
+
+
+
+
+export const getSubmitFilmmakerMutationKey = () => ['submitFilmmaker'] as const;
+
+export const getSubmitFilmmakerMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitFilmmaker>>, TError,SubmitFilmmakerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitFilmmaker>>, TError,SubmitFilmmakerMutationVariables, TContext> => {
+
+const mutationKey = getSubmitFilmmakerMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitFilmmaker>>, SubmitFilmmakerMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitFilmmaker(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitFilmmakerMutationResult = NonNullable<Awaited<ReturnType<typeof submitFilmmaker>>>
+    export type SubmitFilmmakerMutationBody = BodyType<FilmmakerSubmissionInput>
+    export type SubmitFilmmakerMutationError = ErrorType<void>
+    export type SubmitFilmmakerMutationVariables = {data: BodyType<FilmmakerSubmissionInput>}
+
+    /**
+ * @summary Submit the filmmaker flow
+ */
+export const useSubmitFilmmaker = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitFilmmaker>>, TError,SubmitFilmmakerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitFilmmaker>>,
+        TError,
+        SubmitFilmmakerMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubmitFilmmakerMutationOptions(options));
     }
 
 export const getGetAdminMeUrl = () => {

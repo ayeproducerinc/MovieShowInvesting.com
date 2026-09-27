@@ -1,8 +1,15 @@
+import { randomUUID } from "node:crypto";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { and, count, eq, isNull, sql } from "drizzle-orm";
 import pg from "pg";
 import * as schema from "./schema";
-import { flowProgressTable, visitorsTable, type FlowProgressRecord } from "./schema";
+import {
+  flowProgressTable,
+  filmmakersTable,
+  projectsTable,
+  visitorsTable,
+  type FlowProgressRecord,
+} from "./schema";
 
 const { Pool } = pg;
 
@@ -81,6 +88,37 @@ export async function saveVisitorFlowProgress(input: {
   answers: Record<string, unknown>;
   completed: boolean;
 }): Promise<FlowProgressRecord> {
+  if (input.flow === "filmmaker") {
+    return db.transaction(async (tx) => {
+      await tx.select({ visitorId: visitorsTable.visitorId })
+        .from(visitorsTable)
+        .where(eq(visitorsTable.visitorId, input.visitorId))
+        .for("update");
+
+      const [existing] = await tx.select().from(flowProgressTable).where(and(
+        eq(flowProgressTable.visitorId, input.visitorId),
+        eq(flowProgressTable.flow, "filmmaker"),
+      ));
+      if (existing?.completed) {
+        return existing;
+      }
+
+      const [record] = await tx.insert(flowProgressTable).values({
+        ...input,
+        completed: false,
+      }).onConflictDoUpdate({
+        target: [flowProgressTable.visitorId, flowProgressTable.flow],
+        set: {
+          lastScreen: input.lastScreen,
+          answers: input.answers,
+          completed: false,
+          updatedAt: new Date(),
+        },
+      }).returning();
+      return record;
+    });
+  }
+
   const [record] = await db.insert(flowProgressTable).values(input).onConflictDoUpdate({
     target: [flowProgressTable.visitorId, flowProgressTable.flow],
     set: {
@@ -91,6 +129,170 @@ export async function saveVisitorFlowProgress(input: {
     },
   }).returning();
   return record;
+}
+
+export type FilmmakerSubmissionData = {
+  no_project_yet: boolean;
+  stage?: "distribution" | "production" | "idea" | "other";
+  stage_other?: string;
+  title?: string;
+  format?: "movie" | "show";
+  genre?: "Horror" | "Drama" | "Comedy" | "Thriller" | "Documentary" | "Sci-Fi" | "Other";
+  genre_other?: string;
+  logline?: string;
+  trailer_url?: string;
+  pilot_url?: string;
+  budget?: number;
+  budget_from_example?: boolean;
+  deal_answer?: "yes" | "maybe" | "no";
+  offer_per100?: number;
+  offer_other_text?: string;
+  wants_lower?: boolean;
+  payback_terms?: "works" | "need_some" | "other";
+  payback_terms_other?: string;
+  funding_sources?: string[];
+  funding_other?: string;
+  reached_goal?: boolean;
+  funding_experience?: string;
+  name: string;
+  email: string;
+  city: string;
+  state: string;
+  favorite_genres: string[];
+  chat_opt_in: boolean;
+  phone?: string;
+};
+
+export class FilmmakerSubmissionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FilmmakerSubmissionError";
+  }
+}
+
+export async function createFilmmakerSubmission(input: {
+  visitorId: string;
+  data: FilmmakerSubmissionData;
+}): Promise<{ filmmakerId: number; projectId: number | null }> {
+  return db.transaction(async (tx) => {
+    const [visitor] = await tx.select().from(visitorsTable)
+      .where(eq(visitorsTable.visitorId, input.visitorId))
+      .for("update");
+    if (!visitor) {
+      throw new FilmmakerSubmissionError("Visitor must be recorded before submitting.");
+    }
+    if (!input.data.no_project_yet && visitor.priceGroup !== "A" && visitor.priceGroup !== "B") {
+      throw new FilmmakerSubmissionError("A price group is required before project submission.");
+    }
+
+    const [existingProgress] = await tx.select().from(flowProgressTable).where(and(
+      eq(flowProgressTable.visitorId, input.visitorId),
+      eq(flowProgressTable.flow, "filmmaker"),
+    ));
+    if (existingProgress?.completed) {
+      const stored = existingProgress.answers._submission;
+      if (stored && typeof stored === "object") {
+        const submission = stored as { filmmaker_id?: unknown; project_id?: unknown };
+        if (typeof submission.filmmaker_id === "number"
+          && (submission.project_id === null || typeof submission.project_id === "number")) {
+          const [priorFilmmaker] = await tx.select({ id: filmmakersTable.id })
+            .from(filmmakersTable)
+            .where(and(
+              eq(filmmakersTable.id, submission.filmmaker_id),
+              eq(filmmakersTable.visitorId, input.visitorId),
+            ));
+          const [priorProject] = submission.project_id === null
+            ? [undefined]
+            : await tx.select({ id: projectsTable.id }).from(projectsTable).where(and(
+              eq(projectsTable.id, submission.project_id),
+              eq(projectsTable.filmmakerId, submission.filmmaker_id),
+            ));
+          if (priorFilmmaker && (submission.project_id === null || priorProject)) {
+            return {
+              filmmakerId: priorFilmmaker.id,
+              projectId: priorProject?.id ?? null,
+            };
+          }
+        }
+      }
+    }
+
+    const [filmmaker] = await tx.insert(filmmakersTable).values({
+      name: input.data.name,
+      email: input.data.email,
+      phone: input.data.phone,
+      city: input.data.city,
+      state: input.data.state,
+      favoriteGenres: input.data.favorite_genres,
+      chatOptIn: input.data.chat_opt_in,
+      noProjectYet: input.data.no_project_yet,
+      visitorId: input.visitorId,
+      fundingSources: input.data.funding_sources,
+      fundingOther: input.data.funding_other,
+      reachedGoal: input.data.reached_goal,
+      fundingExperience: input.data.funding_experience,
+    }).returning({ id: filmmakersTable.id });
+
+    const submittedAnswers = {
+      ...input.data,
+      ...(!input.data.no_project_yet && input.data.wants_lower ? { offer_per100: 125 } : {}),
+    };
+    let projectId: number | null = null;
+    if (!input.data.no_project_yet) {
+      const title = input.data.title!;
+      const slugBase = title.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 70) || "project";
+      const [project] = await tx.insert(projectsTable).values({
+        filmmakerId: filmmaker.id,
+        slug: `${slugBase}-${randomUUID()}`,
+        title,
+        format: input.data.format,
+        genre: input.data.genre,
+        genreOther: input.data.genre_other,
+        stage: input.data.stage,
+        stageOther: input.data.stage_other,
+        logline: input.data.logline,
+        trailerUrl: input.data.trailer_url,
+        pilotUrl: input.data.pilot_url,
+        budget: input.data.budget,
+        budgetFromExample: input.data.budget_from_example,
+        priceGroup: visitor.priceGroup,
+        dealAnswer: input.data.deal_answer,
+        offerPer100: input.data.wants_lower ? 125 : input.data.offer_per100,
+        offerOtherText: input.data.offer_other_text,
+        wantsLower: input.data.wants_lower,
+        paybackTerms: input.data.payback_terms,
+        paybackTermsOther: input.data.payback_terms_other,
+      }).returning({ id: projectsTable.id });
+      projectId = project.id;
+    }
+
+    await tx.insert(flowProgressTable).values({
+      visitorId: input.visitorId,
+      flow: "filmmaker",
+      lastScreen: 6,
+      answers: {
+        ...(existingProgress?.answers ?? {}),
+        ...submittedAnswers,
+        _submission: { filmmaker_id: filmmaker.id, project_id: projectId },
+      },
+      completed: true,
+    }).onConflictDoUpdate({
+      target: [flowProgressTable.visitorId, flowProgressTable.flow],
+      set: {
+        lastScreen: 6,
+        answers: {
+          ...(existingProgress?.answers ?? {}),
+          ...submittedAnswers,
+          _submission: { filmmaker_id: filmmaker.id, project_id: projectId },
+        },
+        completed: true,
+        updatedAt: new Date(),
+      },
+    });
+
+    return { filmmakerId: filmmaker.id, projectId };
+  });
 }
 
 export async function updateProjectReview(

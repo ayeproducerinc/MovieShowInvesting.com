@@ -113,6 +113,59 @@ export const SaveFlowProgressResponse = zod.object({
 
 
 /**
+ * @summary Submit the filmmaker flow
+ */
+
+export const submitFilmmakerBodyOfferPer100Min = 125;
+
+
+
+
+
+
+export const SubmitFilmmakerBody = zod.object({
+  "no_project_yet": zod.boolean(),
+  "stage": zod.enum(['distribution', 'production', 'idea', 'other']).optional(),
+  "stage_other": zod.string().optional(),
+  "title": zod.string().optional(),
+  "format": zod.enum(['movie', 'show']).optional(),
+  "genre": zod.enum(['Horror', 'Drama', 'Comedy', 'Thriller', 'Documentary', 'Sci-Fi', 'Other']).optional(),
+  "genre_other": zod.string().optional(),
+  "logline": zod.string().optional(),
+  "trailer_url": zod.string().optional(),
+  "pilot_url": zod.string().optional(),
+  "budget": zod.number().int().min(1).optional(),
+  "budget_from_example": zod.boolean().optional(),
+  "deal_answer": zod.enum(['yes', 'maybe', 'no']).optional(),
+  "offer_per100": zod.number().int().min(submitFilmmakerBodyOfferPer100Min).optional(),
+  "offer_other_text": zod.string().optional(),
+  "wants_lower": zod.boolean().optional(),
+  "payback_terms": zod.enum(['works', 'need_some', 'other']).optional(),
+  "payback_terms_other": zod.string().optional(),
+  "funding_sources": zod.array(zod.string()).optional(),
+  "funding_other": zod.string().optional(),
+  "reached_goal": zod.boolean().optional(),
+  "funding_experience": zod.string().optional(),
+  "name": zod.string().min(1),
+  "email": zod.string().email(),
+  "city": zod.string().min(1),
+  "state": zod.string().min(1),
+  "favorite_genres": zod.array(zod.string()),
+  "chat_opt_in": zod.boolean(),
+  "phone": zod.string().optional()
+})
+
+
+
+
+
+export const SubmitFilmmakerResponse = zod.object({
+  "filmmaker_id": zod.number().int().min(1),
+  "project_id": zod.number().int().min(1).nullable()
+})
+
+
+/**
  * @summary Check verified Firebase admin access
  */
 export const GetAdminMeResponse = zod.object({

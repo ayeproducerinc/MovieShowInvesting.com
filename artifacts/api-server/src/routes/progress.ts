@@ -90,6 +90,10 @@ router.post("/progress", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid progress input." });
     return;
   }
+  if (parsed.data.flow === "filmmaker" && parsed.data.completed === true) {
+    res.status(400).json({ error: "Filmmaker progress is completed only by final submission." });
+    return;
+  }
 
   const cookieId = req.cookies?.[VISITOR_COOKIE];
   if (typeof cookieId !== "string" || !UUID.test(cookieId)) {

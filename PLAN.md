@@ -31,7 +31,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 3 — Filmmaker flow
 
-**Status:** not started  
+**Status:** complete — the six-screen intake saves and restores progress, shows the approved slate and price-group calculations, enforces the $125 floor, and submits real filmmaker/project records (or a filmmaker alone on the no-project path). F1–F4 calculator values and budget lists were checked; isolated API submissions verified F4’s saved floor, F5’s no-project branch, completed-progress protection, and idempotency, then the test records were removed. The finished result/share experience remains Phase 4.
 **Deliverables:**
 
 - Six-screen flow at `/start/filmmaker`, with progress, back navigation, auto-advance where specified, and progress saved after every screen for same-device resume.
