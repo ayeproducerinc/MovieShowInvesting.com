@@ -27,6 +27,7 @@ const MAX_TRAILER_BYTES = 500 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 40_000_000;
 const MAX_CONCURRENT_TRAILER_UPLOADS = 4;
+const IMAGE_STORAGE_FOLDER = "Movie Show Investing folder";
 const TRAILER_TYPES = ["video/mp4", "video/webm", "video/quicktime"] as const;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 const STORAGE_HOSTS = new Set([
@@ -41,6 +42,7 @@ const STORAGE_HOSTS = new Set([
   "jh.storage.bunnycdn.com",
 ]);
 const activeTrailerUploads = new Set<string>();
+let reportedStorageConfigIssue = false;
 
 type BunnyConfig = {
   streamKey: string;
@@ -100,6 +102,17 @@ function readConfig(): { stream: BunnyConfig | null; storage: BunnyConfig | null
   const storage = storageKey && storageZone && storageHost && cdnBaseUrl
     ? { streamKey: "", libraryId: "", storageKey, storageZone, storageHost, cdnBaseUrl }
     : null;
+  if (!storage && !reportedStorageConfigIssue
+    && (storageKey || storageZone || rawStorageHost || rawCdnBaseUrl)) {
+    const invalid = [
+      !storageKey && "BUNNY_STORAGE_API_KEY",
+      !storageZone && "BUNNY_STORAGE_ZONE",
+      !storageHost && "BUNNY_STORAGE_HOST (must be a supported Bunny Storage hostname)",
+      !cdnBaseUrl && "BUNNY_CDN_BASE_URL (must be an HTTPS URL)",
+    ].filter(Boolean);
+    console.warn(`Bunny Storage unavailable. Check ${invalid.join(", ")}. No secret values logged.`);
+    reportedStorageConfigIssue = true;
+  }
   return { stream, storage };
 }
 
@@ -449,7 +462,7 @@ router.post(
 
     const extension = outputType === "image/jpeg" ? "jpg" : outputType.split("/")[1];
     const objectName = `${randomUUID()}.${extension}`;
-    const path = `filmmakers/${owner.id}/${objectName}`;
+    const path = `${IMAGE_STORAGE_FOLDER}/filmmakers/${owner.id}/${objectName}`;
     const storageUrl = `https://${config.storageHost}/${encodeURIComponent(config.storageZone)}/${path
       .split("/").map(encodeURIComponent).join("/")}`;
     const cdnUrl = `${config.cdnBaseUrl}/${path.split("/").map(encodeURIComponent).join("/")}`;
