@@ -18,12 +18,14 @@ import {
 } from "@workspace/api-zod";
 import { authenticateFilmmaker } from "../lib/filmmaker-auth";
 import { sendTransactionalEmail } from "../lib/mailjet";
+import { allowedTurnstileHostnames, getTurnstileConfig, verifyTurnstileToken } from "../lib/cloudflare-turnstile";
 
 const router: IRouter = Router();
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ASKER_LIMIT = 5;
 const ASKER_WINDOW_MS = 24 * 60 * 60 * 1000;
 const IP_LIMIT = 20;
+const ASK_TURNSTILE_ACTION = "ask_filmmaker";
 
 function digest(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -51,11 +53,6 @@ function configuredAppBaseUrl(): string | null {
   } catch {
     return null;
   }
-}
-
-function turnstileSiteKey(): string | null {
-  const value = process.env.CLOUDFLARE_TURNSTILE_SITE_KEY ?? process.env.TURNSTILE_SITE_KEY;
-  return value?.trim() || null;
 }
 
 async function allowIpAttempt(ip: string): Promise<boolean> {
@@ -89,25 +86,6 @@ async function allowIpAttempt(ip: string): Promise<boolean> {
     throw error;
   } finally {
     client.release();
-  }
-}
-
-async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
-  const secret = process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY ?? process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) return false;
-  try {
-    const body = new URLSearchParams({ secret, response: token, remoteip: ip });
-    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body,
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) return false;
-    const result: unknown = await response.json();
-    return result !== null && typeof result === "object" && "success" in result && result.success === true;
-  } catch {
-    return false;
   }
 }
 
@@ -249,14 +227,13 @@ async function sendReservedAnswer(
 }
 
 router.get("/question-config", (_req, res): void => {
-  const siteKey = turnstileSiteKey();
-  const hasSecret = Boolean((process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY ?? process.env.TURNSTILE_SECRET_KEY)?.trim());
+  const { siteKey, secretKey } = getTurnstileConfig();
   const hasMailjet = Boolean(
     process.env.MAILJET_API_KEY?.trim()
     && process.env.MAILJET_SECRET_KEY?.trim()
     && process.env.MAILJET_SENDER_EMAIL?.trim(),
   );
-  const available = Boolean(siteKey && hasSecret && hasMailjet && configuredAppBaseUrl());
+  const available = Boolean(siteKey && secretKey && allowedTurnstileHostnames().length && hasMailjet && configuredAppBaseUrl());
   res.json(GetQuestionConfigResponse.parse({
     available,
     turnstile_site_key: available ? siteKey : null,
@@ -264,6 +241,11 @@ router.get("/question-config", (_req, res): void => {
 });
 
 router.post("/projects/:slug/questions", async (req, res): Promise<void> => {
+  const turnstile = getTurnstileConfig();
+  if (!turnstile.siteKey || !turnstile.secretKey || !allowedTurnstileHostnames().length) {
+    res.status(503).json({ error: "Questions are unavailable until anti-bot protection is configured." });
+    return;
+  }
   const ip = req.ip || req.socket.remoteAddress || "unknown";
   if (!await allowIpAttempt(ip)) {
     res.status(429).json({ error: "Too many questions from this network. Please try again later." });
@@ -281,11 +263,15 @@ router.post("/projects/:slug/questions", async (req, res): Promise<void> => {
     email: parsedBody.data.email.trim().toLowerCase(),
     question: parsedBody.data.question.trim(),
   };
+  if (input.website?.trim()) {
+    res.status(400).json({ error: "Invalid question submission." });
+    return;
+  }
   if (!input.first_name || input.question.length < 5) {
     res.status(400).json({ error: "Provide a valid first name, email, question, and Turnstile response." });
     return;
   }
-  if (!await verifyTurnstile(input.turnstile_token, ip)) {
+  if (!await verifyTurnstileToken(input.turnstile_token, { ip, action: ASK_TURNSTILE_ACTION })) {
     res.status(403).json({ error: "The anti-bot verification could not be verified. Please try again." });
     return;
   }

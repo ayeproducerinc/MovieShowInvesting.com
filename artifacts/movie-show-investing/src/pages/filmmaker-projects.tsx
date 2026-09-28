@@ -46,6 +46,7 @@ export default function FilmmakerProjects() {
   const claimedUid = useRef<string | null>(null);
   const uid = auth.user?.uid;
   const identityId = ssoUser?.id ?? uid;
+  const identityProvider = ssoUser ? 'replit' : uid ? 'firebase' : null;
   const user = auth.user;
 
   const projects = useGetFilmmakerProjects({
@@ -180,6 +181,6 @@ export default function FilmmakerProjects() {
     />
     {!projects.isPending && !projects.isError && !claiming && identityId && <FilmmakerInterestAlerts key={identityId} uid={identityId} busy={acting} onOpenProject={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}/>}
     {!projects.isPending && !projects.isError && !claiming && <FilmmakerQuestionsDesk projects={projects.data?.projects ?? []}/>}
-    {!projects.isPending && !projects.isError && !claiming && identityId && <FilmmakerConversationsDesk uid={identityId} projectIds={(projects.data?.projects ?? []).map(project => project.id)}/>}
+    {!projects.isPending && !projects.isError && !claiming && identityId && identityProvider && <FilmmakerConversationsDesk key={`${identityProvider}:${identityId}`} provider={identityProvider} uid={identityId} projectIds={(projects.data?.projects ?? []).map(project => project.id)}/>}
   </>;
 }

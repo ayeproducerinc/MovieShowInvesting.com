@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { pool } from "@workspace/db";
 import { resolveProtectedIdentity, type FilmmakerIdentity } from "./filmmaker-auth";
+import { getFirebaseUidForEmail } from "./firebase-admin";
 import { ISSUER_URL } from "./replit-auth";
 
 function normalizedEmail(value: string): string {
@@ -22,6 +23,21 @@ export async function authorizeAdminIdentity(
   if (identity.email !== adminEmail) {
     res.status(403).json({ error: "This account is not an administrator." });
     return null;
+  }
+
+  if (identity.provider === "firebase") {
+    let canonicalUid: string;
+    try {
+      canonicalUid = await getFirebaseUidForEmail(adminEmail);
+    } catch {
+      req.log.error("Firebase admin identity lookup unavailable");
+      res.status(503).json({ error: "Admin access could not be verified right now." });
+      return null;
+    }
+    if (identity.uid !== canonicalUid) {
+      res.status(403).json({ error: "This account is not an administrator." });
+      return null;
+    }
   }
 
   if (identity.provider === "replit") {

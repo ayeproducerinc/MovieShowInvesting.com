@@ -19,3 +19,4 @@
 - [Repeat interest signatures](repeat-interest-signatures.md) — a new non-binding indication after confirmation must be a separate signed snapshot; never reinterpret the original investor record.
 - [Public sharing and browser activation](public-sharing-browser-activation.md) — refresh share eligibility in the background, but do not await a network check before native share or clipboard calls.
 - [Analytics capture boundary](analytics-capture-boundary.md) — only opt-in masked replay on public pages was approved; private investor and filmmaker routes remain excluded.
+- [Turnstile hostname boundary](turnstile-host-boundary.md) — verify challenge hosts against configured app domains, not proxy-derived request headers.

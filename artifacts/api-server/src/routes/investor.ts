@@ -461,9 +461,13 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
   if (identity) {
     const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
     const { rows } = await pool.query<InvestorRow>(
-      `select * from investors where ${uidColumn} = $1 order by id limit 1`,
+      `select * from investors where ${uidColumn} = $1 order by id`,
       [identity.uid],
     );
+    if (rows.length > 1) {
+      res.status(409).json({ error: "This account has multiple investor interest records and cannot be read safely." });
+      return;
+    }
     investor = rows[0];
     if (investor && investor.email?.trim().toLowerCase() !== identity.email) {
       res.status(403).json({ error: "This investor intent is not associated with the verified account email." });
@@ -473,9 +477,13 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
     // Linked investor records are never accessible through a guest cookie,
     // including the visitor cookie originally used before account linking.
     const { rows } = await pool.query<InvestorRow>(
-      "select * from investors where visitor_id = $1 and firebase_uid is null and replit_uid is null order by id limit 1",
+      "select * from investors where visitor_id = $1 and firebase_uid is null and replit_uid is null order by id",
       [visitorId],
     );
+    if (rows.length > 1) {
+      res.status(409).json({ error: "This browser has multiple guest investor interest records and cannot be read safely." });
+      return;
+    }
     investor = rows[0];
   }
   if (!investor) {
@@ -572,6 +580,11 @@ router.post("/investor/intents/claim", async (req, res): Promise<void> => {
     const { rows: visitors } = await client.query<InvestorRow>(
       "select * from investors where visitor_id = $1 for update", [visitorId],
     );
+    if (visitors.length > 1) {
+      await client.query("rollback");
+      res.status(409).json({ error: "This browser has multiple investor interest records and cannot be claimed safely." });
+      return;
+    }
     const guest = visitors[0];
     if (!guest) {
       await client.query("rollback");
@@ -597,6 +610,11 @@ router.post("/investor/intents/claim", async (req, res): Promise<void> => {
     const { rows: accountRows } = await client.query<InvestorRow>(
       `select * from investors where ${uidColumn} = $1 for update`, [identity.uid],
     );
+    if (accountRows.length > 1) {
+      await client.query("rollback");
+      res.status(409).json({ error: "This account has multiple investor interest records and cannot be linked safely." });
+      return;
+    }
     if (accountRows[0] && accountRows[0].id !== guest.id) {
       await client.query("rollback");
       res.status(409).json({ error: "This account already has a different investor interest record." });
@@ -637,6 +655,11 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
     const { rows } = await client.query<InvestorRow>(
       `select * from investors where ${uidColumn} = $1 for update`, [identity.uid],
     );
+    if (rows.length > 1) {
+      await client.query("rollback");
+      res.status(409).json({ error: "This account has multiple investor interest records and cannot be confirmed safely." });
+      return;
+    }
     const investor = rows[0];
     if (!investor) {
       await client.query("rollback");

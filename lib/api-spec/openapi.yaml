@@ -1384,6 +1384,7 @@ components:
       additionalProperties: false
       required: [first_name, email, question, turnstile_token]
       properties:
+        website: { type: string, maxLength: 256, description: "Leave blank. Bot-detection field; never saved." }
         first_name: { type: string, minLength: 1, maxLength: 80 }
         email: { type: string, format: email, maxLength: 254 }
         question: { type: string, minLength: 5, maxLength: 3000 }

@@ -37,6 +37,11 @@ export interface QuestionConfig {
 
 export interface QuestionInput {
   /**
+     * Leave blank. Bot-detection field; never saved.
+     * @maxLength 256
+     */
+  website?: string;
+  /**
      * @minLength 1
      * @maxLength 80
      */

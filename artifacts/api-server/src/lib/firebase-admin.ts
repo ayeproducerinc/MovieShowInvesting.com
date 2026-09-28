@@ -24,3 +24,8 @@ function getFirebaseAdminAuth() {
 export async function verifyFirebaseIdToken(token: string) {
   return getFirebaseAdminAuth().verifyIdToken(token, true);
 }
+
+export async function getFirebaseUidForEmail(email: string): Promise<string> {
+  const user = await getFirebaseAdminAuth().getUserByEmail(email);
+  return user.uid;
+}

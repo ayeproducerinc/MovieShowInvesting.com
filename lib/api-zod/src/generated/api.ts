@@ -78,6 +78,8 @@ export const AskFilmmakerParams = zod.object({
   "slug": zod.coerce.string().min(1)
 })
 
+export const askFilmmakerBodyWebsiteMax = 256;
+
 export const askFilmmakerBodyFirstNameMax = 80;
 
 export const askFilmmakerBodyEmailMax = 254;
@@ -89,6 +91,7 @@ export const askFilmmakerBodyQuestionMax = 3000;
 
 
 export const AskFilmmakerBody = zod.object({
+  "website": zod.string().max(askFilmmakerBodyWebsiteMax).optional().describe('Leave blank. Bot-detection field; never saved.'),
   "first_name": zod.string().min(1).max(askFilmmakerBodyFirstNameMax),
   "email": zod.string().email().max(askFilmmakerBodyEmailMax),
   "question": zod.string().min(askFilmmakerBodyQuestionMin).max(askFilmmakerBodyQuestionMax),

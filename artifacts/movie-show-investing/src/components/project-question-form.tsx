@@ -39,6 +39,7 @@ function Verification({ siteKey, onToken, resetRef }: { siteKey: string; onToken
       if (!mounted || !element.current || !window.turnstile) return;
       id = window.turnstile.render(element.current, {
         sitekey: siteKey,
+         action: 'ask_filmmaker',
         theme: 'light',
         callback: (value: string) => { setError(''); callback.current(value); },
         'expired-callback': () => { callback.current(''); if (id && window.turnstile) window.turnstile.reset(id); },
@@ -62,6 +63,7 @@ export function ProjectQuestionForm({ slug, title }: { slug: string; title: stri
   const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
   const [question, setQuestion] = useState('');
+  const [website, setWebsite] = useState('');
   const [token, setToken] = useState('');
   const [feedback, setFeedback] = useState('');
   const [sent, setSent] = useState(false);
@@ -70,7 +72,7 @@ export function ProjectQuestionForm({ slug, title }: { slug: string; title: stri
     if (!token || !config.data?.available || !config.data.turnstile_site_key) return;
     setFeedback('');
     try {
-      await ask.mutateAsync({ slug, data: { first_name: firstName.trim(), email: email.trim(), question: question.trim(), turnstile_token: token } });
+      await ask.mutateAsync({ slug, data: { first_name: firstName.trim(), email: email.trim(), question: question.trim(), website, turnstile_token: token } });
       setSent(true);
       setToken('');
       resetRef.current?.();
@@ -90,6 +92,7 @@ export function ProjectQuestionForm({ slug, title }: { slug: string; title: stri
         : sent ? <div className="q-state" role="status" data-testid="status-question-submitted"><span className="q-kicker">Sent privately</span><h3>Your question is on its way.</h3><p>If the filmmaker replies, we’ll send the answer to the address you provided. Your contact details are not shown on the project page.</p><button type="button" className="q-button q-button--outline" onClick={() => { setSent(false); setQuestion(''); setFeedback(''); }}>Ask another question <ArrowUpRight size={16}/></button></div>
         : <form onSubmit={event => void submit(event)}>
           <span className="q-kicker">Private correspondence</span><h3 className="q-title">Write to the filmmaker.</h3>
+           <div aria-hidden="true" style={{position:'absolute',left:'-10000px',width:1,height:1,overflow:'hidden'}}><label>Website<input tabIndex={-1} autoComplete="off" value={website} onChange={event=>setWebsite(event.target.value)} /></label></div>
           <label className="q-field">First name<input data-testid="input-question-first-name" required maxLength={80} autoComplete="given-name" value={firstName} onChange={event => setFirstName(event.target.value)} placeholder="Your first name"/></label>
           <label className="q-field">Email for the reply<input data-testid="input-question-email" required type="email" maxLength={254} autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com"/><small>Kept private. Used only for this correspondence.</small></label>
           <label className="q-field">Your question<textarea data-testid="textarea-question" required minLength={5} maxLength={3000} value={question} onChange={event => setQuestion(event.target.value)} placeholder="What would you like to know about this project?"/><small>{question.length} / 3000 characters</small></label>

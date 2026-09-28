@@ -3,9 +3,9 @@ import { Link } from 'wouter';
 import { getGetMyConversationsQueryKey, getGetMessagingConfigQueryKey, useGetMessagingConfig, useGetMyConversations } from '@workspace/api-client-react';
 import './conversation.css';
 
-export function FilmmakerConversationsDesk({ projectIds, uid }: { projectIds: number[]; uid: string }) {
+export function FilmmakerConversationsDesk({ projectIds, provider, uid }: { projectIds: number[]; provider: string; uid: string }) {
   const config = useGetMessagingConfig({ query: { queryKey: getGetMessagingConfigQueryKey(), retry: false } });
-  const list = useGetMyConversations({ query: { queryKey: [...getGetMyConversationsQueryKey(), uid], enabled: config.data?.available === true, retry: false } });
+  const list = useGetMyConversations({ query: { queryKey: [...getGetMyConversationsQueryKey(), provider, uid], enabled: config.data?.available === true, retry: false } });
   if (!config.data?.available) return null;
   const conversations = (list.data?.conversations ?? []).filter(item => projectIds.includes(item.project_id));
   return <section className="q-desk correspondence" aria-label="Project conversations" style={{ minHeight: 0 }}><div className="page-wrap">
