@@ -5,12 +5,13 @@ const legal = {
   privacy: {
     label: 'Privacy / Prelaunch information',
     title: <>What we know.<br/><em>What we keep.</em></>,
-    intro: 'This page explains the limited information used by this prelaunch site. It will be expanded before filmmaker submissions and account features open.',
+    intro: 'This page explains how this prelaunch site uses visitor, project, investor, account, and message information. A fuller launch notice will follow.',
     sections: [
       ['Information this site records', 'When you visit, the site may set a visitor ID cookie that lasts for one year and record the first campaign information in your URL: utm_source, utm_medium, utm_campaign, and ref. This helps us understand how visitors find the site. The site also receives ordinary technical information sent with a web request, such as your IP address and browser details.'],
-      ['What is not available yet', 'Project submissions, investor signup, pledges, and authentication are not open on this prelaunch site. Please do not send personal, financial, or project information through URL parameters.'],
-      ['How information is used', 'Visitor and attribution data are used to understand site traffic and prepare the service. We do not use this page to collect payments or execute investments. The public site count, when displayed, comes from our database.'],
-      ['Changes and questions', 'A fuller privacy notice, including a data-deletion contact and details for future account and message features, will be published before those features launch. Do not treat this preliminary notice as covering features that are not yet available.'],
+      ['Project and investor information', 'If you submit a project or express investor interest, we store the details and contact information you provide to manage those submissions and non-binding indications of interest. Email-link sign-in identifies account holders. Please do not send personal, financial, or project information through URL parameters. No payment or investment transaction occurs on this site.'],
+      ['Project messages', 'Project messages are visible to the signed-in investor and the filmmaker for that project. Authorized Movie Show Investing administrators can also read messages and reports, review safety concerns, and lock conversations. Messages are stored on the platform. Email notifications, if enabled, contain no message text. Do not share confidential scripts or sensitive personal or financial information.'],
+      ['How information is used', 'Visitor and attribution data are used to understand site traffic and prepare the service. Project and investor details support the corresponding site features, and administrators may review reported or other project messages for safety and support. The public site count, when displayed, comes from our database.'],
+      ['Changes and questions', 'This is a prelaunch privacy summary. A fuller privacy notice, including a data-deletion contact, will be published before general launch.'],
     ],
   },
   terms: {
@@ -18,10 +19,10 @@ const legal = {
     title: <>The terms of<br/><em>this beginning.</em></>,
     intro: 'Movie Show Investing is currently an informational prelaunch site. These preliminary terms describe what is available today, not future investment or account terms.',
     sections: [
-      ['About the site', 'Movie Show Investing is operated by AYe Producer, Inc. At this stage you may read about the planned service and visit informational pages. Filmmaker submissions, investor registration, and pledges are not available yet.'],
+      ['About the site', 'Movie Show Investing is operated by AYe Producer, Inc. You may share a project, explore approved projects, express non-binding investor interest, and use project messaging when it is available. These features do not create an investment commitment.'],
       ['No investment relationship', 'Nothing on this site is an offer to sell securities or a solicitation to buy them. No trade takes place, no money is collected, and viewing this site does not create an investment commitment or grant access to a future offering.'],
       ['Accuracy and availability', 'We may update, pause, or change this prelaunch site as the product develops. Descriptions of later features explain current plans, not a promise that a feature, project, or opportunity will become available.'],
-      ['Before future features open', 'Additional terms for submissions, accounts, and indications of interest will be presented when those features are ready. Please review them then before choosing to participate.'],
+      ['Before general launch', 'Additional terms for submissions, accounts, and indications of interest will be presented before general launch. Please review them before choosing to participate.'],
     ],
   },
   disclaimers: {
