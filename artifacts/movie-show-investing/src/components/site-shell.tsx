@@ -3,9 +3,11 @@ import { ArrowUpRight, Menu, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { signOut } from 'firebase/auth';
 import { useQueryClient } from '@tanstack/react-query';
-import { getGetFilmmakerProjectsQueryKey, getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey, leaveFilmmakerAccount } from '@workspace/api-client-react';
-import { getInitializedAuth, useFirebaseUser } from '@/components/firebase-bootstrap';
+import { leaveFilmmakerAccount } from '@workspace/api-client-react';
+import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { clearFilmmakerAction } from '@/lib/filmmaker-intent';
+import { useAuth } from '@workspace/replit-auth-web';
+import { switchToSso } from '@/lib/auth-switch';
 
 const navigation = [
   { href: '/', label: 'Home' },
@@ -20,10 +22,25 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [location, navigate] = useLocation();
   const user = useFirebaseUser();
+  const firebaseReady = useFirebaseSessionReady();
+  const replitAuth = useAuth();
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   async function leave() {
+    if (replitAuth.user) {
+      setSigningOut(true);
+      setSignOutError('');
+      try {
+        clearFilmmakerAction();
+        queryClient.clear();
+        replitAuth.logout('/');
+      } catch {
+        setSignOutError('Could not sign out. Please try again.');
+        setSigningOut(false);
+      }
+      return;
+    }
     const auth = getInitializedAuth();
     if (!auth || signingOut) return;
     setSigningOut(true);
@@ -32,9 +49,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
       await leaveFilmmakerAccount();
       await signOut(auth);
       clearFilmmakerAction();
-      queryClient.removeQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
-      queryClient.removeQueries({ queryKey: getGetFilmmakerResultQueryKey() });
-      queryClient.removeQueries({ queryKey: getGetFlowProgressQueryKey('filmmaker') });
+      queryClient.clear();
       setOpen(false);
       navigate('/');
     } catch {
@@ -42,6 +57,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
     } finally {
       setSigningOut(false);
     }
+  }
+  const signedIn = replitAuth.user || (!replitAuth.isLoading && user);
+  function beginSso() {
+    void switchToSso(getInitializedAuth(), queryClient, replitAuth.login);
   }
   return (
     <div className="min-h-[100dvh] flex flex-col">
@@ -61,19 +80,27 @@ export function SiteShell({ children }: { children: ReactNode }) {
           </nav>
           <div className="flex items-center gap-4">
             <div className="hidden items-center gap-3 md:flex">
-              {user ? <>
+              {signedIn ? <>
                 <Link href="/me/projects" data-testid="link-header-my-projects" className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">My projects</Link>
-                <button type="button" data-testid="button-header-sign-out" onClick={() => void leave()} disabled={signingOut} className="text-[12px] font-semibold whitespace-nowrap underline underline-offset-4">Sign out</button>
-              </> : <Link href="/me/projects" data-testid="link-header-sign-in" onClick={clearFilmmakerAction} className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">Sign in</Link>}
+                {!replitAuth.user && <button type="button" onClick={beginSso} disabled={replitAuth.isLoading || !firebaseReady} className="text-[12px] font-semibold whitespace-nowrap underline underline-offset-4">Single sign-on</button>}
+                <button type="button" data-testid="button-header-sign-out" onClick={() => void leave()} disabled={signingOut || replitAuth.isLoading} className="text-[12px] font-semibold whitespace-nowrap underline underline-offset-4">Sign out</button>
+              </> : <>
+                <Link href="/me/projects" data-testid="link-header-sign-in" onClick={clearFilmmakerAction} className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">Sign in</Link>
+                <button type="button" onClick={beginSso} disabled={replitAuth.isLoading || !firebaseReady} className="text-[12px] font-semibold whitespace-nowrap underline underline-offset-4">Continue with single sign-on</button>
+              </>}
             </div>
             <button type="button" data-testid="button-toggle-menu" className="inline-flex h-10 w-10 items-center justify-center border border-[#26303d] md:hidden" aria-expanded={open} aria-label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen(!open)}>{open ? <X size={19} /> : <Menu size={19} />}</button>
           </div>
         </div>
         <div className="page-wrap flex min-h-10 items-center justify-end gap-5 border-t border-[#d7d0c5] py-2 md:hidden" aria-label="Account controls">
-          {user ? <>
+          {signedIn ? <>
             <Link href="/me/projects" data-testid="link-mobile-my-projects" onClick={() => setOpen(false)} className="text-[12px] font-bold text-[#902f4d]">My projects</Link>
-            <button type="button" data-testid="button-mobile-sign-out" onClick={() => void leave()} disabled={signingOut} className="text-[12px] font-semibold underline underline-offset-4">Sign out</button>
-          </> : <Link href="/me/projects" data-testid="link-mobile-sign-in" onClick={() => { clearFilmmakerAction(); setOpen(false); }} className="text-[12px] font-bold text-[#902f4d]">Sign in</Link>}
+            {!replitAuth.user && <button type="button" onClick={beginSso} disabled={replitAuth.isLoading || !firebaseReady} className="text-[12px] font-semibold underline underline-offset-4">Single sign-on</button>}
+            <button type="button" data-testid="button-mobile-sign-out" onClick={() => void leave()} disabled={signingOut || replitAuth.isLoading} className="text-[12px] font-semibold underline underline-offset-4">Sign out</button>
+          </> : <>
+            <Link href="/me/projects" data-testid="link-mobile-sign-in" onClick={() => { clearFilmmakerAction(); setOpen(false); }} className="text-[12px] font-bold text-[#902f4d]">Sign in</Link>
+            <button type="button" onClick={beginSso} disabled={replitAuth.isLoading || !firebaseReady} className="text-[12px] font-semibold underline underline-offset-4">Continue with single sign-on</button>
+          </>}
         </div>
         {open && <nav className="absolute top-full left-0 right-0 border-b border-[#bcb4a7] bg-[#f4f0e7] px-5 pb-5 shadow-lg md:hidden" aria-label="Mobile navigation">
           {navigation.map((item) => <Link key={item.href} href={item.href} data-testid={`link-mobile-${item.href.replaceAll('/', '-')}`} onClick={() => setOpen(false)} className="flex items-center justify-between border-t border-[#cec7bb] py-4 text-lg font-semibold">{item.label}<ArrowUpRight size={18}/></Link>)}

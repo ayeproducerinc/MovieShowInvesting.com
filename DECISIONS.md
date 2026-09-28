@@ -61,10 +61,10 @@ These product rules are locked for the MVP. Change them only when the owner expl
 
 - Use the existing project’s React/Vite frontend and Express API with PostgreSQL/Drizzle. Do not add a Flask server or a second API server.
 - Keep the API contract OpenAPI-first and use the generated client/schema packages already in the project.
-- Firebase is for authentication only: email-link sign-in and phone verification. Store all other application data in PostgreSQL.
-- Magic links identify the signed-in messaging participant; Mailjet may notify them about a new message but is not the conversation record. Notification failure must not erase an internal message or expose its contents to email recipients.
+- Firebase remains connected for email-link sign-in and phone verification. Replit single sign-on is an additional sign-in option for verified accounts, including multi-account testing; its sessions and account ownership are stored separately in PostgreSQL. Never merge a Firebase-owned record into a Replit account merely because the email matches. Guest project claims still require proof from the original browser and a matching verified email.
+- The verified signed-in account identifies a messaging participant; Mailjet may notify them about a new message but is not the conversation record. Notification failure must not erase an internal message or expose its contents to email recipients.
 - The owner approved the messaging notice: “Project messages are visible to the signed-in investor and the filmmaker for that project. Authorized Movie Show Investing administrators can also read messages and reports, review safety concerns, and lock conversations. Messages are stored on the platform. Email notifications, if enabled, contain no message text. Do not share confidential scripts or sensitive personal or financial information.” Display it in the conversation flow and Privacy page; do not replace it without approval.
-- The admin area uses Firebase email-link sign-in with a server-verified admin allowlist, not a separate admin password. A valid Firebase login alone does not grant admin access. The previously supplied admin password is unused.
+- The admin area uses a server-verified allowlist, not a separate admin password. Firebase admin access requires the verified configured email. Replit admin access additionally requires an explicitly provisioned, immutable provider subject; email match alone never grants admin access. The previously supplied admin password is unused.
 - Use Replit Secrets for credentials and environment-specific configuration; never put secret values in source files or ask the user to paste them into chat.
 - Save flow progress as the user proceeds so funnel drop-off and pricing answers can be analyzed.
 

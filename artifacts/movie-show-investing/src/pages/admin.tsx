@@ -13,6 +13,9 @@ import {
 } from '@workspace/api-client-react';
 import { ArrowDownToLine, ArrowRight, Clapperboard, LockKeyhole, LogOut, Mail, RotateCw, ShieldAlert } from 'lucide-react';
 import { AdminConversations } from '@/components/admin-conversations';
+import { useAuth } from '@workspace/replit-auth-web';
+import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-web';
+import { switchToFirebase, switchToSso } from '@/lib/auth-switch';
 
 const SECTIONS: { id: AdminSection; label: string; description: string }[] = [
   { id: 'summary', label: 'Summary', description: 'A consolidated view of activity recorded across the site.' },
@@ -223,13 +226,13 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
   </>;
 }
 
-function Dashboard({ user, email, onSignOut }: { user: User; email: string; onSignOut: () => void }) {
+function Dashboard({ userId, email, onSignOut, onSwitchIdentity }: { userId: string; email: string; onSignOut: () => void; onSwitchIdentity: () => void }) {
   const [active, setActive] = useState<AdminSection>('summary');
   const [conversationMode, setConversationMode] = useState(false);
   const section = SECTIONS.find(item => item.id === active)!;
   // The active table is read here for the export control; SectionData shares its query cache.
   const { data, isFetching } = useGetAdminTable(active, {
-    query: { queryKey: [...getGetAdminTableQueryKey(active), user.uid], retry: false, staleTime: 20_000, refetchOnWindowFocus: true },
+    query: { queryKey: [...getGetAdminTableQueryKey(active), userId], retry: false, staleTime: 20_000, refetchOnWindowFocus: true },
   });
   return <Frame email={email} onSignOut={onSignOut}>
     <div className="admin-stage">
@@ -241,7 +244,7 @@ function Dashboard({ user, email, onSignOut }: { user: User; email: string; onSi
           </button>)}
           <button type="button" aria-current={conversationMode ? 'page' : undefined} onClick={() => setConversationMode(true)} data-testid="button-section-conversations"><span className="admin-nav-number">11</span>Conversations</button>
         </nav>
-        <div className="admin-sidebar-foot">Private administration<br />{email}<br /><br />No payments are collected here.</div>
+        <div className="admin-sidebar-foot">Private administration<br />{email}<br /><br /><button type="button" className="admin-link admin-mono" onClick={onSwitchIdentity}>Switch sign-in method</button><br /><br />No payments are collected here.</div>
       </aside>
       <main className="admin-main">
         <div className="admin-main-inner">
@@ -255,7 +258,7 @@ function Dashboard({ user, email, onSignOut }: { user: User; email: string; onSi
               <ArrowDownToLine size={16} /> Download CSV
              </button>}
           </div>
-           {conversationMode ? <AdminConversations uid={user.uid}/> : <SectionData key={`${active}-${user.uid}`} section={section} userId={user.uid} />}
+            {conversationMode ? <AdminConversations uid={userId}/> : <SectionData key={`${active}-${userId}`} section={section} userId={userId} />}
         </div>
       </main>
     </div>
@@ -264,6 +267,7 @@ function Dashboard({ user, email, onSignOut }: { user: User; email: string; onSi
 
 export default function Admin() {
   const queryClient = useQueryClient();
+  const replitAuth = useAuth();
   const { data: config, isPending: configPending, isError: configError, refetch: retryConfig } = useGetFirebaseConfig({
     query: { queryKey: getGetFirebaseConfigQueryKey(), retry: false, staleTime: 300_000 },
   });
@@ -307,10 +311,10 @@ export default function Admin() {
     if (!auth) return;
     return onAuthStateChanged(auth, next => {
       if (previousUid.current !== next?.uid) {
-        clearPrivateData(queryClient);
+        if (previousUid.current !== null || next) queryClient.clear();
         previousUid.current = next?.uid ?? null;
       }
-      setAuthTokenGetter(next ? () => auth.currentUser?.getIdToken() ?? null : null);
+      setAuthTokenGetter(next && !isReplitAuthActive() && !isReplitAuthLoading() ? () => auth.currentUser?.getIdToken() ?? null : null);
       setUser(next);
       setAuthReady(true);
     }, () => {
@@ -319,6 +323,20 @@ export default function Admin() {
       setFeedback('The sign-in session could not be restored. Please try signing in again.');
     });
   }, [auth, queryClient]);
+
+  useEffect(() => {
+    if (!replitAuth.user) return;
+    setAuthTokenGetter(null);
+    queryClient.clear();
+  }, [replitAuth.user?.id, queryClient]);
+
+  useEffect(() => {
+    if (replitAuth.isLoading) {
+      setAuthTokenGetter(null);
+    } else if (!replitAuth.user && auth?.currentUser) {
+      setAuthTokenGetter(() => auth.currentUser?.getIdToken() ?? null);
+    }
+  }, [auth, replitAuth.isLoading, replitAuth.user?.id]);
 
   useEffect(() => {
     if (!auth || !authReady || !linkPresent || !savedEmail || completionInFlight.current || completionAttempted) return;
@@ -339,8 +357,11 @@ export default function Admin() {
     });
   }, [auth, authReady, linkPresent, savedEmail, completionAttempted]);
 
+  const identityId = replitAuth.user?.id ?? user?.uid;
+  const identityEmail = replitAuth.user?.email ?? user?.email ?? '';
+  const identityReady = !replitAuth.isLoading && (Boolean(replitAuth.user) || (Boolean(user) && authReady && !linkPresent && !busy));
   const me = useGetAdminMe({
-    query: { queryKey: [...getGetAdminMeQueryKey(), user?.uid], enabled: !!user && !linkPresent && !busy, retry: false, staleTime: 30_000, refetchOnWindowFocus: true },
+    query: { queryKey: [...getGetAdminMeQueryKey(), identityId], enabled: !!identityId && identityReady, retry: false, staleTime: 30_000, refetchOnWindowFocus: true },
   });
 
   async function sendLink(event: FormEvent<HTMLFormElement>) {
@@ -372,6 +393,11 @@ export default function Admin() {
   }
 
   async function leave() {
+    if (replitAuth.user) {
+      queryClient.clear();
+      replitAuth.logout('/admin');
+      return;
+    }
     if (auth) {
       try {
         await signOut(auth);
@@ -383,21 +409,28 @@ export default function Admin() {
     }
   }
 
-  if (configPending) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
-  if (configError || (config && (!config.apiKey || !config.authDomain || !config.projectId || !config.appId))) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
+  if (replitAuth.isLoading) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
+  if (!replitAuth.user && configPending) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
+  if (!replitAuth.user && (configError || (config && (!config.apiKey || !config.authDomain || !config.projectId || !config.appId)))) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
     <Notice icon={<ShieldAlert size={20} />} title="Sign-in is not configured" action="Check again" onAction={() => void retryConfig()}>
       The administration room needs the site's Firebase web configuration before email-link sign-in can work. Public pages remain available.
     </Notice>
+    <button type="button" className="admin-button" style={{ marginTop: 18 }} onClick={() => void switchToSso(auth, queryClient, replitAuth.login)}>Continue with single sign-on <ArrowRight size={16}/></button>
   </div></div></Frame>;
-  if (!auth || !authReady) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>{feedback ? <Notice icon={<ShieldAlert size={20} />} title="Sign-in unavailable">{feedback}</Notice> : <Skeleton />}</div></div></Frame>;
-  if (user && !linkPresent && !busy) {
-    if (me.isPending) return <Frame email={user.email ?? undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
-    if (me.isError) return <Frame email={user.email ?? undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
+  if (!replitAuth.user && (!auth || !authReady)) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>{feedback ? <Notice icon={<ShieldAlert size={20} />} title="Sign-in unavailable">{feedback}</Notice> : <Skeleton />}<button type="button" className="admin-button" style={{ marginTop: 18 }} disabled={replitAuth.isLoading} onClick={() => void switchToSso(auth, queryClient, replitAuth.login)}>Continue with single sign-on <ArrowRight size={16}/></button></div></div></Frame>;
+  if (identityReady && identityId) {
+    if (me.isPending) return <Frame email={identityEmail || undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
+    if (me.isError) return <Frame email={identityEmail || undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
       <Notice icon={<ShieldAlert size={20} />} title={me.error?.status === 403 ? 'Access not granted' : 'Access could not be verified'} action={me.error?.status === 403 ? 'Sign out' : 'Try again'} onAction={me.error?.status === 403 ? leave : () => void me.refetch()}>
         {me.error?.status === 403 ? 'This signed-in address does not have administrator access. Only the server can grant access to the private workspace.' : 'We could not confirm your administrator access right now. No private data has been shown.'}
       </Notice>
+      <button type="button" className="admin-button secondary" style={{ marginTop: 18 }} onClick={() => replitAuth.user
+        ? switchToFirebase(queryClient, replitAuth.logout)
+        : void switchToSso(auth, queryClient, replitAuth.login)}>{replitAuth.user ? 'Use an email-link account instead' : 'Continue with single sign-on'}</button>
     </div></div></Frame>;
-    if (me.data?.role === 'admin') return <Dashboard user={user} email={me.data.email} onSignOut={leave} />;
+    if (me.data?.role === 'admin') return <Dashboard userId={identityId} email={me.data.email} onSignOut={leave} onSwitchIdentity={() => replitAuth.user
+      ? switchToFirebase(queryClient, replitAuth.logout)
+      : void switchToSso(auth, queryClient, replitAuth.login)} />;
   }
 
   return <Frame>
@@ -432,6 +465,8 @@ export default function Admin() {
             <div className="admin-field"><label className="admin-mono" htmlFor="admin-email">Email address</label><input id="admin-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@yourstudio.com" data-testid="input-admin-email" /></div>
             <button className="admin-button" type="submit" disabled={busy} data-testid="button-send-email-link">{busy ? 'Working…' : linkPresent && !completionAttempted ? 'Complete sign-in' : sentTo ? 'Send another link' : 'Send sign-in link'}<ArrowRight size={16} /></button>
           </form>}
+          <button type="button" className="admin-button secondary" style={{ marginTop: 14 }} disabled={replitAuth.isLoading} onClick={() => void switchToSso(auth, queryClient, replitAuth.login)}>Continue with single sign-on <ArrowRight size={16}/></button>
+          {replitAuth.user && <button type="button" className="admin-link" style={{ marginTop: 12 }} onClick={() => switchToFirebase(queryClient, replitAuth.logout)}>Use an email-link account instead</button>}
           {linkPresent && !savedEmail && <p className="admin-auth-note">For your security, use the exact address that received this link.</p>}
           {!linkPresent && <p className="admin-auth-note"><LockKeyhole size={13} style={{ display: 'inline', marginRight: 8 }} />Access is verified by the server after you sign in. Having a link alone does not grant administrator access.</p>}
           {completionAttempted && linkPresent && <button className="admin-link" type="button" onClick={() => { setLinkHandled(true); setFeedback(''); }} data-testid="button-dismiss-expired-link"><RotateCw size={13} style={{ display: 'inline', marginRight: 6 }} />Start a fresh sign-in</button>}

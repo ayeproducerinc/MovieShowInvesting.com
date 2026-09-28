@@ -1,9 +1,10 @@
 import type { Request, Response } from "express";
-import { getFilmmakerAccountVisitorUid } from "@workspace/db";
+import { getFilmmakerAccountVisitorOwner } from "@workspace/db";
 import { FirebaseConfigurationError, verifyFirebaseIdToken } from "./firebase-admin";
 
 export type FilmmakerIdentity = {
   uid: string;
+  provider: "firebase" | "replit";
   email: string;
   phoneNumber: string | null;
 };
@@ -18,44 +19,54 @@ export async function authenticateFilmmaker(
   required: boolean,
 ): Promise<FilmmakerIdentity | null> {
   const authorization = req.get("authorization");
-  const match = authorization?.match(/^Bearer\s+(\S+)$/i);
-  if (!match) {
-    if (authorization && required) {
+  if (authorization !== undefined) {
+    const match = authorization.match(/^Bearer\s+(\S+)$/i);
+    if (!match) {
       res.status(401).json({ error: "A valid Firebase bearer token is required." });
       return null;
     }
-    if (required) {
-      res.status(401).json({ error: "A Firebase ID token is required." });
-    }
-    return null;
-  }
-
-  try {
-    const decoded = await verifyFirebaseIdToken(match[1]);
-    if (decoded.email_verified !== true || typeof decoded.email !== "string" || !decoded.uid) {
-      if (required) {
+    try {
+      const decoded = await verifyFirebaseIdToken(match[1]);
+      if (decoded.email_verified !== true || typeof decoded.email !== "string" || !decoded.uid) {
         res.status(403).json({ error: "A verified Firebase email is required." });
+        return null;
       }
-      return null;
-    }
-    return {
-      uid: decoded.uid,
-      email: decoded.email.trim().toLowerCase(),
-      phoneNumber: typeof decoded.phone_number === "string" ? decoded.phone_number : null,
-    };
-  } catch (error) {
-    if (error instanceof FirebaseConfigurationError) {
-      if (required) {
+      return {
+        uid: decoded.uid,
+        provider: "firebase",
+        email: decoded.email.trim().toLowerCase(),
+        phoneNumber: typeof decoded.phone_number === "string" ? decoded.phone_number : null,
+      };
+    } catch (error) {
+      if (error instanceof FirebaseConfigurationError) {
         res.status(503).json({ error: error.message });
+        return null;
       }
+      req.log.warn({ error: errorMessage(error) }, "Firebase filmmaker token verification failed");
+      res.status(401).json({ error: "The Firebase ID token is invalid or expired." });
       return null;
     }
-    req.log.warn({ error: errorMessage(error) }, "Firebase filmmaker token verification failed");
-    if (required) {
-      res.status(401).json({ error: "The Firebase ID token is invalid or expired." });
-    }
-    return null;
   }
+  if (req.isAuthenticated?.() && req.user) {
+    const { id, email } = req.user;
+    if (!id || !email?.trim()) {
+      res.status(403).json({ error: "A verified Replit account email is required." });
+      return null;
+    }
+    return { uid: id, provider: "replit", email: email.trim().toLowerCase(), phoneNumber: null };
+  }
+  if (required) {
+    res.status(401).json({ error: "A verified Firebase or Replit account is required." });
+  }
+  return null;
+}
+
+export async function resolveProtectedIdentity(
+  req: Request,
+  res: Response,
+  required = true,
+): Promise<FilmmakerIdentity | null> {
+  return authenticateFilmmaker(req, res, required);
 }
 
 export type FilmmakerVisitorAccess =
@@ -67,12 +78,16 @@ export async function authorizeFilmmakerVisitor(
   res: Response,
   visitorId: string,
 ): Promise<FilmmakerVisitorAccess> {
-  const ownerUid = await getFilmmakerAccountVisitorUid(visitorId);
-  if (!ownerUid) return { allowed: true, identity: null };
+  const identity = await authenticateFilmmaker(req, res, false);
+  if (req.get("authorization") !== undefined && !identity) return { allowed: false };
+  const owner = await getFilmmakerAccountVisitorOwner(visitorId);
+  if (!owner) return { allowed: true, identity };
 
-  const identity = await authenticateFilmmaker(req, res, true);
-  if (!identity) return { allowed: false };
-  if (identity.uid !== ownerUid) {
+  if (!identity) {
+    await authenticateFilmmaker(req, res, true);
+    return { allowed: false };
+  }
+  if (identity.provider !== owner.provider || identity.uid !== owner.uid) {
     res.status(403).json({ error: "This visitor is linked to a different filmmaker account." });
     return { allowed: false };
   }

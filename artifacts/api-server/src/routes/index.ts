@@ -14,9 +14,11 @@ import exploreRouter from "./explore";
 import investorRouter from "./investor";
 import conversationsRouter from "./conversations";
 import adminConversationsRouter from "./admin-conversations";
+import replitAuthRouter from "./replit-auth";
 
 const router: IRouter = Router();
 
+router.use(replitAuthRouter);
 router.use(healthRouter);
 router.use(siteRouter);
 router.use(progressRouter);

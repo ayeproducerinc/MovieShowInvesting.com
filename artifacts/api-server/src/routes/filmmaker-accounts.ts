@@ -6,7 +6,7 @@ import {
   claimFilmmakerVisitor,
   ensureVisitor,
   getFilmmakerAccountProjectVisitor,
-  getFilmmakerAccountVisitorUid,
+  getFilmmakerAccountVisitorOwner,
   listFilmmakerAccountProjects,
   resumeFilmmakerAccountDraft,
   startOrResumeFilmmakerAccountDraft,
@@ -75,7 +75,7 @@ function accountError(res: Response, error: unknown, action: "claim" | "start"):
 router.get("/filmmakers/projects", async (req, res): Promise<void> => {
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
-  const result = await listFilmmakerAccountProjects(identity.uid);
+  const result = await listFilmmakerAccountProjects(identity.uid, identity.provider);
   res.json(GetFilmmakerProjectsResponse.parse({
     projects: result.projects.map((project) => ({
       id: project.id,
@@ -100,7 +100,7 @@ router.post("/filmmakers/projects/claim", async (req, res): Promise<void> => {
   try {
     const result = await claimFilmmakerVisitor({
       visitorId,
-      firebaseUid: identity.uid,
+      ...(identity.provider === "firebase" ? { firebaseUid: identity.uid } : { replitUid: identity.uid }),
       verifiedEmail: identity.email,
     });
     res.json(ClaimFilmmakerProjectResponse.parse({
@@ -120,7 +120,7 @@ router.post("/filmmakers/projects/start", async (req, res): Promise<void> => {
   const currentVisitorId = readVisitorCookie(req);
   try {
     const draft = await startOrResumeFilmmakerAccountDraft({
-      firebaseUid: identity.uid,
+      ...(identity.provider === "firebase" ? { firebaseUid: identity.uid } : { replitUid: identity.uid }),
       currentVisitorId,
     });
     setVisitorCookie(req, res, draft.visitorId);
@@ -138,7 +138,7 @@ router.post("/filmmakers/projects/start", async (req, res): Promise<void> => {
 router.post("/filmmakers/projects/resume", async (req, res): Promise<void> => {
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
-  const draft = await resumeFilmmakerAccountDraft(identity.uid);
+  const draft = await resumeFilmmakerAccountDraft(identity.uid, identity.provider);
   if (!draft) {
     res.status(404).json({ error: "No resumable filmmaker draft was found." });
     return;
@@ -155,8 +155,8 @@ router.post("/filmmakers/projects/leave", async (req, res): Promise<void> => {
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
   const currentVisitorId = readVisitorCookie(req);
-  const ownerUid = currentVisitorId ? await getFilmmakerAccountVisitorUid(currentVisitorId) : null;
-  const shouldRotate = ownerUid === identity.uid;
+  const owner = currentVisitorId ? await getFilmmakerAccountVisitorOwner(currentVisitorId) : null;
+  const shouldRotate = owner?.provider === identity.provider && owner.uid === identity.uid;
   if (shouldRotate) {
     const visitorId = randomUUID();
     await ensureVisitor(visitorId);
@@ -173,7 +173,7 @@ router.post("/filmmakers/projects/:project_id/select", async (req, res): Promise
   }
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
-  const visitorId = await getFilmmakerAccountProjectVisitor(identity.uid, params.data.project_id);
+  const visitorId = await getFilmmakerAccountProjectVisitor(identity.uid, params.data.project_id, identity.provider);
   if (!visitorId) {
     res.status(404).json({ error: "Project is not available to this filmmaker account." });
     return;

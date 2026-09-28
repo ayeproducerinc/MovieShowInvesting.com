@@ -4,12 +4,10 @@ import { getApp, getApps, initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, type Auth, type User } from 'firebase/auth';
 import {
   getGetFirebaseConfigQueryKey,
-  getGetFilmmakerProjectsQueryKey,
-  getGetFilmmakerResultQueryKey,
-  getGetFlowProgressQueryKey,
   setAuthTokenGetter,
   useGetFirebaseConfig,
 } from '@workspace/api-client-react';
+import { isReplitAuthActive, isReplitAuthLoading, useAuth } from '@workspace/replit-auth-web';
 
 const APP_NAME = 'movie-show-investing';
 let initializedAuth: Auth | null = null;
@@ -49,6 +47,7 @@ export function getInitializedAuth(): Auth | null {
 
 export function FirebaseBootstrap() {
   const queryClient = useQueryClient();
+  const replitAuth = useAuth();
   const { data: config, error, isError } = useGetFirebaseConfig({
     query: {
       queryKey: getGetFirebaseConfigQueryKey(),
@@ -76,16 +75,10 @@ export function FirebaseBootstrap() {
       initializedAuth = getAuth(app);
       return onAuthStateChanged(initializedAuth, user => {
         if (previousUid !== (user?.uid ?? null)) {
-          queryClient.removeQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
-          queryClient.removeQueries({ queryKey: getGetFilmmakerResultQueryKey() });
-          queryClient.removeQueries({ queryKey: getGetFlowProgressQueryKey('filmmaker') });
-          queryClient.removeQueries({
-            predicate: query => typeof query.queryKey[0] === 'string'
-              && /^\/api\/filmmakers\/projects\/\d+\/questions$/.test(query.queryKey[0]),
-          });
+          if (previousUid !== null || user) queryClient.clear();
           previousUid = user?.uid ?? null;
         }
-        setAuthTokenGetter(user ? () => initializedAuth?.currentUser?.getIdToken() ?? null : null);
+        setAuthTokenGetter(user && !isReplitAuthActive() && !isReplitAuthLoading() ? () => initializedAuth?.currentUser?.getIdToken() ?? null : null);
         currentUser = user;
         listeners.forEach(listener => listener());
         setSessionReady(true);
@@ -101,6 +94,19 @@ export function FirebaseBootstrap() {
       return undefined;
     }
   }, [config, queryClient]);
+
+  useEffect(() => {
+    if (replitAuth.isLoading) {
+      setAuthTokenGetter(null);
+      return;
+    }
+    if (replitAuth.user) {
+      setAuthTokenGetter(null);
+      queryClient.clear();
+    } else {
+      setAuthTokenGetter(currentUser ? () => initializedAuth?.currentUser?.getIdToken() ?? null : null);
+    }
+  }, [replitAuth.isLoading, replitAuth.user?.id, queryClient]);
 
   useEffect(() => {
     if (isError) setSessionReady(true);

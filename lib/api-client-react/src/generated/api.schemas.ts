@@ -5,6 +5,30 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface AuthUser {
+  id: string;
+  email: string;
+  /** @nullable */
+  firstName: string | null;
+  /** @nullable */
+  lastName: string | null;
+  /** @nullable */
+  profileImageUrl: string | null;
+}
+
+export interface AuthUserEnvelope {
+  user: AuthUser | null;
+}
+
+export interface LogoutSessionEnvelope {
+  success: true;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  returnTo: string;
+}
+
 export interface QuestionConfig {
   available: boolean;
   /** @nullable */
@@ -843,6 +867,18 @@ export interface AdminMessageReview {
   id: number;
   hidden: boolean;
 }
+
+export type BeginBrowserLoginParams = {
+returnTo?: string;
+};
+
+export type LogoutBrowserSessionParams = {
+/**
+ * Optional local path returned for post-logout navigation.
+ * @maxLength 2048
+ */
+returnTo?: string;
+};
 
 export type SearchLocationsParams = {
 /**

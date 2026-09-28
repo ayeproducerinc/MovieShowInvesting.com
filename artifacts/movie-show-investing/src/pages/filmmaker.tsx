@@ -3,7 +3,8 @@ import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { getGetFilmmakerProjectsQueryKey, getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey, useGetFilmmakerProjects, useGetFilmmakerResult, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
 import type { FilmmakerSubmissionInput } from '@workspace/api-client-react';
-import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
+import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
+import { useAuth } from '@workspace/replit-auth-web';
 import { showGuestConfirmation } from '@/lib/filmmaker-confirmation';
 import { LocationPicker } from '../components/location-picker';
 import { calculateDeal, examples, money, phase, restoreWorksheet, standardOffer, validListedOffer, type Format, type Stage } from './filmmaker-calculator';
@@ -65,14 +66,21 @@ function payload(a:Answers):FilmmakerSubmissionInput {
 }
 
 export default function Filmmaker() {
+  const replitAuth = useAuth();
+  const firebaseUser = useFirebaseUser();
+  const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
+  return <FilmmakerWorksheet key={identityId} identityId={identityId} authLoading={replitAuth.isLoading} />;
+}
+
+function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; authLoading: boolean }) {
   const [, navigate] = useLocation();
   const authReady = useFirebaseSessionReady();
   const user = useFirebaseUser();
-  const completedResult = useGetFilmmakerResult({ query:{ queryKey:getGetFilmmakerResultQueryKey(), enabled:authReady, retry:(count,error)=>error.status !== 404 && count < 2 } });
+  const completedResult = useGetFilmmakerResult({ query:{ queryKey:[...getGetFilmmakerResultQueryKey(),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
   useEffect(() => { if (completedResult.data?.completed) navigate('/start/filmmaker/done'); }, [completedResult.data?.completed, navigate]);
-  const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:getGetFlowProgressQueryKey('filmmaker'), enabled:authReady, retry:(count,error)=>error.status !== 404 && count < 2 } });
-  const checkAccountProjects = !!user && authReady && completedResult.error?.status === 404 && progress.error?.status === 404;
-  const accountProjects = useGetFilmmakerProjects({ query:{ queryKey:getGetFilmmakerProjectsQueryKey(), enabled:checkAccountProjects, retry:(count,error)=>error.status !== 401 && count < 2 } });
+  const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:[...getGetFlowProgressQueryKey('filmmaker'),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
+  const checkAccountProjects = identityId !== 'visitor' && authReady && !authLoading && completedResult.error?.status === 404 && progress.error?.status === 404;
+  const accountProjects = useGetFilmmakerProjects({ query:{ queryKey:[...getGetFilmmakerProjectsQueryKey(),identityId], enabled:checkAccountProjects, retry:(count,error)=>error.status !== 401 && count < 2 } });
   useEffect(() => {
     if (checkAccountProjects && accountProjects.data && (accountProjects.data.projects.length || accountProjects.data.has_resumable_draft)) navigate('/me/projects');
   }, [checkAccountProjects, accountProjects.data, navigate]);
@@ -141,14 +149,14 @@ export default function Filmmaker() {
     return operation;
   }
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || authLoading) return;
     const snapshot = JSON.stringify({ screen, answers:a });
     if (snapshot === lastSaved.current) return;
     editTimer.current = window.setTimeout(() => { editTimer.current = null; void persist(screen, a).catch(() => undefined); }, 800);
     return () => { if (editTimer.current !== null) window.clearTimeout(editTimer.current); editTimer.current = null; };
     // Deliberately schedule only when answers/screen change; mutation objects are unstable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a, screen, hydrated]);
+  }, [a, screen, hydrated, authLoading]);
   const stage = a.stage ?? 'idea';
   const budgetOptions = examples(stage, a.format);
   const budget = Number.isSafeInteger(a.budget) && a.budget > 0 ? a.budget : 0;
@@ -197,7 +205,7 @@ export default function Filmmaker() {
     try {
       await persist(6, a);
       await submit.mutateAsync({ data:payload(a) });
-      if (!getInitializedAuth()?.currentUser) showGuestConfirmation();
+      if (identityId === 'visitor') showGuestConfirmation();
       navigate('/start/filmmaker/done');
     } catch { setSaveError('We could not submit your information. If you switched projects in another tab, return to your project desk and reopen this draft. Nothing has been confirmed.'); }
   }
@@ -241,7 +249,7 @@ export default function Filmmaker() {
       <div className="fm-field"><label htmlFor="custom-budget" className="fm-label">Your estimated budget · USD</label><input id="custom-budget" data-testid="input-custom-budget" className="fm-input" inputMode="numeric" value={a.budget ? a.budget.toLocaleString('en-US') : ''} onChange={e=>{ const raw=e.target.value.replace(/,/g,''); if (/^\d*$/.test(raw)) change('budget',raw ? Number(raw) : 0); }} aria-invalid={!budgetValid} />{!budgetValid && <p className="fm-error" role="alert">Enter a positive whole-dollar amount.</p>}</div>}
   </div>;
 
-  if (completedResult.isLoading || progress.isLoading || group.isLoading || (checkAccountProjects && accountProjects.isPending) || !hydrated && !progress.isError) return <section className="fm"><div className="page-wrap" style={{padding:'70px 0 140px'}} aria-label="Loading saved answers"><p className="fm-kicker">Opening your worksheet</p><div className="fm-skeleton" style={{maxWidth:440,height:75}}/><div className="fm-skeleton" style={{maxWidth:310}}/><div className="fm-skeleton" style={{maxWidth:600,height:190}}/></div></section>;
+  if (authLoading || completedResult.isLoading || progress.isLoading || group.isLoading || (checkAccountProjects && accountProjects.isPending) || !hydrated && !progress.isError) return <section className="fm"><div className="page-wrap" style={{padding:'70px 0 140px'}} aria-label="Loading saved answers"><p className="fm-kicker">Opening your worksheet</p><div className="fm-skeleton" style={{maxWidth:440,height:75}}/><div className="fm-skeleton" style={{maxWidth:310}}/><div className="fm-skeleton" style={{maxWidth:600,height:190}}/></div></section>;
   if (completedResult.isError && completedResult.error?.status !== 404 || progress.isError && progress.error?.status !== 404 || group.isError || !group.data) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Connection interrupted</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>We can’t open your worksheet yet.</h1><p className="fm-small">Your previous answers and pricing group need to load before you continue. Please try again.</p><button type="button" data-testid="button-retry-loading" className="fm-primary" style={{marginTop:30}} onClick={()=>{ void completedResult.refetch(); void progress.refetch(); void group.refetch(); }}><RotateCcw size={17}/> Try again</button></div></section>;
   return <section className="fm"><div className="page-wrap">
     <div className="fm-top"><Link href="/" data-testid="link-flow-home" className="fm-kicker">Movie Show Investing / Filmmakers</Link><span className="fm-kicker" data-testid="text-progress">Step {screen} of 6</span></div>

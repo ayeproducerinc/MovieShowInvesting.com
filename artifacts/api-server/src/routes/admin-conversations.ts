@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import {
   GetAdminConversationParams,
@@ -9,10 +9,9 @@ import {
   ModerateAdminConversationParams,
   ModerateAdminConversationResponse,
 } from "@workspace/api-zod";
-import { FirebaseConfigurationError, verifyFirebaseIdToken } from "../lib/firebase-admin";
+import { authorizeAdminIdentity } from "../lib/admin-auth";
 
 const router: IRouter = Router();
-type AdminIdentity = { uid: string };
 type ConversationRow = {
   id: number;
   project_id: number;
@@ -26,45 +25,8 @@ type ConversationRow = {
 };
 type AdminConversationRow = ConversationRow & { report_reason: string | null };
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Authentication failed.";
-}
-
-async function authorizeAdmin(req: Request, res: Response): Promise<AdminIdentity | null> {
-  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  if (!adminEmail) {
-    res.status(503).json({ error: "Admin access is not configured. Set ADMIN_EMAIL on the server." });
-    return null;
-  }
-  const match = req.get("authorization")?.match(/^Bearer\s+(\S+)$/i);
-  if (!match) {
-    res.status(401).json({ error: "A Firebase ID token is required." });
-    return null;
-  }
-  try {
-    const decoded = await verifyFirebaseIdToken(match[1]);
-    if (decoded.email_verified !== true || typeof decoded.email !== "string" || !decoded.uid) {
-      res.status(401).json({ error: "A verified Firebase email is required." });
-      return null;
-    }
-    if (decoded.email.trim().toLowerCase() !== adminEmail) {
-      res.status(403).json({ error: "This account is not an administrator." });
-      return null;
-    }
-    return { uid: decoded.uid };
-  } catch (error) {
-    if (error instanceof FirebaseConfigurationError) {
-      res.status(503).json({ error: error.message });
-      return null;
-    }
-    req.log.warn({ error: errorMessage(error) }, "Firebase admin token verification failed");
-    res.status(401).json({ error: "The Firebase ID token is invalid or expired." });
-    return null;
-  }
-}
-
 router.get("/admin/conversations", async (req, res): Promise<void> => {
-  if (!await authorizeAdmin(req, res)) return;
+  if (!await authorizeAdminIdentity(req, res)) return;
   const result = await pool.query<ConversationRow>(
     `select c.id, c.project_id, p.slug as project_slug, p.title as project_title,
        coalesce(i.name, 'Investor') as other_party_name,
@@ -78,7 +40,7 @@ router.get("/admin/conversations", async (req, res): Promise<void> => {
 });
 
 router.get("/admin/conversations/:id", async (req, res): Promise<void> => {
-  if (!await authorizeAdmin(req, res)) return;
+  if (!await authorizeAdminIdentity(req, res)) return;
   const params = GetAdminConversationParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: "Invalid conversation ID." });
@@ -129,7 +91,7 @@ router.get("/admin/conversations/:id", async (req, res): Promise<void> => {
 });
 
 router.post("/admin/conversations/:id/moderation", async (req, res): Promise<void> => {
-  const admin = await authorizeAdmin(req, res);
+  const admin = await authorizeAdminIdentity(req, res);
   if (!admin) return;
   const params = ModerateAdminConversationParams.safeParse(req.params);
   const body = ModerateAdminConversationBody.safeParse(req.body);

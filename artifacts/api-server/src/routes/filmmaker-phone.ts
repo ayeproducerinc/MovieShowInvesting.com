@@ -9,7 +9,11 @@ router.post("/filmmakers/phone-verification", async (req, res): Promise<void> =>
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
   if (!identity.phoneNumber) {
-    res.status(403).json({ error: "A phone number linked to this Firebase account is required." });
+    res.status(403).json({
+      error: identity.provider === "replit"
+        ? "Phone verification is currently available only for Firebase accounts."
+        : "A phone number linked to this Firebase account is required.",
+    });
     return;
   }
 

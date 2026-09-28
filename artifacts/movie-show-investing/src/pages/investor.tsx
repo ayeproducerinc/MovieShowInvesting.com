@@ -5,6 +5,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getGetCurrentInvestorIntentQueryKey, getGetFlowProgressQueryKey, useGetCurrentInvestorIntent, useGetExplore, useGetFlowProgress, useMatchInvestor, useSaveFlowProgress, useSaveInvestorIntent } from '@workspace/api-client-react';
 import type { ExploreProject, InvestorIntentInput } from '@workspace/api-client-react';
 import { InvestorProjectCard } from '@/components/investor-project-card';
+import { useAuth } from '@workspace/replit-auth-web';
+import { useFirebaseUser } from '@/components/firebase-bootstrap';
 import '../investor.css';
 
 type Answers = InvestorIntentInput & { terms_read:boolean; lineup: {project_id:number; amount:number}[] };
@@ -37,7 +39,11 @@ function ErrorState({retry}: {retry:()=>void}) {
 }
 
 export function InvestorDone() {
-  const current = useGetCurrentInvestorIntent();
+  const replitAuth = useAuth();
+  const firebaseUser = useFirebaseUser();
+  const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
+  const current = useGetCurrentInvestorIntent({ query: { queryKey: [...getGetCurrentInvestorIntentQueryKey(), identityId], enabled: !replitAuth.isLoading } });
+  if (replitAuth.isLoading) return <section className="inv"><div className="page-wrap inv-state" role="status" aria-label="Checking sign-in"><div className="inv-skeleton" style={{height:95}}/><div className="inv-skeleton"/></div></section>;
   return <section className="inv"><div className="page-wrap">
     {current.isLoading ? <div className="inv-state" aria-label="Loading saved interest"><div className="inv-skeleton" style={{height:95}}/><div className="inv-skeleton"/></div> :
     current.isError ? <ErrorState retry={()=>void current.refetch()}/> :
@@ -51,10 +57,17 @@ export function InvestorDone() {
 }
 
 export default function Investor() {
+  const replitAuth = useAuth();
+  const firebaseUser = useFirebaseUser();
+  const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
+  return <InvestorWorksheet key={identityId} identityId={identityId} authLoading={replitAuth.isLoading} />;
+}
+
+function InvestorWorksheet({ identityId, authLoading }: { identityId: string; authLoading: boolean }) {
   const [,navigate] = useLocation();
   const queryClient = useQueryClient();
-  const progress = useGetFlowProgress('investor',{query:{queryKey:getGetFlowProgressQueryKey('investor'),retry:(count,error)=>error.status!==404 && count<2}});
-  const current = useGetCurrentInvestorIntent({query:{queryKey:getGetCurrentInvestorIntentQueryKey(),retry:(count,error)=>error.status!==404 && count<2}});
+  const progress = useGetFlowProgress('investor',{query:{queryKey:[...getGetFlowProgressQueryKey('investor'),identityId],enabled:!authLoading,retry:(count,error)=>error.status!==404 && count<2}});
+  const current = useGetCurrentInvestorIntent({query:{queryKey:[...getGetCurrentInvestorIntentQueryKey(),identityId],enabled:!authLoading,retry:(count,error)=>error.status!==404 && count<2}});
   const explore = useGetExplore();
   const match = useMatchInvestor();
   const save = useSaveFlowProgress();
@@ -156,7 +169,7 @@ export default function Investor() {
     const projects=ids.map(id=>available.find(p=>p.id===id)).filter((x):x is ExploreProject=>Boolean(x));
     change('lineup',split(a.amount,projects));
   }
-  if(progress.isLoading || current.isLoading || explore.isLoading || !ready && !progress.isError) return <section className="inv"><div className="page-wrap inv-state" aria-label="Loading investor worksheet"><p className="inv-kicker">Opening your worksheet</p><div className="inv-skeleton" style={{height:85}}/><div className="inv-skeleton" style={{height:150}}/></div></section>;
+  if(authLoading || progress.isLoading || current.isLoading || explore.isLoading || !ready && !progress.isError) return <section className="inv"><div className="page-wrap inv-state" aria-label="Loading investor worksheet"><p className="inv-kicker">Opening your worksheet</p><div className="inv-skeleton" style={{height:85}}/><div className="inv-skeleton" style={{height:150}}/></div></section>;
   if(progress.isError && progress.error?.status!==404 || current.isError && current.error?.status!==404 || explore.isError) return <section className="inv"><ErrorState retry={()=>{void progress.refetch();void current.refetch();void explore.refetch();}}/></section>;
   return <section className="inv"><div className="page-wrap">
     <div className="inv-top"><Link href="/explore" className="inv-kicker" data-testid="link-invest-explore">Movie Show Investing / Explore</Link><span className="inv-kicker" data-testid="text-invest-step">Step {screen} / 5</span></div>

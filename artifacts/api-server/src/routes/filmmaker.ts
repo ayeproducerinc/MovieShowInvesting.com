@@ -143,7 +143,8 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
   try {
     const result = await createFilmmakerSubmission({
       visitorId: cookieId,
-      firebaseUid: identity?.uid,
+      ...(identity?.provider === "firebase" ? { firebaseUid: identity.uid } : {}),
+      ...(identity?.provider === "replit" ? { replitUid: identity.uid } : {}),
       firebaseEmail: identity?.email,
       data: data as FilmmakerSubmissionData,
     });

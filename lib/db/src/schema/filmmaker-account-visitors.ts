@@ -5,10 +5,12 @@ import { visitorsTable } from "./visitors";
 
 export const filmmakerAccountVisitorsTable = pgTable("filmmaker_account_visitors", {
   visitorId: text("visitor_id").primaryKey().references(() => visitorsTable.visitorId, { onDelete: "cascade" }),
-  firebaseUid: text("firebase_uid").notNull(),
+  firebaseUid: text("firebase_uid"),
+  replitUid: text("replit_uid"),
   linkedAt: timestamp("linked_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("filmmaker_account_visitors_uid_idx").on(table.firebaseUid),
+  index("filmmaker_account_visitors_replit_uid_idx").on(table.replitUid),
 ]);
 
 export const insertFilmmakerAccountVisitorSchema = createInsertSchema(filmmakerAccountVisitorsTable).omit({

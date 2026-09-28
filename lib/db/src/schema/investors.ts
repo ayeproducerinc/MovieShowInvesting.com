@@ -35,11 +35,13 @@ export const investorsTable = pgTable("investors", {
   signedAt: timestamp("signed_at", { withTimezone: true }),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   firebaseUid: text("firebase_uid"),
+  replitUid: text("replit_uid"),
   visitorId: text("visitor_id").references(() => visitorsTable.visitorId, { onDelete: "set null" }),
   ownRefCode: text("own_ref_code"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("investors_firebase_uid_unique").on(table.firebaseUid),
+  uniqueIndex("investors_replit_uid_unique").on(table.replitUid),
   uniqueIndex("investors_visitor_id_unique").on(table.visitorId),
 ]);
 

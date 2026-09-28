@@ -8,6 +8,7 @@ import {
 import {
   getGetFirebaseConfigQueryKey, setAuthTokenGetter, useGetFirebaseConfig,
 } from '@workspace/api-client-react';
+import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-web';
 import { pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 
 const APP_NAME = 'movie-show-investing';
@@ -72,7 +73,7 @@ export function useFilmmakerEmailLink() {
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, next => {
-      setAuthTokenGetter(next ? () => auth.currentUser?.getIdToken() ?? null : null);
+      setAuthTokenGetter(next && !isReplitAuthActive() && !isReplitAuthLoading() ? () => auth.currentUser?.getIdToken() ?? null : null);
       setUser(next);
       setReady(true);
     }, () => {

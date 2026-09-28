@@ -51,6 +51,7 @@ export async function getFilmmakerCount(): Promise<number> {
   const [result] = await db.select({
     total: sql<number>`count(distinct case
       when ${filmmakersTable.firebaseUid} is not null then 'uid:' || ${filmmakersTable.firebaseUid}
+      when ${filmmakersTable.replitUid} is not null then 'replit:' || ${filmmakersTable.replitUid}
       else 'filmmaker:' || ${filmmakersTable.id}::text
     end)::int`,
   }).from(filmmakersTable);
@@ -212,12 +213,15 @@ function storedSubmissionReference(answers: Record<string, unknown>): {
 export async function createFilmmakerSubmission(input: {
   visitorId: string;
   firebaseUid?: string;
+  replitUid?: string;
   firebaseEmail?: string;
   data: FilmmakerSubmissionData;
 }): Promise<{ filmmakerId: number; projectId: number | null }> {
   return db.transaction(async (tx) => {
-    if (input.firebaseUid) {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.firebaseUid}))`);
+    const identityUid = input.firebaseUid ?? input.replitUid;
+    const provider = input.firebaseUid ? "firebase" : input.replitUid ? "replit" : null;
+    if (identityUid) {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${provider} || ':' || ${identityUid}))`);
     }
     const [visitor] = await tx.select().from(visitorsTable)
       .where(eq(visitorsTable.visitorId, input.visitorId))
@@ -228,11 +232,12 @@ export async function createFilmmakerSubmission(input: {
     const [accountLink] = await tx.select().from(filmmakerAccountVisitorsTable)
       .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId))
       .for("update");
-    if (accountLink && accountLink.firebaseUid !== input.firebaseUid) {
+    const accountLinkUid = accountLink?.firebaseUid ?? accountLink?.replitUid ?? null;
+    if (accountLink && accountLinkUid !== identityUid) {
       throw new FilmmakerSubmissionError("This visitor is linked to a different filmmaker account.");
     }
     const verifiedEmailMatchesContact = Boolean(
-      input.firebaseUid
+      identityUid
       && input.firebaseEmail
       && normalizedEmail(input.firebaseEmail) === normalizedEmail(input.data.email),
     );
@@ -285,21 +290,22 @@ export async function createFilmmakerSubmission(input: {
       };
     }
 
-    let accountUid = accountLink?.firebaseUid ?? null;
-    if (verifiedEmailMatchesContact && input.firebaseUid && !accountLink) {
+    let accountUid = accountLinkUid;
+    if (verifiedEmailMatchesContact && identityUid && provider && !accountLink) {
       await tx.insert(filmmakerAccountVisitorsTable).values({
         visitorId: input.visitorId,
-        firebaseUid: input.firebaseUid,
+        firebaseUid: provider === "firebase" ? identityUid : null,
+        replitUid: provider === "replit" ? identityUid : null,
       }).onConflictDoNothing();
       const [linked] = await tx.select().from(filmmakerAccountVisitorsTable)
         .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId));
-      if (!linked || linked.firebaseUid !== input.firebaseUid) {
+      if (!linked || (provider === "firebase" ? linked.firebaseUid : linked.replitUid) !== identityUid) {
         throw new FilmmakerSubmissionError("This visitor is linked to a different filmmaker account.");
       }
-      accountUid = linked.firebaseUid;
+      accountUid = identityUid;
     }
 
-    const [syncedPhone] = accountUid
+    const [syncedPhone] = accountUid && provider === "firebase"
       ? await tx.select({ phone: filmmakersTable.phone })
         .from(filmmakersTable)
         .where(and(
@@ -320,7 +326,8 @@ export async function createFilmmakerSubmission(input: {
       chatOptIn: input.data.chat_opt_in,
       noProjectYet: input.data.no_project_yet,
       visitorId: input.visitorId,
-      firebaseUid: accountUid,
+      firebaseUid: provider === "firebase" ? accountUid : null,
+      replitUid: provider === "replit" ? accountUid : null,
       fundingSources: input.data.funding_sources,
       fundingOther: input.data.funding_other,
       reachedGoal: input.data.reached_goal,
@@ -390,11 +397,16 @@ export async function createFilmmakerSubmission(input: {
 
 export async function claimFilmmakerVisitor(input: {
   visitorId: string;
-  firebaseUid: string;
+  firebaseUid?: string;
+  replitUid?: string;
   verifiedEmail: string;
 }): Promise<{ submissionClaimed: boolean; projectId: number | null }> {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.firebaseUid}))`);
+    const provider = input.firebaseUid ? "firebase" : "replit";
+    const uid = input.firebaseUid ?? input.replitUid;
+    if (!uid) throw new FilmmakerAccountError("visitor_owned_by_another_account", "A verified account is required.");
+    const ownerColumn = provider === "firebase" ? filmmakerAccountVisitorsTable.firebaseUid : filmmakerAccountVisitorsTable.replitUid;
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${provider} || ':' || ${uid}))`);
     const [visitor] = await tx.select().from(visitorsTable)
       .where(eq(visitorsTable.visitorId, input.visitorId))
       .for("update");
@@ -405,7 +417,7 @@ export async function claimFilmmakerVisitor(input: {
     const [existingLink] = await tx.select().from(filmmakerAccountVisitorsTable)
       .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId))
       .for("update");
-    if (existingLink && existingLink.firebaseUid !== input.firebaseUid) {
+    if (existingLink && (provider === "firebase" ? existingLink.firebaseUid : existingLink.replitUid) !== uid) {
       throw new FilmmakerAccountError("visitor_owned_by_another_account", "This project belongs to a different filmmaker account.");
     }
 
@@ -423,7 +435,7 @@ export async function claimFilmmakerVisitor(input: {
           eq(flowProgressTable.completed, false),
         ))
         .where(and(
-          eq(filmmakerAccountVisitorsTable.firebaseUid, input.firebaseUid),
+          eq(ownerColumn, uid),
           ne(filmmakerAccountVisitorsTable.visitorId, input.visitorId),
         ))
         .limit(1);
@@ -449,7 +461,9 @@ export async function claimFilmmakerVisitor(input: {
       if (!filmmaker) {
         throw new FilmmakerAccountError("submission_not_found", "The completed submission could not be verified.");
       }
-      if (filmmaker.firebaseUid && filmmaker.firebaseUid !== input.firebaseUid) {
+      const filmmakerOwnerUid = provider === "firebase" ? filmmaker.firebaseUid : filmmaker.replitUid;
+      if ((filmmaker.firebaseUid && provider !== "firebase") || (filmmaker.replitUid && provider !== "replit")
+        || (filmmakerOwnerUid && filmmakerOwnerUid !== uid)) {
         throw new FilmmakerAccountError("visitor_owned_by_another_account", "This project belongs to a different filmmaker account.");
       }
       if (normalizedEmail(filmmaker.email) !== normalizedEmail(input.verifiedEmail)) {
@@ -466,17 +480,19 @@ export async function claimFilmmakerVisitor(input: {
       } else if (!filmmaker.noProjectYet) {
         throw new FilmmakerAccountError("submission_not_found", "The completed submission could not be verified.");
       }
-      const [syncedPhone] = await tx.select({ phone: filmmakersTable.phone })
+      const [syncedPhone] = provider === "firebase" ? await tx.select({ phone: filmmakersTable.phone })
         .from(filmmakersTable)
         .where(and(
-          eq(filmmakersTable.firebaseUid, input.firebaseUid),
+          eq(filmmakersTable.firebaseUid, uid),
           eq(filmmakersTable.phoneVerified, true),
         ))
-        .limit(1);
-      if (filmmaker.firebaseUid !== input.firebaseUid || syncedPhone) {
+        .limit(1) : [];
+      if (filmmakerOwnerUid !== uid || syncedPhone) {
         await tx.update(filmmakersTable).set({
-          firebaseUid: input.firebaseUid,
-          ...(syncedPhone ? { phone: syncedPhone.phone, phoneVerified: true } : { phoneVerified: false }),
+          ...(provider === "firebase" ? { firebaseUid: uid } : { replitUid: uid }),
+          ...(provider === "firebase"
+            ? (syncedPhone ? { phone: syncedPhone.phone, phoneVerified: true } : { phoneVerified: false })
+            : {}),
         })
           .where(eq(filmmakersTable.id, filmmaker.id));
       }
@@ -487,11 +503,12 @@ export async function claimFilmmakerVisitor(input: {
     if (!existingLink) {
       await tx.insert(filmmakerAccountVisitorsTable).values({
         visitorId: input.visitorId,
-        firebaseUid: input.firebaseUid,
+        firebaseUid: provider === "firebase" ? uid : null,
+        replitUid: provider === "replit" ? uid : null,
       }).onConflictDoNothing();
       const [linked] = await tx.select().from(filmmakerAccountVisitorsTable)
         .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId));
-      if (!linked || linked.firebaseUid !== input.firebaseUid) {
+      if (!linked || (provider === "firebase" ? linked.firebaseUid : linked.replitUid) !== uid) {
         throw new FilmmakerAccountError("visitor_owned_by_another_account", "This project belongs to a different filmmaker account.");
       }
     }
@@ -500,15 +517,20 @@ export async function claimFilmmakerVisitor(input: {
   });
 }
 
-export async function getFilmmakerAccountVisitorUid(visitorId: string): Promise<string | null> {
-  const [link] = await db.select({ firebaseUid: filmmakerAccountVisitorsTable.firebaseUid })
+export async function getFilmmakerAccountVisitorOwner(visitorId: string): Promise<{ provider: "firebase" | "replit"; uid: string } | null> {
+  const [link] = await db.select({
+    firebaseUid: filmmakerAccountVisitorsTable.firebaseUid,
+    replitUid: filmmakerAccountVisitorsTable.replitUid,
+  })
     .from(filmmakerAccountVisitorsTable)
     .where(eq(filmmakerAccountVisitorsTable.visitorId, visitorId))
     .limit(1);
-  return link?.firebaseUid ?? null;
+  if (link?.firebaseUid) return { provider: "firebase", uid: link.firebaseUid };
+  if (link?.replitUid) return { provider: "replit", uid: link.replitUid };
+  return null;
 }
 
-export async function listFilmmakerAccountProjects(firebaseUid: string): Promise<{
+export async function listFilmmakerAccountProjects(firebaseUid: string, provider: "firebase" | "replit" = "firebase"): Promise<{
   projects: Array<{
     id: number;
     slug: string | null;
@@ -519,6 +541,8 @@ export async function listFilmmakerAccountProjects(firebaseUid: string): Promise
   hasResumableDraft: boolean;
   phoneVerified: boolean;
 }> {
+  const accountColumn = provider === "firebase" ? filmmakersTable.firebaseUid : filmmakersTable.replitUid;
+  const visitorOwnerColumn = provider === "firebase" ? filmmakerAccountVisitorsTable.firebaseUid : filmmakerAccountVisitorsTable.replitUid;
   const projects = await db.select({
     id: projectsTable.id,
     slug: projectsTable.slug,
@@ -528,7 +552,7 @@ export async function listFilmmakerAccountProjects(firebaseUid: string): Promise
     createdAt: projectsTable.createdAt,
   }).from(projectsTable)
     .innerJoin(filmmakersTable, eq(projectsTable.filmmakerId, filmmakersTable.id))
-    .where(eq(filmmakersTable.firebaseUid, firebaseUid))
+    .where(eq(accountColumn, firebaseUid))
     .orderBy(desc(projectsTable.createdAt), desc(projectsTable.id));
 
   const [draft] = await db.select({ visitorId: filmmakerAccountVisitorsTable.visitorId })
@@ -538,11 +562,11 @@ export async function listFilmmakerAccountProjects(firebaseUid: string): Promise
       eq(flowProgressTable.flow, "filmmaker"),
       eq(flowProgressTable.completed, false),
     ))
-    .where(eq(filmmakerAccountVisitorsTable.firebaseUid, firebaseUid))
+    .where(eq(visitorOwnerColumn, firebaseUid))
     .limit(1);
   const [verifiedPhone] = await db.select({ id: filmmakersTable.id })
     .from(filmmakersTable)
-    .where(and(eq(filmmakersTable.firebaseUid, firebaseUid), eq(filmmakersTable.phoneVerified, true)))
+    .where(and(eq(accountColumn, firebaseUid), eq(filmmakersTable.phoneVerified, true)))
     .limit(1);
 
   return {
@@ -554,7 +578,7 @@ export async function listFilmmakerAccountProjects(firebaseUid: string): Promise
       createdAt: project.createdAt,
     })),
     hasResumableDraft: Boolean(draft),
-    phoneVerified: Boolean(verifiedPhone),
+    phoneVerified: provider === "firebase" && Boolean(verifiedPhone),
   };
 }
 
@@ -572,11 +596,16 @@ export async function syncFilmmakerPhoneVerification(firebaseUid: string, phoneN
 }
 
 export async function startOrResumeFilmmakerAccountDraft(input: {
-  firebaseUid: string;
+  firebaseUid?: string;
+  replitUid?: string;
   currentVisitorId: string | null;
 }): Promise<{ visitorId: string; status: "created" | "resumed"; lastScreen: number; updatedAt: Date }> {
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.firebaseUid}))`);
+    const provider = input.firebaseUid ? "firebase" : "replit";
+    const uid = input.firebaseUid ?? input.replitUid;
+    if (!uid) throw new FilmmakerAccountError("visitor_owned_by_another_account", "A verified account is required.");
+    const ownerColumn = provider === "firebase" ? filmmakerAccountVisitorsTable.firebaseUid : filmmakerAccountVisitorsTable.replitUid;
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${provider} || ':' || ${uid}))`);
     let currentVisitor: typeof visitorsTable.$inferSelect | undefined;
     if (input.currentVisitorId) {
       const [visitor] = await tx.select().from(visitorsTable)
@@ -590,7 +619,7 @@ export async function startOrResumeFilmmakerAccountDraft(input: {
       const [link] = await tx.select().from(filmmakerAccountVisitorsTable)
         .where(eq(filmmakerAccountVisitorsTable.visitorId, input.currentVisitorId))
         .for("update");
-      if (link && link.firebaseUid !== input.firebaseUid) {
+      if (link && (provider === "firebase" ? link.firebaseUid : link.replitUid) !== uid) {
         throw new FilmmakerAccountError("visitor_owned_by_another_account", "This visitor is linked to a different filmmaker account.");
       }
 
@@ -607,7 +636,7 @@ export async function startOrResumeFilmmakerAccountDraft(input: {
             eq(flowProgressTable.completed, false),
           ))
           .where(and(
-            eq(filmmakerAccountVisitorsTable.firebaseUid, input.firebaseUid),
+            eq(ownerColumn, uid),
             ne(filmmakerAccountVisitorsTable.visitorId, input.currentVisitorId),
           ))
           .limit(1);
@@ -621,14 +650,17 @@ export async function startOrResumeFilmmakerAccountDraft(input: {
       if (progress?.completed) {
         const reference = storedSubmissionReference(progress.answers);
         const [filmmaker] = reference
-          ? await tx.select({ firebaseUid: filmmakersTable.firebaseUid })
+          ? await tx.select({
+            firebaseUid: filmmakersTable.firebaseUid,
+            replitUid: filmmakersTable.replitUid,
+          })
             .from(filmmakersTable)
             .where(and(
               eq(filmmakersTable.id, reference.filmmakerId),
               eq(filmmakersTable.visitorId, input.currentVisitorId),
             )).for("update")
           : [undefined];
-        if (!filmmaker || filmmaker.firebaseUid !== input.firebaseUid || !link) {
+        if (!filmmaker || (provider === "firebase" ? filmmaker.firebaseUid : filmmaker.replitUid) !== uid || !link) {
           throw new FilmmakerAccountError(
             "completed_submission_unclaimed",
             "Claim the current completed submission before starting another project.",
@@ -637,11 +669,12 @@ export async function startOrResumeFilmmakerAccountDraft(input: {
       } else if (!link) {
         await tx.insert(filmmakerAccountVisitorsTable).values({
           visitorId: input.currentVisitorId,
-          firebaseUid: input.firebaseUid,
+          firebaseUid: provider === "firebase" ? uid : null,
+          replitUid: provider === "replit" ? uid : null,
         }).onConflictDoNothing();
         const [linked] = await tx.select().from(filmmakerAccountVisitorsTable)
           .where(eq(filmmakerAccountVisitorsTable.visitorId, input.currentVisitorId));
-        if (!linked || linked.firebaseUid !== input.firebaseUid) {
+        if (!linked || (provider === "firebase" ? linked.firebaseUid : linked.replitUid) !== uid) {
           throw new FilmmakerAccountError("visitor_owned_by_another_account", "This visitor is linked to a different filmmaker account.");
         }
       }
@@ -657,7 +690,7 @@ export async function startOrResumeFilmmakerAccountDraft(input: {
         eq(flowProgressTable.flow, "filmmaker"),
         eq(flowProgressTable.completed, false),
       ))
-      .where(eq(filmmakerAccountVisitorsTable.firebaseUid, input.firebaseUid))
+      .where(eq(ownerColumn, uid))
       .orderBy(desc(flowProgressTable.updatedAt))
       .limit(1);
     if (existingDraft) {
@@ -672,7 +705,7 @@ export async function startOrResumeFilmmakerAccountDraft(input: {
     const linkedVisitors = await tx.select({ priceGroup: visitorsTable.priceGroup })
       .from(filmmakerAccountVisitorsTable)
       .innerJoin(visitorsTable, eq(visitorsTable.visitorId, filmmakerAccountVisitorsTable.visitorId))
-      .where(eq(filmmakerAccountVisitorsTable.firebaseUid, input.firebaseUid))
+      .where(eq(ownerColumn, uid))
       .orderBy(asc(filmmakerAccountVisitorsTable.linkedAt));
     const stableGroup = linkedVisitors.find(({ priceGroup }) => priceGroup === "A" || priceGroup === "B")?.priceGroup
       ?? (currentVisitor?.priceGroup === "A" || currentVisitor?.priceGroup === "B" ? currentVisitor.priceGroup : null);
@@ -680,7 +713,8 @@ export async function startOrResumeFilmmakerAccountDraft(input: {
     await tx.insert(visitorsTable).values({ visitorId, priceGroup: stableGroup }).onConflictDoNothing();
     await tx.insert(filmmakerAccountVisitorsTable).values({
       visitorId,
-      firebaseUid: input.firebaseUid,
+      firebaseUid: provider === "firebase" ? uid : null,
+      replitUid: provider === "replit" ? uid : null,
     });
     const [progress] = await tx.insert(flowProgressTable).values({
       visitorId,
@@ -698,11 +732,12 @@ export async function startOrResumeFilmmakerAccountDraft(input: {
   });
 }
 
-export async function resumeFilmmakerAccountDraft(firebaseUid: string): Promise<{
+export async function resumeFilmmakerAccountDraft(uid: string, provider: "firebase" | "replit" = "firebase"): Promise<{
   visitorId: string;
   lastScreen: number;
   updatedAt: Date;
 } | null> {
+  const ownerColumn = provider === "firebase" ? filmmakerAccountVisitorsTable.firebaseUid : filmmakerAccountVisitorsTable.replitUid;
   const [draft] = await db.select({
     visitorId: filmmakerAccountVisitorsTable.visitorId,
     lastScreen: flowProgressTable.lastScreen,
@@ -713,24 +748,27 @@ export async function resumeFilmmakerAccountDraft(firebaseUid: string): Promise<
       eq(flowProgressTable.flow, "filmmaker"),
       eq(flowProgressTable.completed, false),
     ))
-    .where(eq(filmmakerAccountVisitorsTable.firebaseUid, firebaseUid))
+    .where(eq(ownerColumn, uid))
     .orderBy(desc(flowProgressTable.updatedAt))
     .limit(1);
   return draft ?? null;
 }
 
 export async function getFilmmakerAccountProjectVisitor(
-  firebaseUid: string,
+  uid: string,
   projectId: number,
+  provider: "firebase" | "replit" = "firebase",
 ): Promise<string | null> {
+  const accountColumn = provider === "firebase" ? filmmakersTable.firebaseUid : filmmakersTable.replitUid;
+  const ownerColumn = provider === "firebase" ? filmmakerAccountVisitorsTable.firebaseUid : filmmakerAccountVisitorsTable.replitUid;
   const [owner] = await db.select({ visitorId: filmmakersTable.visitorId })
     .from(projectsTable)
     .innerJoin(filmmakersTable, eq(filmmakersTable.id, projectsTable.filmmakerId))
     .innerJoin(filmmakerAccountVisitorsTable, eq(filmmakerAccountVisitorsTable.visitorId, filmmakersTable.visitorId))
     .where(and(
       eq(projectsTable.id, projectId),
-      eq(filmmakersTable.firebaseUid, firebaseUid),
-      eq(filmmakerAccountVisitorsTable.firebaseUid, firebaseUid),
+      eq(accountColumn, uid),
+      eq(ownerColumn, uid),
     ));
   return owner?.visitorId ?? null;
 }

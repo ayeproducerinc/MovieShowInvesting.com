@@ -1,5 +1,5 @@
 import cookieParser from "cookie-parser";
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import {
   GetCurrentInvestorIntentResponse,
@@ -8,7 +8,7 @@ import {
   SaveInvestorIntentBody,
   SaveInvestorIntentResponse,
 } from "@workspace/api-zod";
-import { FirebaseConfigurationError, verifyFirebaseIdToken } from "../lib/firebase-admin";
+import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -18,7 +18,6 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SLATES = ["distribution", "production", "idea"] as const;
 type Slate = typeof SLATES[number];
 type Minimums = Record<Slate, number | null>;
-type InvestorIdentity = { uid: string; email: string };
 type ProjectRow = {
   id: number;
   slug: string | null;
@@ -49,6 +48,7 @@ type InvestorRow = {
   minima: Minimums | null;
   call_opt_in: boolean | null;
   firebase_uid: string | null;
+  replit_uid: string | null;
   visitor_id: string | null;
 };
 
@@ -60,36 +60,6 @@ function safeImageUrl(value: string | null): string | null {
       ? url.toString()
       : null;
   } catch {
-    return null;
-  }
-}
-
-async function authenticateInvestor(
-  req: Request,
-  res: Response,
-  required: boolean,
-): Promise<InvestorIdentity | null> {
-  const authorization = req.get("authorization");
-  const token = authorization?.match(/^Bearer\s+(\S+)$/i)?.[1];
-  if (!token) {
-    if (authorization) res.status(401).json({ error: "A valid Firebase bearer token is required." });
-    else if (required) res.status(401).json({ error: "A Firebase ID token is required." });
-    return null;
-  }
-  try {
-    const decoded = await verifyFirebaseIdToken(token);
-    if (decoded.email_verified !== true || typeof decoded.email !== "string" || !decoded.uid) {
-      res.status(403).json({ error: "A verified Firebase email is required." });
-      return null;
-    }
-    return { uid: decoded.uid, email: decoded.email.trim().toLowerCase() };
-  } catch (error) {
-    if (error instanceof FirebaseConfigurationError) {
-      res.status(503).json({ error: error.message });
-      return null;
-    }
-    req.log.warn({ error: error instanceof Error ? error.message : "Authentication failed." }, "Firebase investor token verification failed");
-    res.status(401).json({ error: "The Firebase ID token is invalid or expired." });
     return null;
   }
 }
@@ -148,12 +118,12 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid investor intent input." });
     return;
   }
-  const identity = await authenticateInvestor(req, res, false);
+  const identity = await resolveProtectedIdentity(req, res, false);
   if (req.get("authorization") && !identity) return;
   const data = parsed.data;
   const email = data.email.trim().toLowerCase();
   if (identity && identity.email !== email) {
-    res.status(403).json({ error: "The submitted email must match the verified Firebase account." });
+    res.status(403).json({ error: "The submitted email must match the verified account." });
     return;
   }
 
@@ -214,7 +184,7 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
     const lockKeys = [
       `investor:email:${email}`,
       ...(visitorId ? [`investor:visitor:${visitorId}`] : []),
-      ...(identity ? [`investor:firebase:${identity.uid}`] : []),
+      ...(identity ? [`investor:${identity.provider}:${identity.uid}`] : []),
     ].sort();
     for (const lockKey of lockKeys) {
       await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [lockKey]);
@@ -242,16 +212,17 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
     const emailOwner = matchingInvestors.rows[0];
     let uidOwner: InvestorRow | undefined;
     if (identity) {
+      const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
       const uidMatches = await client.query<InvestorRow>(
-        "select * from investors where firebase_uid = $1 order by id limit 2 for update",
+        `select * from investors where ${uidColumn} = $1 order by id limit 2 for update`,
         [identity.uid],
       );
       if (uidMatches.rows.length > 1) {
-        conflict = "This Firebase account has conflicting investor records and cannot be safely updated.";
+        conflict = "This account has conflicting investor records and cannot be safely updated.";
       } else {
         uidOwner = uidMatches.rows[0];
         if (uidOwner && uidOwner.email?.trim().toLowerCase() !== email) {
-          conflict = "This Firebase account already has an investor intent with a different email.";
+          conflict = "This account already has an investor intent with a different email.";
         }
       }
     }
@@ -270,21 +241,29 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
     const existing = emailOwner ?? uidOwner;
     if (matchingInvestors.rows.length > 1) {
       conflict = "This email has conflicting investor records and cannot be safely updated.";
-    } else if (emailOwner?.firebase_uid) {
-      if (!identity || emailOwner.firebase_uid !== identity.uid) {
+    } else if (emailOwner?.firebase_uid || emailOwner?.replit_uid) {
+      const sameOwner = Boolean(identity && (
+        identity.provider === "firebase" ? emailOwner.firebase_uid === identity.uid
+          : emailOwner.replit_uid === identity.uid
+      ));
+      if (!sameOwner) {
         conflict = "This email is already associated with a different investor identity.";
       }
     } else if (emailOwner && !identity && (!visitorId || emailOwner.visitor_id !== visitorId)) {
       conflict = "This email is already associated with a different investor identity.";
     }
     if (uidOwner && existing && uidOwner.id !== existing.id) {
-      conflict = "This Firebase account and email belong to different investor records.";
+      conflict = "This account and email belong to different investor records.";
     }
     if (visitorOwner && existing && visitorOwner.id !== existing.id) {
       conflict = "This visitor is already associated with a different investor intent.";
     }
-    if (visitorOwner?.firebase_uid && (!identity || visitorOwner.firebase_uid !== identity.uid)) {
-      conflict = "This visitor is linked to a different Firebase account.";
+    if (visitorOwner?.firebase_uid || visitorOwner?.replit_uid) {
+      const sameVisitorOwner = Boolean(identity && (
+        identity.provider === "firebase" ? visitorOwner.firebase_uid === identity.uid
+          : visitorOwner.replit_uid === identity.uid
+      ));
+      if (!sameVisitorOwner) conflict = "This visitor is linked to a different account.";
     }
     if (visitorOwner && !identity && visitorOwner.email?.trim().toLowerCase() !== email) {
       conflict = "This visitor already has an investor intent with a different email.";
@@ -311,7 +290,8 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
         data.stages,
         JSON.stringify(minimums),
         data.call_opt_in,
-        existing?.firebase_uid ?? identity?.uid ?? null,
+        existing?.firebase_uid ?? (identity?.provider === "firebase" ? identity.uid : null),
+        existing?.replit_uid ?? (identity?.provider === "replit" ? identity.uid : null),
         existing?.visitor_id ?? visitorId,
       ];
       if (existing) {
@@ -323,8 +303,8 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
             accredited = $9, experience = $10, experience_other = $11,
             motivations = $12, motivations_other = $13, favorite_genres = $14,
             stages = $15, minima = $16::jsonb, call_opt_in = $17,
-            firebase_uid = $18, visitor_id = $19
-          where id = $20
+            firebase_uid = $18, replit_uid = $19, visitor_id = $20
+          where id = $21
         `, [...values, investorId]);
       } else {
         const inserted = await client.query<{ id: number }>(`
@@ -332,10 +312,10 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
             name, email, city, state, zip, amount_choice, investment_amount,
             unallocated, accredited, experience, experience_other, motivations,
             motivations_other, favorite_genres, stages, minima, call_opt_in,
-            firebase_uid, visitor_id
+            firebase_uid, replit_uid, visitor_id
           ) values (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-            $15, $16::jsonb, $17, $18, $19
+            $15, $16::jsonb, $17, $18, $19, $20
           ) returning id
         `, values);
         investorId = inserted.rows[0].id;
@@ -392,27 +372,28 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
 });
 
 router.get("/investor/intents/current", async (req, res): Promise<void> => {
-  const identity = await authenticateInvestor(req, res, false);
+  const identity = await resolveProtectedIdentity(req, res, false);
   if (req.get("authorization") && !identity) return;
   const cookieCandidate = req.cookies?.[VISITOR_COOKIE];
   const visitorId = typeof cookieCandidate === "string" && UUID.test(cookieCandidate) ? cookieCandidate : null;
 
   let investor: InvestorRow | undefined;
   if (identity) {
+    const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
     const { rows } = await pool.query<InvestorRow>(
-      "select * from investors where firebase_uid = $1 order by id limit 1",
+      `select * from investors where ${uidColumn} = $1 order by id limit 1`,
       [identity.uid],
     );
     investor = rows[0];
     if (investor && investor.email?.trim().toLowerCase() !== identity.email) {
-      res.status(403).json({ error: "This investor intent is not associated with the verified Firebase email." });
+      res.status(403).json({ error: "This investor intent is not associated with the verified account email." });
       return;
     }
   } else if (visitorId) {
     // Linked investor records are never accessible through a guest cookie,
     // including the visitor cookie originally used before account linking.
     const { rows } = await pool.query<InvestorRow>(
-      "select * from investors where visitor_id = $1 and firebase_uid is null order by id limit 1",
+      "select * from investors where visitor_id = $1 and firebase_uid is null and replit_uid is null order by id limit 1",
       [visitorId],
     );
     investor = rows[0];

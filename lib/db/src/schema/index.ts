@@ -29,3 +29,4 @@ export * from "./email-log";
 export * from "./filmmaker-account-visitors";
 export * from "./question-ip-attempts";
 export * from "./conversations";
+export * from "./auth";

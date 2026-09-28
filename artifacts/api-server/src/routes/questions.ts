@@ -417,10 +417,11 @@ router.get("/filmmakers/projects/:projectId/questions", async (req, res): Promis
   const projectId = params.data.projectId;
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
+  const ownerColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
   const owner = await pool.query(
     `select p.id from projects p
      inner join filmmakers f on f.id = p.filmmaker_id
-     where p.id = $1 and f.firebase_uid = $2 limit 1`,
+     where p.id = $1 and f.${ownerColumn} = $2 limit 1`,
     [projectId, identity.uid],
   );
   if (owner.rowCount === 0) {
@@ -453,10 +454,11 @@ router.post("/filmmakers/projects/:projectId/questions/:messageId/answer", async
   const answer = parsedBody.data.answer.trim();
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
+  const ownerColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
   const owner = await pool.query(
     `select p.id from projects p
      inner join filmmakers f on f.id = p.filmmaker_id
-     where p.id = $1 and f.firebase_uid = $2 limit 1`,
+     where p.id = $1 and f.${ownerColumn} = $2 limit 1`,
     [projectId, identity.uid],
   );
   if (owner.rowCount === 0) {

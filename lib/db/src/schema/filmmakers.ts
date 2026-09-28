@@ -17,6 +17,7 @@ export const filmmakersTable = pgTable("filmmakers", {
   visitorId: text("visitor_id").references(() => visitorsTable.visitorId, { onDelete: "set null" }),
   ownRefCode: text("own_ref_code"),
   firebaseUid: text("firebase_uid"),
+  replitUid: text("replit_uid"),
   emailVerified: boolean("email_verified"),
   phoneVerified: boolean("phone_verified"),
   fundingSources: text("funding_sources").array(),
@@ -26,6 +27,7 @@ export const filmmakersTable = pgTable("filmmakers", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("filmmakers_firebase_uid_idx").on(table.firebaseUid),
+  index("filmmakers_replit_uid_idx").on(table.replitUid),
 ]);
 
 export const insertFilmmakerSchema = createInsertSchema(filmmakersTable).omit({

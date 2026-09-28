@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter } from "express";
 import {
   db,
   emailLogTable,
@@ -24,12 +24,11 @@ import {
   ReviewAdminProjectParams,
   ReviewAdminProjectResponse,
 } from "@workspace/api-zod";
-import { FirebaseConfigurationError, verifyFirebaseIdToken } from "../lib/firebase-admin";
+import { authorizeAdminIdentity } from "../lib/admin-auth";
 
 const router: IRouter = Router();
 type Section = "summary" | "pledges" | "location" | "funnels" | "market" | "price-test" | "queues" | "messages" | "channels" | "email-log";
 type AdminTable = { section: Section; title: string; columns: string[]; rows: string[][]; total: number };
-type Identity = { email: string };
 
 const SECTION_TITLES: Record<Section, string> = {
   summary: "Summary",
@@ -43,47 +42,6 @@ const SECTION_TITLES: Record<Section, string> = {
   channels: "Channels",
   "email-log": "Email log",
 };
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Authentication failed.";
-}
-
-async function authorize(req: Request, res: Response): Promise<Identity | null> {
-  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  if (!adminEmail) {
-    res.status(503).json({ error: "Admin access is not configured. Set ADMIN_EMAIL on the server." });
-    return null;
-  }
-
-  const authorization = req.get("authorization");
-  const match = authorization?.match(/^Bearer\s+(\S+)$/i);
-  if (!match) {
-    res.status(401).json({ error: "A Firebase ID token is required." });
-    return null;
-  }
-
-  try {
-    const decoded = await verifyFirebaseIdToken(match[1]);
-    if (decoded.email_verified !== true || typeof decoded.email !== "string") {
-      res.status(401).json({ error: "A verified Firebase email is required." });
-      return null;
-    }
-    const email = decoded.email.trim().toLowerCase();
-    if (email !== adminEmail) {
-      res.status(403).json({ error: "This account is not an administrator." });
-      return null;
-    }
-    return { email };
-  } catch (error) {
-    if (error instanceof FirebaseConfigurationError) {
-      res.status(503).json({ error: error.message });
-      return null;
-    }
-    req.log.warn({ error: errorMessage(error) }, "Firebase admin token verification failed");
-    res.status(401).json({ error: "The Firebase ID token is invalid or expired." });
-    return null;
-  }
-}
 
 function text(value: unknown): string {
   if (value == null) return "";
@@ -376,13 +334,13 @@ async function getAdminTable(section: Section): Promise<AdminTable> {
 }
 
 router.get("/admin/me", async (req, res): Promise<void> => {
-  const identity = await authorize(req, res);
+  const identity = await authorizeAdminIdentity(req, res);
   if (!identity) return;
   res.json(GetAdminMeResponse.parse({ email: identity.email, role: "admin" }));
 });
 
 router.get("/admin/tables/:section", async (req, res): Promise<void> => {
-  const identity = await authorize(req, res);
+  const identity = await authorizeAdminIdentity(req, res);
   if (!identity) return;
   const parsedParams = GetAdminTableParams.safeParse(req.params);
   if (!parsedParams.success) {
@@ -394,7 +352,7 @@ router.get("/admin/tables/:section", async (req, res): Promise<void> => {
 });
 
 router.patch("/admin/projects/:projectId", async (req, res): Promise<void> => {
-  const identity = await authorize(req, res);
+  const identity = await authorizeAdminIdentity(req, res);
   if (!identity) return;
 
   const parsedParams = ReviewAdminProjectParams.safeParse(req.params);
@@ -417,7 +375,7 @@ router.patch("/admin/projects/:projectId", async (req, res): Promise<void> => {
 });
 
 router.patch("/admin/messages/:messageId", async (req, res): Promise<void> => {
-  const identity = await authorize(req, res);
+  const identity = await authorizeAdminIdentity(req, res);
   if (!identity) return;
 
   const parsedParams = ReviewAdminMessageParams.safeParse(req.params);
