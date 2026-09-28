@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { getGetFilmmakerProjectsQueryKey, getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey, useGetFilmmakerProjects, useGetFilmmakerResult, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
+import { getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey, useGetFilmmakerResult, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
 import type { FilmmakerSubmissionInput } from '@workspace/api-client-react';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { useAuth } from '@workspace/replit-auth-web';
@@ -79,11 +79,9 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
   const completedResult = useGetFilmmakerResult({ query:{ queryKey:[...getGetFilmmakerResultQueryKey(),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
   useEffect(() => { if (completedResult.data?.completed) navigate('/start/filmmaker/done'); }, [completedResult.data?.completed, navigate]);
   const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:[...getGetFlowProgressQueryKey('filmmaker'),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
-  const checkAccountProjects = identityId !== 'visitor' && authReady && !authLoading && completedResult.error?.status === 404 && progress.error?.status === 404;
-  const accountProjects = useGetFilmmakerProjects({ query:{ queryKey:[...getGetFilmmakerProjectsQueryKey(),identityId], enabled:checkAccountProjects, retry:(count,error)=>error.status !== 401 && count < 2 } });
   useEffect(() => {
-    if (checkAccountProjects && accountProjects.data && (accountProjects.data.projects.length || accountProjects.data.has_resumable_draft)) navigate('/me/projects');
-  }, [checkAccountProjects, accountProjects.data, navigate]);
+    if (identityId !== 'visitor' && authReady && !authLoading && completedResult.error?.status === 404 && progress.error?.status === 404) navigate('/me/projects');
+  }, [identityId, authReady, authLoading, completedResult.error, progress.error, navigate]);
   const group = useGetPriceGroup();
   const draftHeaders: Record<string, string> = progress.data?.draft_id ? { 'X-MSI-Draft-Id': String(progress.data.draft_id) } : {};
   const save = useSaveFlowProgress({ request: { headers: draftHeaders } });
@@ -123,11 +121,11 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
   }, [progress.data, navigate]);
   useEffect(() => {
     // An untouched visitor has no progress row. The API deliberately returns 404.
-    if (progress.isError && progress.error?.status === 404 && !initialized.current) {
+    if (identityId === 'visitor' && progress.isError && progress.error?.status === 404 && !initialized.current) {
       initialized.current = true;
       setHydrated(true);
     }
-  }, [progress.isError, progress.error]);
+  }, [identityId, progress.isError, progress.error]);
 
   function change<K extends keyof Answers>(key:K, value:Answers[K]) {
     setA(current => ({ ...current, [key]:value }));
@@ -143,7 +141,12 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
     operation.then(() => {
       lastSaved.current = serialized;
       setSaveError('');
-    }).catch(() => setSaveError('Your changes could not be saved. If you opened another project in a different tab, return to your project desk and reopen this draft.')).finally(() => {
+    }).catch((error: unknown) => {
+      const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
+      setSaveError(status === 409 || status === 403 || status === 404
+        ? 'This draft is no longer selected for this visit. Copy any unsaved answers, then open My projects to resume the draft or start another project.'
+        : 'Your changes could not be saved. Please try again.');
+    }).finally(() => {
       if (queue.current === operation) setSaving(false);
     });
     return operation;
@@ -207,7 +210,12 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
       await submit.mutateAsync({ data:payload(a) });
       if (identityId === 'visitor') showGuestConfirmation();
       navigate('/start/filmmaker/done');
-    } catch { setSaveError('We could not submit your information. If you switched projects in another tab, return to your project desk and reopen this draft. Nothing has been confirmed.'); }
+    } catch (error) {
+      const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
+      setSaveError(status === 409 || status === 403 || status === 404
+        ? 'This draft is no longer selected for this visit. Copy any unsaved answers, then open My projects to resume the draft or start another project.'
+        : 'We could not submit your information. Nothing has been confirmed. Please try again.');
+    }
   }
   function selectStage(value:Stage) {
     const next = { ...a, stage:value, budget:examples(value,a.format)[0], budget_mode:'example' as const, offer_per100:null, offer_choice:'', wants_lower:false };
@@ -249,8 +257,9 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
       <div className="fm-field"><label htmlFor="custom-budget" className="fm-label">Your estimated budget · USD</label><input id="custom-budget" data-testid="input-custom-budget" className="fm-input" inputMode="numeric" value={a.budget ? a.budget.toLocaleString('en-US') : ''} onChange={e=>{ const raw=e.target.value.replace(/,/g,''); if (/^\d*$/.test(raw)) change('budget',raw ? Number(raw) : 0); }} aria-invalid={!budgetValid} />{!budgetValid && <p className="fm-error" role="alert">Enter a positive whole-dollar amount.</p>}</div>}
   </div>;
 
-  if (authLoading || completedResult.isLoading || progress.isLoading || group.isLoading || (checkAccountProjects && accountProjects.isPending) || !hydrated && !progress.isError) return <section className="fm"><div className="page-wrap" style={{padding:'70px 0 140px'}} aria-label="Loading saved answers"><p className="fm-kicker">Opening your worksheet</p><div className="fm-skeleton" style={{maxWidth:440,height:75}}/><div className="fm-skeleton" style={{maxWidth:310}}/><div className="fm-skeleton" style={{maxWidth:600,height:190}}/></div></section>;
+  if (authLoading || completedResult.isLoading || progress.isLoading || group.isLoading || completedResult.data?.completed || !hydrated && !progress.isError) return <section className="fm"><div className="page-wrap" style={{padding:'70px 0 140px'}} aria-label="Loading saved answers"><p className="fm-kicker">Opening your worksheet</p><div className="fm-skeleton" style={{maxWidth:440,height:75}}/><div className="fm-skeleton" style={{maxWidth:310}}/><div className="fm-skeleton" style={{maxWidth:600,height:190}}/></div></section>;
   if (completedResult.isError && completedResult.error?.status !== 404 || progress.isError && progress.error?.status !== 404 || group.isError || !group.data) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Connection interrupted</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>We can’t open your worksheet yet.</h1><p className="fm-small">Your previous answers and pricing group need to load before you continue. Please try again.</p><button type="button" data-testid="button-retry-loading" className="fm-primary" style={{marginTop:30}} onClick={()=>{ void completedResult.refetch(); void progress.refetch(); void group.refetch(); }}><RotateCcw size={17}/> Try again</button></div></section>;
+  if (identityId !== 'visitor' && progress.error?.status === 404) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Choose a project</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>Your draft isn’t selected.</h1><p className="fm-small">Open My projects to resume a saved draft or start another project. No project was changed.</p><Link href="/me/projects" data-testid="link-select-filmmaker-draft" className="fm-primary" style={{marginTop:30}}>My projects <ArrowRight size={17}/></Link></div></section>;
   return <section className="fm"><div className="page-wrap">
     <div className="fm-top"><Link href="/" data-testid="link-flow-home" className="fm-kicker">Movie Show Investing / Filmmakers</Link><span className="fm-kicker" data-testid="text-progress">Step {screen} of 6</span></div>
     <div className="fm-progress" aria-label={`Step ${screen} of 6`}>{headings.map((heading,i)=><span key={heading} className={i<screen ? 'active' : ''} title={`Step ${i+1}: ${heading}`}/>)}</div>
@@ -321,7 +330,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
           <p className="fm-small">By submitting, you’re sharing information with Movie Show Investing for its launch MVP. This does not create a project listing or an investment opportunity. See our <Link href="/privacy" className="underline" data-testid="link-flow-privacy">privacy policy</Link>.</p>
         </>}
         {validation && <p className="fm-error" data-testid="error-validation" role="alert">{validation}</p>}
-        {saveError && <div className="fm-error" data-testid="error-save" role="alert">{saveError} <button type="button" data-testid="button-retry-save" className="underline" onClick={()=>void persist(screenRef.current,answersRef.current).catch(()=>undefined)}>Retry save</button></div>}
+        {saveError && <div className="fm-error" data-testid="error-save" role="alert">{saveError} {saveError.startsWith('This draft') ? <Link href="/me/projects" data-testid="link-reselect-draft">My projects</Link> : <button type="button" data-testid="button-retry-save" className="underline" onClick={()=>void persist(screenRef.current,answersRef.current).catch(()=>undefined)}>Retry save</button>}</div>}
         <div className="fm-steps">
           {screen>1 ? <button type="button" data-testid="button-back" className="fm-back" disabled={saving || submit.isPending} onClick={()=>void back()}><ArrowLeft size={17}/> Back</button> : <span className="fm-small">Your answers save as you go.</span>}
           {screen===1 && !a.stage ? <span className="fm-small">Choose a stage to continue</span> :

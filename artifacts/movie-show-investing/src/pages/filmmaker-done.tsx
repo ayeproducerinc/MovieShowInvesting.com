@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, Check, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { getGetFilmmakerResultQueryKey, useGetFilmmakerResult, useUpdateFilmmakerShowcase } from '@workspace/api-client-react';
+import { getFilmmakerResult, getGetFilmmakerResultQueryKey, useGetFilmmakerResult, useUpdateFilmmakerShowcase } from '@workspace/api-client-react';
 import type { FilmmakerResult, FilmmakerShowcaseUpdate } from '@workspace/api-client-react';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { closeGuestConfirmation, guestConfirmationVisible } from '@/lib/filmmaker-confirmation';
@@ -23,6 +23,8 @@ function validLinks(value: string) {
 
 function ShowcaseForm({ result, onSaved }: { result: FilmmakerResult; onSaved: () => void }) {
   const update = useUpdateFilmmakerShowcase({ request: { headers: result.project_id ? { 'X-MSI-Project-Id': String(result.project_id) } : {} } });
+  const [checking, setChecking] = useState(false);
+  const [needsReselect, setNeedsReselect] = useState(false);
   const [synopsis, setSynopsis] = useState(result.synopsis || '');
   const [links, setLinks] = useState(result.team_links.join('\n'));
   const [moneyUse, setMoneyUse] = useState(result.money_use || '');
@@ -36,6 +38,7 @@ function ShowcaseForm({ result, onSaved }: { result: FilmmakerResult; onSaved: (
   }, [result.trailer_url]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (checking || update.isPending || needsReselect) return;
     const teamLinks = validLinks(links);
     if (!teamLinks) { setError('Add up to eight full http:// or https:// team links, one per line.'); return; }
     const trailerValue = clean(trailer);
@@ -49,8 +52,30 @@ function ShowcaseForm({ result, onSaved }: { result: FilmmakerResult; onSaved: (
       distribution_plan: clean(distribution),
       trailer_url: trailerValue,
     };
-    try { const updated = await update.mutateAsync({ data }); trailerDirty.current = false; setTrailer(updated.trailer_url || ''); setSaved(true); onSaved(); }
-    catch { setError('We could not save your showcase request. Please try again.'); }
+    setChecking(true);
+    try {
+      const current = await getFilmmakerResult();
+      if (current.project_id !== result.project_id) {
+        setNeedsReselect(true);
+        setError('This project is no longer selected for editing. Copy any unsaved details, then open My projects and select it again.');
+        return;
+      }
+      const updated = await update.mutateAsync({ data });
+      trailerDirty.current = false;
+      setTrailer(updated.trailer_url || '');
+      setSaved(true);
+      onSaved();
+    } catch (failure) {
+      const status = failure && typeof failure === 'object' && 'status' in failure ? failure.status : null;
+      if (status === 404 || status === 409 || status === 403 || status === 401) {
+        setNeedsReselect(true);
+        setError('This project could not be opened for editing with the current sign-in and selection. Copy any unsaved details, then open My projects and select it again.');
+      } else {
+        setError('We could not save your showcase request. Please try again.');
+      }
+    } finally {
+      setChecking(false);
+    }
   }
   return <section className="dossier-section" data-testid="section-showcase">
     <span className="dossier-kicker">Optional / showcase review</span>
@@ -63,8 +88,9 @@ function ShowcaseForm({ result, onSaved }: { result: FilmmakerResult; onSaved: (
       <div className="dossier-field"><label htmlFor="showcase-distribution">Distribution plan <small>· optional</small></label><textarea id="showcase-distribution" data-testid="input-showcase-distribution" maxLength={3000} value={distribution} onChange={e => setDistribution(e.target.value)} /></div>
       <div className="dossier-field"><label htmlFor="showcase-trailer">External trailer URL <small>· optional; paste a full http:// or https:// link. Clear to remove. Saving a new link replaces any uploaded trailer.</small></label><input id="showcase-trailer" data-testid="input-showcase-trailer" type="url" maxLength={2048} value={trailer} onChange={e => { trailerDirty.current = true; setTrailer(e.target.value); setError(''); }} placeholder="https://" /></div>
       {error && <p className="dossier-error" role="alert" data-testid="error-showcase">{error}</p>}
+      {needsReselect && <Link href="/me/projects?action=manage" onClick={() => setFilmmakerAction('manage')} data-testid="link-reselect-showcase-project" className="dossier-button dossier-button-outline">Open My projects <ArrowRight size={17}/></Link>}
       {saved && <p className="dossier-notice" role="status" data-testid="status-showcase-saved">Your details and showcase request were saved. Review is still pending unless approved.</p>}
-      <button type="submit" data-testid="button-request-showcase" className="dossier-button" disabled={update.isPending} style={{ marginTop: 18 }}>{update.isPending ? 'Saving request…' : result.showcase_requested ? 'Save showcase details' : 'Request showcase review'} <ArrowRight size={17}/></button>
+      <button type="submit" data-testid="button-request-showcase" className="dossier-button" disabled={checking || update.isPending || needsReselect} style={{ marginTop: 18 }}>{checking || update.isPending ? 'Saving request…' : result.showcase_requested ? 'Save showcase details' : 'Request showcase review'} <ArrowRight size={17}/></button>
     </form>
   </section>;
 }
@@ -86,7 +112,7 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
   const authReady = useFirebaseSessionReady();
   const user = useFirebaseUser();
   const [guestVisible] = useState(guestConfirmationVisible);
-  const result = useGetFilmmakerResult({ query: { queryKey: [...getGetFilmmakerResultQueryKey(), identityId], enabled: authReady && !authLoading, retry: (count, error) => error.status !== 404 && count < 2 } });
+  const result = useGetFilmmakerResult({ query: { queryKey: [...getGetFilmmakerResultQueryKey(), identityId], enabled: authReady && !authLoading, refetchOnMount: 'always', retry: (count, error) => error.status !== 404 && count < 2 } });
   const data = result.data;
   useEffect(() => () => closeGuestConfirmation(), []);
   useEffect(() => {
@@ -97,13 +123,14 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
     return () => window.removeEventListener('pageshow', onPageShow);
   }, [user, navigate]);
   useEffect(() => {
-    if (!authReady || user) return;
+    if (!authReady || user || ssoSignedIn) return;
     if ((data?.completed && !guestVisible) || result.error?.status === 401) navigate('/me/projects');
-  }, [authReady, user, data?.completed, guestVisible, result.error, navigate]);
+  }, [authReady, user, ssoSignedIn, data?.completed, guestVisible, result.error, navigate]);
   useEffect(() => {
     if (data?.completed) sessionStorage.removeItem('filmmaker-submitted-no-project');
   }, [data?.completed]);
-  if (authLoading || !authReady || result.isLoading || (!user && data?.completed && !guestVisible)) return <section className="dossier"><div className="page-wrap dossier-hero" aria-label="Loading your saved submission"><p className="dossier-kicker">Retrieving your submission</p><div className="dossier-skeleton" style={{ width: 'min(90%, 660px)', height: 95 }} /><div className="dossier-skeleton" style={{ width: 'min(60%, 420px)' }} /></div></section>;
+  if (authLoading || !authReady || result.isLoading || (!user && !ssoSignedIn && data?.completed && !guestVisible)) return <section className="dossier"><div className="page-wrap dossier-hero" aria-label="Loading your saved submission"><p className="dossier-kicker">Retrieving your submission</p><div className="dossier-skeleton" style={{ width: 'min(90%, 660px)', height: 95 }} /><div className="dossier-skeleton" style={{ width: 'min(60%, 420px)' }} /></div></section>;
+  if (result.isError && result.error?.status === 404 && identityId !== 'visitor') return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Select your project</p><h1 className="dossier-title">Your project is <em>still saved.</em></h1><p className="dossier-lead" role="alert">There is no submitted project selected for this visit. Open My projects and select the project you want to edit before requesting showcase review.</p><Link href="/me/projects?action=manage" onClick={() => setFilmmakerAction('manage')} data-testid="link-reselect-result-project" className="dossier-button" style={{ marginTop: 30 }}>Open My projects <ArrowRight size={17}/></Link></div></section>;
   if (result.isError && result.error?.status !== 404) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Connection interrupted</p><h1 className="dossier-title">Your story is <em>still here.</em></h1><p className="dossier-lead" role="alert">We couldn’t retrieve your saved submission right now. Please try again.</p><button type="button" className="dossier-button" data-testid="button-retry-result" style={{ marginTop: 30 }} onClick={() => void result.refetch()}><RotateCcw size={16}/> Try again</button></div></section>;
   if (!data?.completed) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Filmmaker worksheet</p><h1 className="dossier-title">The beginning<br/><em>comes first.</em></h1><p className="dossier-lead">There’s no completed submission attached to this visit. Open the worksheet to get started or continue your saved answers.</p><Link href="/start/filmmaker" data-testid="link-return-to-worksheet" className="dossier-button" style={{ marginTop: 32 }}>Open the worksheet <ArrowRight size={17}/></Link></div></section>;
    if (data.no_project_yet) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker"><Check size={15} style={{ display: 'inline', marginRight: 9 }}/> Answers received / No project yet</p><h1 className="dossier-title" data-testid="text-confirmation">There’s room<br/><em>for what’s next.</em></h1><p className="dossier-lead">We received your contact details and your interest in participating in the future. No project or deal terms were submitted.</p><div className="dossier-notice" style={{ maxWidth: 680, marginTop: 42 }}>We’re still building this experience. There’s no investment available or money collected here today. If there’s a relevant next step, we’ll reach out using the information you shared.</div>{!user && !ssoSignedIn && <p className="dossier-status">Your answers are saved. Sign in to manage future projects across devices.</p>}<div className="dossier-actions" style={{ marginTop: 38 }}><Link href="/me/projects?action=start" onClick={() => setFilmmakerAction('start')} data-testid="link-start-another-project" className="dossier-button">Start a project <ArrowRight size={17}/></Link><Link href="/me/projects?action=manage" onClick={() => setFilmmakerAction('manage')} className="dossier-button dossier-button-outline">Manage projects <ArrowRight size={17}/></Link></div></div></section>;
