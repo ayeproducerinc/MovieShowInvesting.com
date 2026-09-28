@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey, useGetFilmmakerResult, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
+import { getGetFilmmakerResultQueryKey, getGetFilmmakerSubmissionConfigQueryKey, getGetFlowProgressQueryKey, useGetFilmmakerResult, useGetFilmmakerSubmissionConfig, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
 import type { FilmmakerSubmissionInput } from '@workspace/api-client-react';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { useAuth } from '@workspace/replit-auth-web';
 import { showGuestConfirmation } from '@/lib/filmmaker-confirmation';
+import { FilmmakerTurnstile } from '@/components/filmmaker-turnstile';
 import { LocationPicker } from '../components/location-picker';
 import { calculateDeal, examples, money, phase, restoreWorksheet, standardOffer, validListedOffer, type Format, type Stage } from './filmmaker-calculator';
 
@@ -50,7 +51,7 @@ function Field({ label, id, value, onChange, required=false, type='text', placeh
   </div>;
 }
 function validUrl(value:string) { if (!value.trim()) return true; try { const u = new URL(value); return u.protocol === 'https:' || u.protocol === 'http:'; } catch { return false; } }
-function payload(a:Answers):FilmmakerSubmissionInput {
+function payload(a:Answers):Omit<FilmmakerSubmissionInput, 'turnstile_token'> {
   const contact = { no_project_yet:a.no_project_yet, name:a.name.trim(), email:a.email.trim(), phone:a.phone.trim() || undefined, city:a.city.trim(), state:a.state.trim() || undefined, country:a.country || undefined, favorite_genres:a.favorite_genres, chat_opt_in:a.chat_opt_in };
   if (a.no_project_yet) return contact;
   return {
@@ -79,6 +80,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
   const completedResult = useGetFilmmakerResult({ query:{ queryKey:[...getGetFilmmakerResultQueryKey(),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
   useEffect(() => { if (completedResult.data?.completed) navigate('/start/filmmaker/done'); }, [completedResult.data?.completed, navigate]);
   const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:[...getGetFlowProgressQueryKey('filmmaker'),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
+  const submissionConfig = useGetFilmmakerSubmissionConfig({ query:{ queryKey:getGetFilmmakerSubmissionConfigQueryKey(), retry:false, refetchOnWindowFocus:true } });
   useEffect(() => {
     if (identityId !== 'visitor' && authReady && !authLoading && completedResult.error?.status === 404 && progress.error?.status === 404) navigate('/me/projects');
   }, [identityId, authReady, authLoading, completedResult.error, progress.error, navigate]);
@@ -92,6 +94,8 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
   const [saveError, setSaveError] = useState('');
   const [validation, setValidation] = useState('');
   const [website, setWebsite] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileResetRef = useRef<(() => void) | null>(null);
   const [saving, setSaving] = useState(false);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const screenRef = useRef(1);
@@ -201,23 +205,43 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
   }
   async function finish() {
     if (submit.isPending) return;
+    if (!submissionConfig.data?.available || !submissionConfig.data.turnstile_site_key) {
+      setValidation('Filmmaker submissions are temporarily unavailable until the anti-bot check is ready. Your saved answers are safe.');
+      return;
+    }
+    if (!turnstileToken) {
+      setValidation('Complete the Cloudflare verification before sending your answers.');
+      return;
+    }
     const error = validateStep(6);
     if (error) { setValidation(error); return; }
+    const token = turnstileToken;
     setValidation('');
     setSaveError('');
+    setTurnstileToken('');
     if (editTimer.current !== null) window.clearTimeout(editTimer.current);
     try {
       await persist(6, a);
-      await submit.mutateAsync({ data:{ ...payload(a), website } });
+      await submit.mutateAsync({ data:{ ...payload(a), website, turnstile_token:token } });
+      turnstileResetRef.current?.();
       if (identityId === 'visitor') showGuestConfirmation();
       navigate('/start/filmmaker/done');
     } catch (error) {
+      turnstileResetRef.current?.();
       const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
+      const responseBody = error && typeof error === 'object' && 'data' in error ? error.data : null;
+      const responseMessage = responseBody && typeof responseBody === 'object' && 'error' in responseBody
+        && typeof responseBody.error === 'string' ? responseBody.error : '';
+      const antiBotFailure = status === 403 && responseMessage.toLowerCase().includes('anti-bot');
       setSaveError(status === 409 || status === 403 || status === 404
-        ? 'This draft is no longer selected for this visit. Copy any unsaved answers, then open My projects to resume the draft or start another project.'
+        ? antiBotFailure
+          ? 'Cloudflare verification could not be verified or has expired. Complete a fresh check and try again. Your worksheet is still saved.'
+          : 'This draft is no longer selected for this visit. Copy any unsaved answers, then open My projects to resume the draft or start another project.'
         : status === 429
           ? 'Too many submission attempts from this browser or network. Please try again later. Your worksheet is still saved.'
-        : 'We could not submit your information. Nothing has been confirmed. Please try again.');
+        : status === 503
+          ? 'Filmmaker submissions are temporarily unavailable. Your worksheet is still saved; please try again later.'
+        : 'We could not submit your information. Complete a fresh verification and try again. Nothing has been confirmed.');
     }
   }
   function selectStage(value:Stage) {
@@ -336,14 +360,18 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
            <div className="fm-section"><p className="fm-label">Favorite genres · select any</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{genres.map(g=><Choice id={`favorite-${g}`} name="favorite-genre" multiple key={g} selected={a.favorite_genres.includes(g)} onClick={()=>toggleArray('favorite_genres',g)}>{g}</Choice>)}</div></div>
           <label className="fm-check fm-section"><input type="checkbox" data-testid="checkbox-chat-opt-in" checked={a.chat_opt_in} onChange={e=>change('chat_opt_in',e.target.checked)}/><span>I’m open to a quick 15-minute chat about my experience.</span></label>
           <p className="fm-small">By submitting, you’re sharing information with Movie Show Investing for its launch MVP. This does not create a project listing or an investment opportunity. See our <Link href="/privacy" className="underline" data-testid="link-flow-privacy">privacy policy</Link>.</p>
+           {submissionConfig.isLoading ? <p className="fm-small" role="status">Checking that secure submission is available…</p>
+             : submissionConfig.isError ? <div className="fm-error" role="alert">We could not check anti-bot protection. Nothing has been sent. <button type="button" className="underline" onClick={()=>void submissionConfig.refetch()}>Check again</button></div>
+             : !submissionConfig.data?.available || !submissionConfig.data.turnstile_site_key ? <div className="fm-error" role="status">Secure submission is temporarily unavailable. Your answers remain saved; please check back later. <button type="button" className="underline" onClick={()=>void submissionConfig.refetch()}>Check again</button></div>
+             : <FilmmakerTurnstile siteKey={submissionConfig.data.turnstile_site_key} onToken={setTurnstileToken} resetRef={turnstileResetRef}/>}
         </>}
         {validation && <p className="fm-error" data-testid="error-validation" role="alert">{validation}</p>}
         {saveError && <div className="fm-error" data-testid="error-save" role="alert">{saveError} {saveError.startsWith('This draft') ? <Link href="/me/projects" data-testid="link-reselect-draft">My projects</Link> : <button type="button" data-testid="button-retry-save" className="underline" onClick={()=>void persist(screenRef.current,answersRef.current).catch(()=>undefined)}>Retry save</button>}</div>}
         <div className="fm-steps">
           {screen>1 ? <button type="button" data-testid="button-back" className="fm-back" disabled={saving || submit.isPending} onClick={()=>void back()}><ArrowLeft size={17}/> Back</button> : <span className="fm-small">Your answers save as you go.</span>}
           {screen===1 && !a.stage ? <span className="fm-small">Choose a stage to continue</span> :
-            <button type="button" data-testid={screen===6?'button-submit-filmmaker':'button-continue'} className="fm-primary" disabled={saving || submit.isPending || screen===4 && (otherOfferError || !a.offer_choice || !validListedOffer(a.offer_per100))} onClick={()=>screen===6 ? void finish() : void advance(a.no_project_yet && screen===2 ? 6 : screen+1)}>
-              {submit.isPending ? 'Submitting…' : saving ? 'Saving…' : screen===6 ? 'Send my answers' : 'Continue'} {!submit.isPending && <ArrowRight size={17}/>}
+             <button type="button" data-testid={screen===6?'button-submit-filmmaker':'button-continue'} className="fm-primary" disabled={saving || submit.isPending || screen===6 && (submissionConfig.isLoading || submissionConfig.isError || !submissionConfig.data?.available || !turnstileToken) || screen===4 && (otherOfferError || !a.offer_choice || !validListedOffer(a.offer_per100))} onClick={()=>screen===6 ? void finish() : void advance(a.no_project_yet && screen===2 ? 6 : screen+1)}>
+               {submit.isPending ? 'Submitting…' : saving ? 'Saving…' : screen===6 ? !submissionConfig.data?.available ? 'Submission unavailable' : !turnstileToken ? 'Complete verification to submit' : 'Send my answers' : 'Continue'} {!submit.isPending && <ArrowRight size={17}/>}
             </button>}
         </div>
         <p className="fm-status" role="status" data-testid="status-save" style={{marginTop:15}}>{saveError ? 'Changes not saved' : saving ? 'Saving your answers…' : lastSaved.current === JSON.stringify({screen,answers:a}) ? 'All changes saved' : 'Changes save automatically'}</p>

@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
@@ -8,7 +8,12 @@ import { SiteShell } from '@/components/site-shell';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
 import { useVisitAttribution } from '@/hooks/use-public-site';
-import { canReplayPage, trackInvestorEvent } from '@/lib/analytics';
+import {
+  canReplayPage,
+  isClarityDocumentActive,
+  setClarityReplayConsent,
+  trackInvestorEvent,
+} from '@/lib/analytics';
 import Home from '@/pages/home';
 import Admin from '@/pages/admin';
 import FAQ from '@/pages/faq';
@@ -76,7 +81,18 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 
 function ReplayRouteBoundary({ children }: { children: ReactNode }) {
   const [location] = useLocation();
-  return <div data-private-analytics={canReplayPage(location) ? undefined : ''}>{children}</div>;
+  const leavingClarityPublicPage = isClarityDocumentActive() && !canReplayPage(location);
+
+  useLayoutEffect(() => {
+    if (!leavingClarityPublicPage) return;
+    setClarityReplayConsent(false, location);
+    // Clarity documents consent withdrawal but no pause/stop API. Keep all
+    // newly routed content unmounted until this navigation unloads its runtime.
+    window.location.reload();
+  }, [leavingClarityPublicPage, location]);
+
+  if (leavingClarityPublicPage) return null;
+  return <div data-private-analytics={canReplayPage(location) ? undefined : ''} data-clarity-mask={canReplayPage(location) ? 'true' : undefined}>{children}</div>;
 }
 
 function PublicPages() {
@@ -123,14 +139,16 @@ function App() {
   return <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-        <ReplayRouteBoundary><Switch>
-          <Route path="/admin" component={Admin} />
-          <Route path="/filmmaker/questions">{() => <QuestionToken kind="answer" />}</Route>
-          <Route path="/question-report">{() => <QuestionToken kind="report" />}</Route>
-          <Route>{() => <PublicPages />}</Route>
-        </Switch></ReplayRouteBoundary>
+        <ReplayRouteBoundary>
+          <Switch>
+            <Route path="/admin" component={Admin} />
+            <Route path="/filmmaker/questions">{() => <QuestionToken kind="answer" />}</Route>
+            <Route path="/question-report">{() => <QuestionToken kind="report" />}</Route>
+            <Route>{() => <PublicPages />}</Route>
+          </Switch>
+          <Toaster />
+        </ReplayRouteBoundary>
       </WouterRouter>
-      <Toaster />
     </TooltipProvider>
   </QueryClientProvider>;
 }

@@ -9,6 +9,7 @@ import { clearFilmmakerAction } from '@/lib/filmmaker-intent';
 import { useAuth } from '@workspace/replit-auth-web';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { ReplayConsent } from '@/components/replay-consent';
+import { hasReplayProviderConfigured } from '@/lib/analytics';
 
 const navigation = [
   { href: '/', label: 'Home' },
@@ -124,7 +125,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
                 <Link href="/privacy" data-testid="link-footer-privacy" className="hover:text-[#dfb674]">Privacy</Link>
                 <Link href="/terms" data-testid="link-footer-terms" className="hover:text-[#dfb674]">Terms</Link>
                 <Link href="/disclaimers" data-testid="link-footer-disclaimers" className="hover:text-[#dfb674]">Disclaimers</Link>
-                {import.meta.env.VITE_MIXPANEL_TOKEN && <ReplayConsent />}
+                {hasReplayProviderConfigured() && <ReplayConsent />}
               </div>
             </div>
           </div>

@@ -11,6 +11,7 @@ import {
 import {
   SubmitFilmmakerBody,
   SubmitFilmmakerResponse,
+  GetFilmmakerSubmissionConfigResponse,
   GetFilmmakerResultResponse,
   UpdateFilmmakerShowcaseBody,
   UpdateFilmmakerShowcaseResponse,
@@ -22,17 +23,19 @@ import {
 } from "../lib/filmmaker-auth";
 import { recordTransactionalEmailStatus, sendTransactionalEmail } from "../lib/mailjet";
 import { reserveFilmmakerSubmissionAttempt } from "../lib/filmmaker-submission-limit";
+import { allowedTurnstileHostnames, getTurnstileConfig, verifyTurnstileToken } from "../lib/cloudflare-turnstile";
 
 const router: IRouter = Router();
 router.use(cookieParser());
 
 const VISITOR_COOKIE = "msi_visitor_id";
+const TURNSTILE_ACTION = "filmmaker_submission";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHOWCASE_FIELDS = new Set([
   "showcase_requested", "synopsis", "team_links", "money_use", "distribution_plan", "trailer_url",
 ]);
 const INPUT_FIELDS = new Set([
-  "website",
+  "website", "turnstile_token",
   "no_project_yet", "stage", "title", "format", "genre", "genre_other",
   "logline", "trailer_url", "pilot_url", "budget", "budget_from_example", "deal_answer",
   "offer_per100", "offer_other_text", "wants_lower", "payback_terms", "payback_terms_other",
@@ -84,6 +87,15 @@ function safeCalendlyUrl(value: string | undefined): string | null {
   }
 }
 
+router.get("/filmmaker-submission-config", (_req, res): void => {
+  const config = getTurnstileConfig();
+  const available = Boolean(config.siteKey && config.secretKey && allowedTurnstileHostnames().length);
+  res.json(GetFilmmakerSubmissionConfigResponse.parse({
+    available,
+    turnstile_site_key: available ? config.siteKey : null,
+  }));
+});
+
 router.post("/filmmakers", async (req, res): Promise<void> => {
   if (req.body === null || typeof req.body !== "object" || Array.isArray(req.body)
     || Object.keys(req.body).some((key) => !INPUT_FIELDS.has(key))) {
@@ -96,9 +108,14 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid filmmaker submission." });
     return;
   }
-  const { website, ...data } = parsed.data;
+  const { website, turnstile_token: turnstileToken, ...data } = parsed.data;
   if (website?.trim()) {
     res.status(400).json({ error: "Invalid filmmaker submission." });
+    return;
+  }
+  const turnstileConfig = getTurnstileConfig();
+  if (!turnstileConfig.siteKey || !turnstileConfig.secretKey || !allowedTurnstileHostnames().length) {
+    res.status(503).json({ error: "Filmmaker submissions are temporarily unavailable until anti-bot protection is configured." });
     return;
   }
 
@@ -155,6 +172,15 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
   } catch {
     req.log.error("Filmmaker submission rate limiter unavailable");
     res.status(503).json({ error: "Submission is temporarily unavailable. Please try again later." });
+    return;
+  }
+
+  const verifiedTurnstile = await verifyTurnstileToken(turnstileToken, {
+    ip: req.ip || req.socket.remoteAddress || undefined,
+    action: TURNSTILE_ACTION,
+  });
+  if (!verifiedTurnstile) {
+    res.status(403).json({ error: "The anti-bot verification could not be verified. Please complete it again and retry." });
     return;
   }
 

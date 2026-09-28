@@ -59,6 +59,7 @@ export * from './filmmakerResultStage';
 export * from './filmmakerShowcase';
 export * from './filmmakerShowcaseUpdate';
 export * from './filmmakerSubmission';
+export * from './filmmakerSubmissionConfig';
 export * from './filmmakerSubmissionInput';
 export * from './filmmakerSubmissionInputDealAnswer';
 export * from './filmmakerSubmissionInputFormat';

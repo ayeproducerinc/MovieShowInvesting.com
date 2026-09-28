@@ -332,8 +332,8 @@ export const SaveFlowProgressResponse = zod.object({
 
 
 /**
- * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID.
- * @summary Submit the filmmaker flow
+ * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. The single-use Turnstile response is verified server-side before creating a submission.
+ * @summary Submit the filmmaker flow after Cloudflare Turnstile verification
  */
 
 
@@ -341,6 +341,8 @@ export const SaveFlowProgressResponse = zod.object({
 export const SubmitFilmmakerHeader = zod.object({
   "X-MSI-Draft-Id": zod.number().int().min(1).optional().describe('Required for account-linked visitors; must match the current filmmaker flow_progress.id.')
 })
+
+export const submitFilmmakerBodyTurnstileTokenMax = 2048;
 
 
 export const submitFilmmakerBodyOfferPer100Min = 125;
@@ -353,6 +355,7 @@ export const submitFilmmakerBodyCountryRegExp = new RegExp('^[A-Z]{2}$');
 
 export const SubmitFilmmakerBody = zod.object({
   "website": zod.string().optional().describe('Leave blank. Bot-detection field; never stored with the submission.'),
+  "turnstile_token": zod.string().min(1).max(submitFilmmakerBodyTurnstileTokenMax).describe('Single-use Cloudflare Turnstile response, verified server-side and never stored.'),
   "no_project_yet": zod.boolean(),
   "stage": zod.enum(['distribution', 'production', 'idea']).optional(),
   "title": zod.string().optional(),
@@ -391,6 +394,18 @@ export const SubmitFilmmakerBody = zod.object({
 export const SubmitFilmmakerResponse = zod.object({
   "filmmaker_id": zod.number().int().min(1),
   "project_id": zod.number().int().min(1).nullable()
+})
+
+
+/**
+ * @summary Read filmmaker final-submission availability and public Turnstile site key
+ */
+
+
+
+export const GetFilmmakerSubmissionConfigResponse = zod.object({
+  "available": zod.boolean(),
+  "turnstile_site_key": zod.string().min(1).nullable()
 })
 
 

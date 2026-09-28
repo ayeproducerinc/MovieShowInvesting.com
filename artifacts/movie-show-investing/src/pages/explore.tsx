@@ -22,7 +22,7 @@ export default function Explore() {
     </div>
     <div className="inv-band"><div className="page-wrap inv-band-inner"><div><p className="inv-kicker" style={{color:'#d9b777'}}>A note before you browse</p><h2>Discovery first.<br/>Decisions later.</h2></div><p>These are project profiles, not investment offers. Expressing interest is non-binding, and no money is collected here. Returns aren’t guaranteed. You may get back less, or nothing.</p></div></div>
     <div className="page-wrap">
-      <div className="inv-toolbar">
+      <div className="inv-toolbar" data-clarity-mask="true">
         <div className="inv-field"><label htmlFor="explore-search">Search projects</label><input id="explore-search" className="inv-input" data-testid="input-explore-search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Title or story"/></div>
         <div className="inv-field"><label htmlFor="explore-stage">Stage</label><select id="explore-stage" className="inv-input" data-testid="select-explore-stage" value={stage} onChange={e=>setStage(e.target.value as GetExploreStage | '')}>{stages.map(([v,label])=><option value={v} key={v}>{label}</option>)}</select></div>
         <div className="inv-field"><label htmlFor="explore-genre">Genre</label><select id="explore-genre" className="inv-input" data-testid="select-explore-genre" value={genre} onChange={e=>setGenre(e.target.value)}>{genres.map(v=><option value={v} key={v}>{v || 'All genres'}</option>)}</select></div>

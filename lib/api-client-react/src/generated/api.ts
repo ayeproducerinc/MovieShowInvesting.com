@@ -56,6 +56,7 @@ import type {
   FilmmakerShowcase,
   FilmmakerShowcaseUpdate,
   FilmmakerSubmission,
+  FilmmakerSubmissionConfig,
   FilmmakerSubmissionInput,
   FilmmakerTrailerUpload,
   FirebaseConfig,
@@ -1607,8 +1608,8 @@ export const getSubmitFilmmakerUrl = () => {
 }
 
 /**
- * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID.
- * @summary Submit the filmmaker flow
+ * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. The single-use Turnstile response is verified server-side before creating a submission.
+ * @summary Submit the filmmaker flow after Cloudflare Turnstile verification
  */
 export const submitFilmmaker = async (filmmakerSubmissionInput: FilmmakerSubmissionInput, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerSubmission> => {
 
@@ -1674,7 +1675,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SubmitFilmmakerMutationVariables = {data: BodyType<FilmmakerSubmissionInput>}
 
     /**
- * @summary Submit the filmmaker flow
+ * @summary Submit the filmmaker flow after Cloudflare Turnstile verification
  */
 export const useSubmitFilmmaker = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitFilmmaker>>, TError,SubmitFilmmakerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -1686,6 +1687,83 @@ export const useSubmitFilmmaker = <TError = ErrorType<void>,
       > => {
       return useMutation(getSubmitFilmmakerMutationOptions(options));
     }
+
+export const getGetFilmmakerSubmissionConfigUrl = () => {
+
+
+
+
+  return `/api/filmmaker-submission-config`
+}
+
+/**
+ * @summary Read filmmaker final-submission availability and public Turnstile site key
+ */
+export const getFilmmakerSubmissionConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerSubmissionConfig> => {
+
+  return customFetch<FilmmakerSubmissionConfig>(getGetFilmmakerSubmissionConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFilmmakerSubmissionConfigQueryKey = () => {
+    return [
+    `/api/filmmaker-submission-config`
+    ] as const;
+    }
+
+
+export const getGetFilmmakerSubmissionConfigQueryOptions = <TData = Awaited<ReturnType<typeof getFilmmakerSubmissionConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerSubmissionConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFilmmakerSubmissionConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFilmmakerSubmissionConfig>>> = ({ signal }) => getFilmmakerSubmissionConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerSubmissionConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFilmmakerSubmissionConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getFilmmakerSubmissionConfig>>>
+export type GetFilmmakerSubmissionConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Read filmmaker final-submission availability and public Turnstile site key
+ */
+
+export function useGetFilmmakerSubmissionConfig<TData = Awaited<ReturnType<typeof getFilmmakerSubmissionConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerSubmissionConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFilmmakerSubmissionConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetFilmmakerResultUrl = () => {
 

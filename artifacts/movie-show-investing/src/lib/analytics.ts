@@ -16,19 +16,96 @@ type MixpanelClient = {
   stop_session_recording: () => void;
 };
 
+type ClarityClient = ((...args: unknown[]) => void) & { q?: unknown[][] };
+type ClarityWindow = Window & { clarity?: ClarityClient };
+
 const publicReplayPages = new Set(['/', '/explore', '/faq']);
 let lastAccount: string | null | undefined;
 let identityRequest = 0;
 let replayActive = false;
 let replayWanted = false;
+let clarityLoadRequested = false;
+let clarityConsentGranted = false;
+
+function clarityProjectId() {
+  const configured = import.meta.env.VITE_CLARITY_PROJECT_ID?.trim();
+  return configured && !/^%.*%$/.test(configured) ? configured : null;
+}
 
 function mixpanel() {
   if (!import.meta.env.VITE_MIXPANEL_TOKEN || typeof window === 'undefined') return null;
   return (window as Window & { mixpanel?: MixpanelClient }).mixpanel ?? null;
 }
 
+function getClarityClient() {
+  if (typeof window === 'undefined') return null;
+  const clarityWindow = window as ClarityWindow;
+  if (clarityWindow.clarity) return clarityWindow.clarity;
+
+  const queue: unknown[][] = [];
+  const clarity = ((...args: unknown[]) => { queue.push(args); }) as ClarityClient;
+  clarity.q = queue;
+  clarityWindow.clarity = clarity;
+  return clarity;
+}
+
 export function canReplayPage(path: string) {
   return publicReplayPages.has(path);
+}
+
+export function hasReplayProviderConfigured() {
+  return Boolean(import.meta.env.VITE_MIXPANEL_TOKEN?.trim() || clarityProjectId());
+}
+
+export function replayProviderNames() {
+  const names = [];
+  if (import.meta.env.VITE_MIXPANEL_TOKEN?.trim()) names.push('Mixpanel');
+  if (clarityProjectId()) names.push('Microsoft Clarity');
+  return names;
+}
+
+/**
+ * Clarity has a consent API but no documented pause/stop API. Only load it
+ * after opt-in on an allowlisted public page. Once loaded, the route boundary
+ * must force a document navigation before rendering any other route.
+ */
+export function setClarityReplayConsent(enabled: boolean, path: string) {
+  const projectId = clarityProjectId();
+  if (!projectId || typeof window === 'undefined') return;
+
+  const shouldEnable = enabled && canReplayPage(path);
+  if (!shouldEnable) {
+    if (clarityLoadRequested && clarityConsentGranted) {
+      getClarityClient()?.('consent', false);
+      clarityConsentGranted = false;
+    }
+    return;
+  }
+
+  const clarity = getClarityClient();
+  if (!clarity) return;
+
+  if (!clarityConsentGranted) {
+    clarity('consent');
+    clarityConsentGranted = true;
+  }
+  if (clarityLoadRequested) return;
+
+  clarityLoadRequested = true;
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = `https://www.clarity.ms/tag/${encodeURIComponent(projectId)}`;
+  script.dataset.clarityAnalytics = 'true';
+  script.onerror = () => {
+    // Keep the document marked as Clarity-active if loading failed partway.
+    // A full navigation remains the conservative way to leave this route.
+    console.warn('Microsoft Clarity could not be loaded.');
+  };
+  document.head.appendChild(script);
+}
+
+export function isClarityDocumentActive() {
+  return clarityLoadRequested;
 }
 
 export function setPublicReplayEnabled(enabled: boolean) {
