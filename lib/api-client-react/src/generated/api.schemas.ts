@@ -669,8 +669,12 @@ export interface InvestorIntentInput {
   stages: string[];
   minima: InvestorMinima;
   call_opt_in: boolean;
-  city?: string;
+  phone?: string;
+  /** @minLength 1 */
+  city: string;
   state?: string;
+  /** @pattern ^[A-Z]{2}$ */
+  country: string;
   zip?: string;
 }
 
@@ -700,9 +704,13 @@ export interface InvestorIntentView {
   minima: InvestorMinima;
   call_opt_in: boolean;
   /** @nullable */
+  phone?: string | null;
+  /** @nullable */
   city?: string | null;
   /** @nullable */
   state?: string | null;
+  /** @nullable */
+  country?: string | null;
   /** @nullable */
   zip?: string | null;
 }

@@ -5,12 +5,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getGetCurrentInvestorIntentQueryKey, getGetFlowProgressQueryKey, useGetCurrentInvestorIntent, useGetExplore, useGetFlowProgress, useMatchInvestor, useSaveFlowProgress, useSaveInvestorIntent } from '@workspace/api-client-react';
 import type { ExploreProject, InvestorIntentInput } from '@workspace/api-client-react';
 import { InvestorProjectCard } from '@/components/investor-project-card';
+import { LocationPicker } from '@/components/location-picker';
 import { useAuth } from '@workspace/replit-auth-web';
 import { useFirebaseUser } from '@/components/firebase-bootstrap';
 import '../investor.css';
 
-type Answers = InvestorIntentInput & { terms_read:boolean; lineup: {project_id:number; amount:number}[] };
-const blank: Answers = { amount:100, name:'', email:'', city:'', state:'', zip:'', accredited:false, experience:[], motivations:[], favorite_genres:[], stages:[], minima:{distribution:null,production:null,idea:null}, allocations:[], unallocated:false, call_opt_in:false, terms_read:false, lineup:[] };
+type Answers = InvestorIntentInput & { terms_read:boolean; location_manual:boolean; lineup: {project_id:number; amount:number}[] };
+const blank: Answers = { amount:100, name:'', email:'', phone:'', city:'', state:'', country:'', zip:'', location_manual:false, accredited:false, experience:[], motivations:[], favorite_genres:[], stages:[], minima:{distribution:null,production:null,idea:null}, allocations:[], unallocated:false, call_opt_in:false, terms_read:false, lineup:[] };
 const headings = ['Your amount','The ground rules','Your interests','The lineup','About you'];
 const descriptions = [
   'Start with the total you might consider. This is a conversation, not a payment.',
@@ -37,8 +38,8 @@ function spreadRating(amount:number, lineup:Answers['lineup']) {
   return 'Moderate';
 }
 function toggle(items:string[], value:string) { return items.includes(value) ? items.filter(x=>x!==value) : [...items,value]; }
-function Field({label,id,value,onChange,type='text',required=false}: {label:string;id:string;value:string;onChange:(value:string)=>void;type?:string;required?:boolean}) {
-  return <div className="inv-field"><label htmlFor={id}>{label}{!required && <span className="inv-small"> · optional</span>}</label><input className="inv-input" id={id} data-testid={`input-${id}`} type={type} required={required} value={value} onChange={e=>onChange(e.target.value)}/></div>;
+function Field({label,id,value,onChange,type='text',required=false,autoComplete}: {label:string;id:string;value:string;onChange:(value:string)=>void;type?:string;required?:boolean;autoComplete?:string}) {
+  return <div className="inv-field"><label htmlFor={id}>{label}{!required && <span className="inv-small"> · optional</span>}</label><input className="inv-input" id={id} data-testid={`input-${id}`} type={type} required={required} autoComplete={autoComplete} value={value} onChange={e=>onChange(e.target.value)}/></div>;
 }
 function Option({label,checked,onChange,type='checkbox',description}: {label:string;checked:boolean;onChange:()=>void;type?:'checkbox'|'radio';description?:string}) {
   return <label className="inv-option"><input type={type} checked={checked} onChange={onChange}/><span>{label}{description && <small>{description}</small>}</span></label>;
@@ -111,6 +112,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
     if (progress.data) {
       initialised.current = true;
       const restored = {...blank,...progress.data.answers, minima:{...blank.minima,...(progress.data.answers.minima as object || {})}} as Answers;
+      if (!('location_manual' in progress.data.answers) && restored.city && !restored.country) restored.location_manual = true;
       const step = Math.max(1,Math.min(5,progress.data.last_screen));
       setA(restored); setScreen(step); lastSaved.current=JSON.stringify({screen:step,a:restored}); setReady(true);
     } else if (progress.error?.status===404) { initialised.current=true; setReady(true); }
@@ -211,7 +213,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
       if(a.lineup.some(x=>!Number.isSafeInteger(Number(x.amount)) || Number(x.amount)<25)) return 'Each project must receive at least $25.';
       if(allocated!==a.amount) return `Your allocations must add up to ${dollars(a.amount)}. Currently allocated: ${dollars(allocated)}.`;
     }
-    if(step===5 && (!a.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim()))) return 'Add your name and a valid email address.';
+    if(step===5 && (!a.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim()) || !a.city.trim() || !/^[A-Z]{2}$/.test(a.country))) return 'Add your name, a valid email, city and country. Choose a city from the suggestions or enter your location manually.';
     return '';
   }
   async function next() {
@@ -232,9 +234,9 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
     if(issue){setError(issue);return;}
     try {
       await persist(5,a);
-      const {terms_read: _terms, lineup: _lineup, ...input}=a;
-      void _terms; void _lineup;
-      await submit.mutateAsync({data:{...input,name:a.name.trim(),email:a.email.trim(),allocations:a.unallocated?[]:a.lineup,unallocated:a.unallocated}});
+      const {terms_read: _terms, lineup: _lineup, location_manual: _manual, ...input}=a;
+      void _terms; void _lineup; void _manual;
+      await submit.mutateAsync({data:{...input,name:a.name.trim(),email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,allocations:a.unallocated?[]:a.lineup,unallocated:a.unallocated}});
       await queryClient.invalidateQueries({queryKey:getGetCurrentInvestorIntentQueryKey()});
       navigate('/invest/done');
     } catch {setError('Your interest could not be saved. Nothing has been submitted; please try again.');}
@@ -273,12 +275,15 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
              </div>
           </>}
         </>}
-        {screen===5 && <><div className="inv-grid"><Field id="invest-name" label="Your name" value={a.name} onChange={v=>change('name',v)} required/><Field id="invest-email" label="Email address" value={a.email} onChange={v=>change('email',v)} type="email" required/><Field id="invest-city" label="City" value={a.city||''} onChange={v=>change('city',v)}/><Field id="invest-state" label="State or region" value={a.state||''} onChange={v=>change('state',v)}/><Field id="invest-zip" label="Postal code" value={a.zip||''} onChange={v=>change('zip',v)}/></div>
+        {screen===5 && <><Field id="invest-name" label="Your name" value={a.name} onChange={v=>change('name',v)} autoComplete="name" required/><Field id="invest-email" label="Email address" value={a.email} onChange={v=>change('email',v)} type="email" autoComplete="email" required/><Field id="invest-phone" label="Phone number" value={a.phone||''} onChange={v=>change('phone',v)} type="tel" autoComplete="tel"/>
+           <LocationPicker value={{city:a.city||'',state:a.state||'',country:a.country||'',location_manual:a.location_manual}}
+             onChange={location=>{setA(current=>({...current,...location}));setError('');}}/>
+           <Field id="invest-zip" label="Postal code" value={a.zip||''} onChange={v=>change('zip',v)} autoComplete="postal-code"/>
           <div className="inv-section"><h2>Investor background</h2><p className="inv-label">Are you an accredited investor?</p><div className="inv-options"><Option label="Yes" type="radio" checked={a.accredited} onChange={()=>change('accredited',true)}/><Option label="No or not sure" type="radio" checked={!a.accredited} onChange={()=>change('accredited',false)}/></div></div>
           <div className="inv-section"><p className="inv-label">What experience do you bring? · choose any</p><div className="inv-options">{['New to investing','Invested in creative projects','Invested in private companies','Work in film or media'].map(value=><Option key={value} label={value} checked={a.experience.includes(value)} onChange={()=>change('experience',toggle(a.experience,value))}/>)}</div></div>
           <div className="inv-section"><p className="inv-label">What brings you here? · choose any</p><div className="inv-options">{['Support independent filmmakers','Discover stories early','Connect with creators','Learn about future opportunities'].map(value=><Option key={value} label={value} checked={a.motivations.includes(value)} onChange={()=>change('motivations',toggle(a.motivations,value))}/>)}</div></div>
-          <div className="inv-section"><Option label="I’m open to a conversation about my interests." checked={a.call_opt_in} onChange={()=>change('call_opt_in',!a.call_opt_in)}/></div>
-          <p className="inv-small">Saving records non-binding interest only. No payment or signed confirmation takes place.</p>
+           <label className="fm-check inv-section inv-contact-opt-in"><input type="checkbox" data-testid="checkbox-invest-chat-opt-in" checked={a.call_opt_in} onChange={e=>change('call_opt_in',e.target.checked)}/><span>I’m open to a quick 15-minute chat about my interests.</span></label>
+           <p className="inv-small">By saving, you’re sharing information with Movie Show Investing for its launch MVP. This records non-binding interest only; no payment or signed confirmation takes place. See our <Link href="/privacy" className="underline" data-testid="link-invest-privacy">privacy policy</Link>.</p>
         </>}
         {error && <p className="inv-error" role="alert" data-testid="error-investor">{error}</p>}
         <div className="inv-foot"><div>{screen>1 && <button type="button" className="inv-button secondary" data-testid="button-invest-back" disabled={saving || match.isPending || submit.isPending} onClick={()=>void back()}><ArrowLeft size={16}/> Back</button>}</div><button type="button" className="inv-button" data-testid={screen===5?'button-save-interest':'button-invest-next'} disabled={saving || match.isPending || submit.isPending} onClick={()=>void (screen===5?finish():next())}>{submit.isPending?'Saving interest…':match.isPending?'Finding projects…':saving?'Saving…':screen===5?'Save non-binding interest':'Continue'} <ArrowRight size={16}/></button></div>

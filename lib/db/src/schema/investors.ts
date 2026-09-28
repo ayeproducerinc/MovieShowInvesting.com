@@ -10,6 +10,7 @@ export const investorsTable = pgTable("investors", {
   phone: text("phone"),
   city: text("city"),
   state: text("state"),
+  country: text("country"),
   zip: text("zip"),
   amountChoice: text("amount_choice"),
   investmentAmount: integer("investment_amount"),

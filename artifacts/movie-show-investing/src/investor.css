@@ -23,6 +23,8 @@
 .inv-field label,.inv-label { font-size:13px; font-weight:700; }
 .inv-input { min-height:53px; width:100%; border:1px solid #aea596; background:#fbf8f1; border-radius:0; color:var(--iv-ink); padding:13px 15px; font:500 15px var(--app-font-sans); }
 .inv-input:focus { border-color:var(--iv-wine); }
+.inv .fm-location { --fm-wine:var(--iv-wine); --fm-ink:var(--iv-ink); }
+.inv-contact-opt-in { --fm-wine:var(--iv-wine); }
 .inv-projects { padding:27px 0 100px; display:grid; gap:12px; }
 .inv-project { min-width:0; display:grid; grid-template-columns:110px minmax(0,1fr); background:#faf7f0; border:1px solid var(--iv-line); overflow:hidden; transition:transform .23s; }
 .inv-project:hover { transform:translateY(-2px); }

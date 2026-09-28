@@ -28,9 +28,13 @@ export interface InvestorIntentView {
   minima: InvestorMinima;
   call_opt_in: boolean;
   /** @nullable */
+  phone?: string | null;
+  /** @nullable */
   city?: string | null;
   /** @nullable */
   state?: string | null;
+  /** @nullable */
+  country?: string | null;
   /** @nullable */
   zip?: string | null;
 }

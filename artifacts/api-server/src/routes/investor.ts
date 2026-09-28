@@ -35,8 +35,10 @@ type InvestorRow = {
   id: number;
   name: string | null;
   email: string | null;
+  phone: string | null;
   city: string | null;
   state: string | null;
+  country: string | null;
   zip: string | null;
   amount_choice: string | null;
   investment_amount: number | null;
@@ -306,7 +308,7 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
       const values = [
         data.name.trim(),
         email,
-        data.city ?? null,
+        data.city.trim(),
         data.state ?? null,
         data.zip ?? null,
         String(data.amount),
@@ -324,6 +326,8 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
         existing?.firebase_uid ?? (identity?.provider === "firebase" ? identity.uid : null),
         existing?.replit_uid ?? (identity?.provider === "replit" ? identity.uid : null),
         existing?.visitor_id ?? visitorId,
+        data.phone?.trim() || null,
+        data.country,
       ];
       if (existing) {
         investorId = existing.id;
@@ -334,8 +338,9 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
             accredited = $9, experience = $10, experience_other = $11,
             motivations = $12, motivations_other = $13, favorite_genres = $14,
             stages = $15, minima = $16::jsonb, call_opt_in = $17,
-            firebase_uid = $18, replit_uid = $19, visitor_id = $20
-          where id = $21
+            firebase_uid = $18, replit_uid = $19, visitor_id = $20,
+            phone = $21, country = $22
+          where id = $23
         `, [...values, investorId]);
       } else {
         const inserted = await client.query<{ id: number }>(`
@@ -343,10 +348,10 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
             name, email, city, state, zip, amount_choice, investment_amount,
             unallocated, accredited, experience, experience_other, motivations,
             motivations_other, favorite_genres, stages, minima, call_opt_in,
-            firebase_uid, replit_uid, visitor_id
+            firebase_uid, replit_uid, visitor_id, phone, country
           ) values (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-            $15, $16::jsonb, $17, $18, $19, $20
+            $15, $16::jsonb, $17, $18, $19, $20, $21, $22
           ) returning id
         `, values);
         investorId = inserted.rows[0].id;
@@ -454,8 +459,10 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
     stages: investor.stages ?? [],
     minima: investor.minima ?? { distribution: null, production: null, idea: null },
     call_opt_in: investor.call_opt_in ?? false,
+    phone: investor.phone,
     city: investor.city,
     state: investor.state,
+    country: investor.country,
     zip: investor.zip,
   };
   res.json(GetCurrentInvestorIntentResponse.parse({ intent }));

@@ -813,6 +813,8 @@ export const saveInvestorIntentBodyMinimaProductionMin = 125;
 export const saveInvestorIntentBodyMinimaIdeaMin = 125;
 
 
+export const saveInvestorIntentBodyCountryRegExp = new RegExp('^[A-Z]{2}$');
+
 
 export const SaveInvestorIntentBody = zod.object({
   "name": zod.string().min(1),
@@ -834,8 +836,10 @@ export const SaveInvestorIntentBody = zod.object({
   "idea": zod.number().int().min(saveInvestorIntentBodyMinimaIdeaMin).nullable()
 }),
   "call_opt_in": zod.boolean(),
-  "city": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "city": zod.string().min(1),
   "state": zod.string().optional(),
+  "country": zod.string().regex(saveInvestorIntentBodyCountryRegExp),
   "zip": zod.string().optional()
 })
 
@@ -887,8 +891,10 @@ export const GetCurrentInvestorIntentResponse = zod.object({
   "idea": zod.number().int().min(getCurrentInvestorIntentResponseIntentOneMinimaIdeaMin).nullable()
 }),
   "call_opt_in": zod.boolean(),
+  "phone": zod.string().nullish(),
   "city": zod.string().nullish(),
   "state": zod.string().nullish(),
+  "country": zod.string().nullish(),
   "zip": zod.string().nullish()
 }),zod.null()])
 })

@@ -32,7 +32,11 @@ export interface InvestorIntentInput {
   stages: string[];
   minima: InvestorMinima;
   call_opt_in: boolean;
-  city?: string;
+  phone?: string;
+  /** @minLength 1 */
+  city: string;
   state?: string;
+  /** @pattern ^[A-Z]{2}$ */
+  country: string;
   zip?: string;
 }
