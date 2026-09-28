@@ -354,13 +354,21 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
       res.status(409).json({ error: "Messaging is disabled or this conversation is locked or under review." });
       return;
     }
-    const senderRole: ParticipantRole = conversation.investor_uid === identity.uid ? "investor" : "filmmaker";
+    const isInvestor = conversation.investor_uid === identity.uid;
+    const isFilmmaker = conversation.filmmaker_uid === identity.uid;
+    if (isInvestor === isFilmmaker) {
+      await client.query("rollback");
+      res.status(403).json({ error: "A unique verified investor or filmmaker account is required." });
+      return;
+    }
+    const senderRole: ParticipantRole = isInvestor ? "investor" : "filmmaker";
+    const senderUid = `${identity.provider}:${identity.uid}`;
     const rateKey = createHash("sha256").update(`${identity.provider}:${identity.uid}`).digest("hex");
     await client.query("select pg_advisory_xact_lock(hashtext($1))", [`conversation-message-sender:${rateKey}`]);
     const count = await client.query<{ count: number }>(
       `select count(*)::int as count from conversation_messages
-       where sender_uid = $1 and created_at > now() - interval '24 hours'`,
-      [identity.uid],
+       where sender_uid in ($1, $2) and created_at > now() - interval '24 hours'`,
+       [identity.uid, senderUid],
     );
     if (count.rows[0].count >= MESSAGE_DAILY_LIMIT) {
       await client.query("rollback");
@@ -371,7 +379,7 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
       `insert into conversation_messages (conversation_id, sender_uid, sender_role, body)
        values ($1, $2, $3, $4)
        returning id, sender_role, body, created_at`,
-      [conversation.id, identity.uid, senderRole, body],
+      [conversation.id, senderUid, senderRole, body],
     );
     inserted = message.rows[0];
     notification = { email: conversation.recipient_email };

@@ -56,6 +56,8 @@
 .inv-section h2 { font:400 36px/1 var(--app-font-serif); margin:0 0 16px; }
 .inv-section > p { line-height:1.7; font-size:13px; color:#596064; }
 .inv-grid { display:grid; gap:13px; }
+.inv-minimum-stage { border:0; margin:0; padding:0; min-width:0; }
+.inv-minimum-stage legend { padding:0; font-size:13px; font-weight:700; }
 .inv-small { font-size:12px; line-height:1.6; color:#626a6b; }
 .inv-lineup { border-top:1px solid var(--iv-line); margin:20px 0; }
 .inv-lineup-row { display:grid; grid-template-columns:minmax(0,1fr) 100px auto; align-items:center; gap:15px; border-bottom:1px solid var(--iv-line); padding:17px 0; }

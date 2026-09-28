@@ -68,7 +68,7 @@ function Thread({ id, uid, onChange }: { id: number; uid: string; onChange: () =
     <div className="corr-messages" aria-label="Messages" aria-live="polite">
       {messages.length ? messages.map(message => <div className="corr-message" key={message.id} data-testid={`message-${message.id}`}><span className="corr-kicker">{message.sender_role === 'filmmaker' ? 'Filmmaker' : 'Investor'}</span><p>{message.body}</p><time dateTime={message.created_at}>{date(message.created_at)}</time></div>) : <div className="corr-state"><span className="corr-kicker">An open line</span><h2>No words exchanged yet.</h2><p>Start with a considered note about this film. This is a text-only conversation, not an investment commitment.</p></div>}
     </div>
-    {conversation.locked ? <div className="corr-compose"><p role="status">This thread has been paused by an administrator. Previous messages remain visible.</p></div> : <form className="corr-compose" onSubmit={event => void submit(event)}>
+    {conversation.locked ? <div className="corr-compose"><p role="status">This thread has been paused by an administrator. Previous messages remain visible.</p></div> : conversation.reported ? <div className="corr-compose"><p role="status">This conversation is under review. Replies are unavailable while an administrator reviews the report. Previous messages remain visible.</p></div> : <form className="corr-compose" onSubmit={event => void submit(event)}>
       <label htmlFor={`message-body-${id}`}>Write a message</label>
       <textarea id={`message-body-${id}`} value={body} onChange={event => setBody(event.target.value)} placeholder="A note about the project…" required data-testid="textarea-message-body"/>
       {error && <p role="alert" className="corr-error">{error}</p>}

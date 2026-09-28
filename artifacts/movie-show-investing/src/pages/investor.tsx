@@ -21,6 +21,8 @@ const descriptions = [
 ];
 const genres = ['Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Other'];
 const stages = [['distribution','Finished film / distribution'],['production','Short or pilot / production'],['idea','Script or idea']] as const;
+type MinimumStage = typeof stages[number][0];
+const fixedMinimumOptions = [[125,'$125'],[150,'$150'],[175,'$175'],[200,'$200'],[250,'$250+']] as const;
 const dollars = (n:number) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);
 const cap = (amount:number) => amount < 150 ? 4 : 5;
 function split(amount:number, selected:ExploreProject[]) {
@@ -93,6 +95,8 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
   const [matches,setMatches] = useState<ExploreProject[]>([]);
   const [matchState,setMatchState] = useState<'idle'|'loading'|'matches'|'no-matches'|'unavailable'>('idle');
   const [showAllAvailable,setShowAllAvailable] = useState(false);
+  const [otherMinimumSelected,setOtherMinimumSelected] = useState<Partial<Record<MinimumStage,boolean>>>({});
+  const [customMinimumDrafts,setCustomMinimumDrafts] = useState<Partial<Record<MinimumStage,string>>>({});
   const [error,setError] = useState('');
   const [saving,setSaving] = useState(false);
   const initialised = useRef(false);
@@ -130,6 +134,35 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
     return ()=>{if(timer.current!==null)window.clearTimeout(timer.current);};
   },[a,screen,ready]);
   const change = <K extends keyof Answers>(key:K,value:Answers[K])=>{setA(prev=>({...prev,[key]:value}));setError('');};
+  function minimumChoice(stage:MinimumStage) {
+    if(otherMinimumSelected[stage]) return 'other';
+    const value=a.minima[stage];
+    if(value===null) return 'not-interested';
+    return fixedMinimumOptions.some(([amount])=>amount===value) ? String(value) : 'other';
+  }
+  function customMinimumValue(stage:MinimumStage) {
+    const value=a.minima[stage];
+    return customMinimumDrafts[stage] ?? (value!==null && !fixedMinimumOptions.some(([amount])=>amount===value) ? String(value) : '');
+  }
+  function isValidCustomMinimum(value:string) {
+    return /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) && Number(value)>=125;
+  }
+  function chooseMinimum(stage:MinimumStage,choice:string) {
+    if(choice==='other') {
+      setOtherMinimumSelected(prev=>({...prev,[stage]:true}));
+      setCustomMinimumDrafts(prev=>({...prev,[stage]:customMinimumValue(stage)}));
+      setError('');
+      return;
+    }
+    setOtherMinimumSelected(prev=>({...prev,[stage]:false}));
+    setCustomMinimumDrafts(prev=>({...prev,[stage]:''}));
+    change('minima',{...a.minima,[stage]:choice==='not-interested'?null:Number(choice)});
+  }
+  function updateCustomMinimum(stage:MinimumStage,value:string) {
+    setCustomMinimumDrafts(prev=>({...prev,[stage]:value}));
+    if(isValidCustomMinimum(value)) change('minima',{...a.minima,[stage]:Number(value)});
+    else setError('');
+  }
   async function persist(step:number, value:Answers) {
     if(timer.current!==null)window.clearTimeout(timer.current);
     setSaving(true);
@@ -169,7 +202,8 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
     if(step===1 && (!Number.isSafeInteger(a.amount) || a.amount<100)) return 'Enter a whole-dollar amount of at least $100.';
     if(step===2 && !a.terms_read) return 'Please acknowledge the ground rules before continuing.';
     if(step===3 && (!a.favorite_genres.length || !a.stages.length)) return 'Choose at least one genre and one project stage.';
-    if(step===3 && Object.values(a.minima).some(value=>value!==null && (!Number.isSafeInteger(value) || value<125))) return 'Minimum preferences must be whole-dollar amounts of at least $125, or left blank.';
+    if(step===3 && stages.some(([stage])=>otherMinimumSelected[stage] && !isValidCustomMinimum(customMinimumValue(stage)))) return 'Enter a whole-dollar custom minimum of at least $125 for each stage where Other is selected.';
+    if(step===3 && Object.values(a.minima).some(value=>value!==null && (!Number.isSafeInteger(value) || value<125))) return 'Minimum preferences must be whole-dollar amounts of at least $125.';
     if(step===4 && !a.unallocated) {
       if(!a.lineup.length) return 'Choose projects, or select Just pledge to leave your interest unallocated.';
       if(a.lineup.length>cap(a.amount)) return `Choose no more than ${cap(a.amount)} projects at this amount.`;
@@ -221,7 +255,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
       <div className="inv-panel">
         {screen===1 && <><p className="inv-label">How much might you be interested in? · USD</p><div className="inv-amount"><span>$</span>{a.amount || '—'}</div><div className="inv-options">{[100,250,500,1000].map(value=><Option key={value} type="radio" checked={a.amount===value} label={dollars(value)} onChange={()=>change('amount',value)}/>)}</div><div className="inv-field"><label htmlFor="invest-amount">Or enter an amount</label><input id="invest-amount" data-testid="input-invest-amount" className="inv-input" type="number" min="100" step="1" value={a.amount || ''} onChange={e=>change('amount',Number(e.target.value))}/></div><p className="inv-small">Minimum total interest: $100. You can adjust your project choices later.</p></>}
         {screen===2 && <><p className="inv-kicker">Read before continuing</p><div className="inv-section"><h2>Interest is not an investment.</h2><p>This worksheet records what you may want to explore. Your pledge is non-binding. No money is collected, and you are not committing to fund a project.</p></div><div className="inv-section"><h2>There is real risk.</h2><p>Returns aren’t guaranteed. You may get back less, or nothing.</p><p>Projects can change, pause, or never reach an audience. Any future opportunity would require separate information and a separate decision.</p></div><div className="inv-section"><Option label="I understand this is non-binding interest, not an investment or an offer." checked={a.terms_read} onChange={()=>change('terms_read',!a.terms_read)}/></div></>}
-         {screen===3 && <><p className="inv-label">Genres you return to · choose any</p><div className="inv-grid">{genres.map(g=><Option key={g} label={g} checked={a.favorite_genres.includes(g)} onChange={()=>change('favorite_genres',toggle(a.favorite_genres,g))}/>)}</div><div className="inv-section"><p className="inv-label">Where in the process?</p><div className="inv-options">{stages.map(([value,label])=><Option key={value} label={label} checked={a.stages.includes(value)} onChange={()=>change('stages',toggle(a.stages,value))}/>)}</div></div><div className="inv-section"><h2>Your minimum preferences</h2><p>Optional minimum illustrative payback target per $100, by stage. Leave blank for no preference. These are preference filters, not promises of a return.</p><div className="inv-grid">{stages.map(([value,label])=><div className="inv-field" key={value}><label htmlFor={`minimum-${value}`}>{label}</label><input id={`minimum-${value}`} className="inv-input" data-testid={`input-minimum-${value}`} type="number" min="125" step="1" placeholder="No minimum" value={a.minima[value]??''} onChange={e=>change('minima',{...a.minima,[value]:e.target.value===''?null:Number(e.target.value)})}/></div>)}</div></div></>}
+          {screen===3 && <><p className="inv-label">Genres you return to · choose any</p><div className="inv-grid">{genres.map(g=><Option key={g} label={g} checked={a.favorite_genres.includes(g)} onChange={()=>change('favorite_genres',toggle(a.favorite_genres,g))}/>)}</div><div className="inv-section"><p className="inv-label">Where in the process?</p><div className="inv-options">{stages.map(([value,label])=><Option key={value} label={label} checked={a.stages.includes(value)} onChange={()=>change('stages',toggle(a.stages,value))}/>)}</div></div><div className="inv-section"><h2>Your minimum preferences</h2><p>Choose one minimum per slate. These are illustrative payback preferences per $100, not promises of a return. Not interested means you do not want matches for that slate.</p><div className="inv-grid">{stages.map(([stage,label])=><fieldset className="inv-minimum-stage" key={stage}><legend>{label}</legend><div className="inv-options">{[...fixedMinimumOptions.map(([amount,text])=>({value:String(amount),label:text})),{value:'other',label:'Other (custom)'},{value:'not-interested',label:'Not interested'}].map(option=><label className="inv-option" key={option.value}><input type="radio" name={`minimum-${stage}`} data-testid={`input-minimum-${stage}-${option.value}`} checked={minimumChoice(stage)===option.value} onChange={()=>chooseMinimum(stage,option.value)}/><span>{option.label}</span></label>)}</div>{minimumChoice(stage)==='other' && <div className="inv-field"><label htmlFor={`minimum-${stage}-custom`}>Custom minimum for {label} · whole dollars, at least $125</label><input id={`minimum-${stage}-custom`} className="inv-input" data-testid={`input-minimum-${stage}-custom`} type="number" min="125" step="1" placeholder="Enter a whole-dollar minimum" value={customMinimumValue(stage)} onChange={e=>updateCustomMinimum(stage,e.target.value)}/></div>}</fieldset>)}</div></div></>}
          {screen===4 && <><p className="inv-kicker">Your possible lineup</p><h2 className="serif" style={{fontSize:'clamp(38px,4vw,58px)',lineHeight:1,margin:'15px 0'}}>Choose where your interest goes.</h2><p className="inv-small">Up to {cap(a.amount)} projects. Each allocation must be at least $25. Your total is {dollars(a.amount)}.</p><p className="inv-small">When matches are available and you have not chosen projects, we start with an even split across up to {cap(a.amount)} matches. You can edit each amount, split evenly again, or manually choose other available projects.</p>
           <div className="inv-options"><Option type="radio" checked={!a.unallocated} label="Choose projects" description="Adjust amounts across a lineup of approved projects." onChange={()=>change('unallocated',false)}/><Option type="radio" checked={a.unallocated} label="Just pledge" description="Save your interest without selecting projects yet." onChange={()=>change('unallocated',true)}/></div>
            <div className="inv-spread" data-testid="text-allocation-spread">{a.unallocated ? <><strong>Allocation spread: None</strong><span>Your interest is unallocated.</span></> : rating ? <><strong>Allocation spread: {rating}</strong><span>Based on the number of projects and largest allocation share. This describes allocation only—not safety, performance, or expected return.</span></> : <><strong>Allocation spread: None</strong><span>No project allocations are currently selected.</span></>}</div>
