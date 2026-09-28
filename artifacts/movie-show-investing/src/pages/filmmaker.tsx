@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
+import { recordPitchForReview } from '@/lib/pitch-review-intent';
 import { getGetFilmmakerResultQueryKey, getGetFilmmakerSubmissionConfigQueryKey, getGetFlowProgressQueryKey, useGetFilmmakerResult, useGetFilmmakerSubmissionConfig, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
 import type { FilmmakerSubmissionInput } from '@workspace/api-client-react';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
@@ -80,7 +81,8 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
   const authReady = useFirebaseSessionReady();
   const user = useFirebaseUser();
   const completedResult = useGetFilmmakerResult({ query:{ queryKey:[...getGetFilmmakerResultQueryKey(),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
-  useEffect(() => { if (completedResult.data?.completed) navigate('/start/filmmaker/done'); }, [completedResult.data?.completed, navigate]);
+  const completedDestination = () => new URLSearchParams(window.location.search).get('new') === '1' ? '/me/projects?action=start' : '/start/filmmaker/done';
+  useEffect(() => { if (completedResult.data?.completed) navigate(completedDestination()); }, [completedResult.data?.completed, navigate]);
   const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:[...getGetFlowProgressQueryKey('filmmaker'),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
   const submissionConfig = useGetFilmmakerSubmissionConfig({ query:{ queryKey:getGetFilmmakerSubmissionConfigQueryKey(), retry:false, refetchOnWindowFocus:true } });
   useEffect(() => {
@@ -120,7 +122,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
     setA(recovered);
     setScreen(recoveredScreen);
     if (progress.data.completed) {
-      navigate('/start/filmmaker/done');
+      navigate(completedDestination());
     } else {
       lastSaved.current = legacyStage ? '' : JSON.stringify({ screen:recoveredScreen, answers:recovered });
       setHydrated(true);
@@ -227,7 +229,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
   async function finish() {
     if (submit.isPending) return;
     if (!submissionConfig.data?.available || !submissionConfig.data.turnstile_site_key) {
-      setValidation('Filmmaker submissions are temporarily unavailable until the anti-bot check is ready. Your saved answers are safe.');
+      setValidation('We could not load the submission verification check. Your answers are saved. Try “Check again” below.');
       return;
     }
     if (!turnstileToken) {
@@ -243,7 +245,8 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
     if (editTimer.current !== null) window.clearTimeout(editTimer.current);
     try {
       await persist(6, a);
-      await submit.mutateAsync({ data:{ ...payload(a), website, turnstile_token:token } });
+      const submitted = await submit.mutateAsync({ data:{ ...payload(a), website, turnstile_token:token } });
+      recordPitchForReview(submitted.project_id);
       turnstileResetRef.current?.();
       if (identityId === 'visitor') showGuestConfirmation();
       navigate('/start/filmmaker/done');
@@ -261,7 +264,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
         : status === 429
           ? 'Too many submission attempts from this browser or network. Please try again later. Your worksheet is still saved.'
         : status === 503
-          ? 'Filmmaker submissions are temporarily unavailable. Your worksheet is still saved; please try again later.'
+          ? 'We could not complete secure submission. Your worksheet is saved; try again later.'
         : 'We could not submit your information. Complete a fresh verification and try again. Nothing has been confirmed.');
     }
   }
@@ -388,9 +391,9 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
             <div className="fm-section"><p className="fm-label">Favorite genres <span className="fm-small">· optional</span></p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{genres.map(g=><Choice id={`favorite-${g}`} name="favorite-genre" multiple key={g} selected={a.favorite_genres.includes(g)} onClick={()=>toggleArray('favorite_genres',g)}>{g}</Choice>)}</div></div>
           <label className="fm-check fm-section"><input type="checkbox" data-testid="checkbox-chat-opt-in" checked={a.chat_opt_in} onChange={e=>change('chat_opt_in',e.target.checked)}/><span>I’m open to a quick 15-minute chat about my experience.</span></label>
           <p className="fm-small">By submitting, you’re sharing information with Movie Show Investing for its launch MVP. This does not create a project listing or an investment opportunity. See our <Link href="/privacy" className="underline" data-testid="link-flow-privacy">privacy policy</Link>.</p>
-           {submissionConfig.isLoading ? <p className="fm-small" role="status">Checking that secure submission is available…</p>
+           {submissionConfig.isLoading ? <p className="fm-small" role="status">Loading secure submission verification…</p>
              : submissionConfig.isError ? <div className="fm-error" role="alert">We could not check anti-bot protection. Nothing has been sent. <button type="button" className="underline" onClick={()=>void submissionConfig.refetch()}>Check again</button></div>
-             : !submissionConfig.data?.available || !submissionConfig.data.turnstile_site_key ? <div className="fm-error" role="status">Secure submission is temporarily unavailable. Your answers remain saved; please check back later. <button type="button" className="underline" onClick={()=>void submissionConfig.refetch()}>Check again</button></div>
+             : !submissionConfig.data?.available || !submissionConfig.data.turnstile_site_key ? <div className="fm-error" role="status">We could not load the submission verification check. Your answers remain saved. <button type="button" className="underline" onClick={()=>void submissionConfig.refetch()}>Check again</button></div>
              : <FilmmakerTurnstile siteKey={submissionConfig.data.turnstile_site_key} onToken={setTurnstileToken} resetRef={turnstileResetRef}/>}
         </>}
         {validation && <p className="fm-error" data-testid="error-validation" role="alert">{validation}</p>}
@@ -399,7 +402,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
           {screen>1 ? <button type="button" data-testid="button-back" className="fm-back" disabled={saving || submit.isPending} onClick={()=>void back()}><ArrowLeft size={17}/> Back</button> : <span className="fm-small">Your answers save as you go.</span>}
           {screen===1 && !a.stage ? <span className="fm-small">Choose a stage to continue</span> :
              <button type="button" data-testid={screen===6?'button-submit-filmmaker':'button-continue'} className="fm-primary" disabled={saving || submit.isPending || screen===6 && (submissionConfig.isLoading || submissionConfig.isError || !submissionConfig.data?.available || !turnstileToken) || screen===4 && (otherOfferError || !a.offer_choice || !validListedOffer(a.offer_per100))} onClick={()=>screen===6 ? void finish() : void advance(a.no_project_yet && screen===2 ? 6 : screen+1)}>
-               {submit.isPending ? 'Submitting…' : saving ? 'Saving…' : screen===6 ? !submissionConfig.data?.available ? 'Submission unavailable' : !turnstileToken ? 'Complete verification to submit' : 'Send my answers' : 'Continue'} {!submit.isPending && <ArrowRight size={17}/>}
+               {submit.isPending ? 'Submitting…' : saving ? 'Saving…' : screen===6 ? !turnstileToken ? 'Complete verification to submit' : 'Send my answers' : 'Continue'} {!submit.isPending && <ArrowRight size={17}/>}
             </button>}
         </div>
         <p className="fm-status" role="status" data-testid="status-save" style={{marginTop:15}}>{saveError ? 'Changes not saved' : saving ? 'Saving your answers…' : lastSaved.current === JSON.stringify({screen,answers:a}) ? 'All changes saved' : 'Changes save automatically'}</p>

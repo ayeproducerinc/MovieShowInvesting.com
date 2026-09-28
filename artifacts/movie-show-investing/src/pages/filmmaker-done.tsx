@@ -6,6 +6,7 @@ import type { FilmmakerResult, FilmmakerShowcaseUpdate } from '@workspace/api-cl
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { closeGuestConfirmation, guestConfirmationVisible } from '@/lib/filmmaker-confirmation';
 import { setFilmmakerAction } from '@/lib/filmmaker-intent';
+import { consumePitchReviewChoice } from '@/lib/pitch-review-intent';
 import { ProjectShare } from '@/components/project-share';
 import { FilmmakerMedia } from '@/components/filmmaker-media';
 import { calculateDeal, money, type Stage } from './filmmaker-calculator';
@@ -52,6 +53,11 @@ function ShowcaseForm({ result, onSaved, reviewStatus }: { result: FilmmakerResu
     || clean(moneyUse) !== (result.money_use || null)
     || clean(distribution) !== (result.distribution_plan || null)
     || clean(trailer) !== (result.trailer_url || null);
+  useEffect(() => {
+    if (result.project_id && !result.showcase_requested && !reviewStatus?.paid && consumePitchReviewChoice(result.project_id)) {
+      setShowPaywall(true);
+    }
+  }, [result.project_id, result.showcase_requested, reviewStatus?.paid]);
   useEffect(() => {
     if (!trailerDirty.current) setTrailer(result.trailer_url || '');
   }, [result.trailer_url]);
