@@ -18,4 +18,4 @@
 - [Confirmed interest in unlisted projects](confirmed-interest-unlisted-projects.md) — a hidden project can retain a private signed indication, but ineligible projects must not show public confirmed totals.
 - [Repeat interest signatures](repeat-interest-signatures.md) — a new non-binding indication after confirmation must be a separate signed snapshot; never reinterpret the original investor record.
 - [Public sharing and browser activation](public-sharing-browser-activation.md) — refresh share eligibility in the background, but do not await a network check before native share or clipboard calls.
-- [Analytics capture boundary](analytics-capture-boundary.md) — keep broad capture and replay off for private investor flows until masking, consent, and owner-approved privacy wording are in place.
+- [Analytics capture boundary](analytics-capture-boundary.md) — only opt-in masked replay on public pages was approved; private investor and filmmaker routes remain excluded.

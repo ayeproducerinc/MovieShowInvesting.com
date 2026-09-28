@@ -8,7 +8,7 @@ import { SiteShell } from '@/components/site-shell';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
 import { useVisitAttribution } from '@/hooks/use-public-site';
-import { trackInvestorEvent } from '@/lib/analytics';
+import { canReplayPage, trackInvestorEvent } from '@/lib/analytics';
 import Home from '@/pages/home';
 import Admin from '@/pages/admin';
 import FAQ from '@/pages/faq';
@@ -74,6 +74,11 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
+function ReplayRouteBoundary({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
+  return <div data-private-analytics={canReplayPage(location) ? undefined : ''}>{children}</div>;
+}
+
 function PublicPages() {
   const visit = useVisitAttribution();
   return <>
@@ -118,12 +123,12 @@ function App() {
   return <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-        <Switch>
+        <ReplayRouteBoundary><Switch>
           <Route path="/admin" component={Admin} />
           <Route path="/filmmaker/questions">{() => <QuestionToken kind="answer" />}</Route>
           <Route path="/question-report">{() => <QuestionToken kind="report" />}</Route>
           <Route>{() => <PublicPages />}</Route>
-        </Switch>
+        </Switch></ReplayRouteBoundary>
       </WouterRouter>
       <Toaster />
     </TooltipProvider>
