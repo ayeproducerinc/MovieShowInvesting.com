@@ -6,7 +6,7 @@ import { visitorsTable } from "./visitors";
 export const investorsTable = pgTable("investors", {
   id: serial("id").primaryKey(),
   name: text("name"),
-  email: text("email").unique(),
+  email: text("email"),
   phone: text("phone"),
   city: text("city"),
   state: text("state"),

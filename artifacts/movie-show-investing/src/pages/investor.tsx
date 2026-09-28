@@ -48,22 +48,24 @@ function ErrorState({retry}: {retry:()=>void}) {
   return <div className="page-wrap inv-state"><p className="inv-kicker">Connection interrupted</p><h1>We couldn’t open your page.</h1><p>Your answers need a reliable connection before you continue. Please try again.</p><button type="button" className="inv-button" data-testid="button-retry-investor" onClick={retry}><RotateCcw size={16}/> Try again</button></div>;
 }
 
-function submissionFailure(cause: unknown): {message:string; checkLineup:boolean} {
+function submissionFailure(cause: unknown): {message:string; checkLineup:boolean; canStartFresh:boolean} {
   const apiError = cause && typeof cause === 'object' ? cause as {status?:unknown;data?:unknown} : null;
   const data = apiError?.data;
   const detail = data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' ? data.error : null;
+  const code = data && typeof data === 'object' && 'code' in data ? data.code : null;
   if (apiError?.status === 409) {
-    if (detail?.includes('investor intent from another visitor')) {
+    if (code === 'guest_interest_conflict') {
       return {
-        message:'This email already has guest interest from an earlier visit. This account cannot replace it. In the browser or browser profile where it was saved, open My lineup and choose “Claim guest interest from this browser.” This attempt was not saved.',
-        checkLineup:true,
+        message:'An older guest form uses this email, but it is not linked to this account. This attempt was not saved. You can start fresh below without changing the older form.',
+        checkLineup:false,
+        canStartFresh:true,
       };
     }
-    return {message:`${detail ?? 'This account conflicts with existing investor interest.'} This attempt was not saved. Check My lineup before trying again.`,checkLineup:true};
+    return {message:`${detail ?? 'This account conflicts with existing investor interest.'} This attempt was not saved. Check My lineup before trying again.`,checkLineup:true,canStartFresh:false};
   }
-  if (apiError?.status === 403) return {message:`${detail ?? 'This account cannot save this interest.'} This attempt was not saved.`,checkLineup:false};
-  if (apiError?.status === 400 && detail) return {message:`${detail} This attempt was not saved.`,checkLineup:false};
-  return {message:'We could not confirm whether your interest was saved. Check My lineup before trying again.',checkLineup:true};
+  if (apiError?.status === 403) return {message:`${detail ?? 'This account cannot save this interest.'} This attempt was not saved.`,checkLineup:false,canStartFresh:false};
+  if (apiError?.status === 400 && detail) return {message:`${detail} This attempt was not saved.`,checkLineup:false,canStartFresh:false};
+  return {message:'We could not confirm whether your interest was saved. Check My lineup before trying again.',checkLineup:true,canStartFresh:false};
 }
 
 function GuestDraftConflictState() {
@@ -113,11 +115,12 @@ export default function Investor() {
   const firebaseUser = useFirebaseUser();
   const firebaseReady = useFirebaseSessionReady();
   const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
+  const expectedOwner = replitAuth.user ? `replit:${replitAuth.user.id}` : firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
   const search = window.location.search;
-  return <InvestorWorksheet key={`${identityId}:${search}`} identityId={identityId} authLoading={replitAuth.isLoading || !firebaseReady} />;
+  return <InvestorWorksheet key={`${expectedOwner}:${search}`} identityId={identityId} expectedOwner={expectedOwner} authLoading={replitAuth.isLoading || !firebaseReady} />;
 }
 
-function InvestorWorksheet({ identityId, authLoading }: { identityId: string; authLoading: boolean }) {
+function InvestorWorksheet({ identityId, expectedOwner, authLoading }: { identityId: string; expectedOwner: string; authLoading: boolean }) {
   const params = new URLSearchParams(window.location.search);
   const targetSlug = params.get('project');
   const newEntry = params.get('new') === '1';
@@ -142,6 +145,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
   const [customMinimumDrafts,setCustomMinimumDrafts] = useState<Partial<Record<MinimumStage,string>>>({});
   const [error,setError] = useState('');
   const [checkLineup,setCheckLineup] = useState(false);
+  const [canStartFresh,setCanStartFresh] = useState(false);
   const [saving,setSaving] = useState(false);
   const initialised = useRef(false);
   const restoredMatchStarted = useRef(false);
@@ -150,6 +154,8 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const saveFn = useRef(save.mutateAsync);
   saveFn.current = save.mutateAsync;
+  const active = useRef(true);
+  useEffect(()=>()=>{active.current=false;if(timer.current!==null)window.clearTimeout(timer.current);},[]);
   useEffect(()=>{
     if (initialised.current) return;
     if (!explore.isSuccess || !current.isSuccess || !progress.data && !progress.isError) return;
@@ -202,13 +208,16 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
     if (json===lastSaved.current) return;
     timer.current=window.setTimeout(()=>{
       setSaving(true);
-      const operation=queue.current.catch(()=>undefined).then(()=>saveFn.current({data:{flow:'investor',last_screen:screen,answers:{...a}}}));
+      const operation=queue.current.catch(()=>undefined).then(()=>{
+        if(!active.current) throw new Error('Investor worksheet is no longer active');
+        return saveFn.current({data:{flow:'investor',last_screen:screen,answers:{...a},expected_investor_owner:expectedOwner}});
+      });
       queue.current=operation;
       operation.then(()=>{lastSaved.current=json;setError('');}).catch(()=>setError('We could not save your progress. Please check your connection before continuing.')).finally(()=>{if(queue.current===operation)setSaving(false);});
     },850);
     return ()=>{if(timer.current!==null)window.clearTimeout(timer.current);};
   },[a,screen,ready,selectionNeeded]);
-  const change = <K extends keyof Answers>(key:K,value:Answers[K])=>{setA(prev=>({...prev,[key]:value}));setError('');};
+  const change = <K extends keyof Answers>(key:K,value:Answers[K])=>{setA(prev=>({...prev,[key]:value}));setError('');setCanStartFresh(false);};
   function minimumChoice(stage:MinimumStage) {
     if(otherMinimumSelected[stage]) return 'other';
     const value=a.minima[stage];
@@ -241,7 +250,10 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
   async function persist(step:number, value:Answers) {
     if(timer.current!==null)window.clearTimeout(timer.current);
     setSaving(true);
-    const operation=queue.current.catch(()=>undefined).then(()=>saveFn.current({data:{flow:'investor',last_screen:step,answers:{...value}}}));
+    const operation=queue.current.catch(()=>undefined).then(()=>{
+      if(!active.current) throw new Error('Investor worksheet is no longer active');
+      return saveFn.current({data:{flow:'investor',last_screen:step,answers:{...value},expected_investor_owner:expectedOwner}});
+    });
     queue.current=operation;
     try {await operation;lastSaved.current=JSON.stringify({screen:step,a:value});setError('');}
     catch {setError('We could not save your answers. Check your connection and try again.');throw new Error('Save failed');}
@@ -301,20 +313,23 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
     }
     try {await persist(screen+1,updated);setA(updated);setScreen(screen+1);window.scrollTo({top:0,behavior:'smooth'});}catch {/* error shown by persist */}
   }
-  async function back() {setError('');try{await persist(screen-1,a);setScreen(screen-1);window.scrollTo({top:0,behavior:'smooth'});}catch {/* error shown by persist */}}
-  async function finish() {
+  async function back() {setError('');setCanStartFresh(false);try{await persist(screen-1,a);setScreen(screen-1);window.scrollTo({top:0,behavior:'smooth'});}catch {/* error shown by persist */}}
+  async function finish(startFresh=false) {
     const issue=validate(5) || validate(4);
     if(issue){setError(issue);return;}
     setCheckLineup(false);
+    setCanStartFresh(false);
     try { await persist(5,a); } catch { return; }
     const {terms_read: _terms, lineup: _lineup, location_manual: _manual, ...input}=a;
     void _terms; void _lineup; void _manual;
     try {
-      await submit.mutateAsync({data:{...input,new_entry:newEntry || current.data?.intent?.entry_id != null && current.data.intent.status==='saved',name:a.name.trim(),email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,allocations:a.unallocated?[]:a.lineup,unallocated:a.unallocated}});
+      if(!active.current) return;
+      await submit.mutateAsync({data:{...input,expected_investor_owner:expectedOwner,new_entry:!startFresh && (newEntry || current.data?.intent?.entry_id != null && current.data.intent.status==='saved'),start_fresh:startFresh,name:a.name.trim(),email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,allocations:a.unallocated?[]:a.lineup,unallocated:a.unallocated}});
     } catch (cause) {
       const failure=submissionFailure(cause);
       setError(failure.message);
       setCheckLineup(failure.checkLineup);
+      setCanStartFresh(failure.canStartFresh);
       return;
     }
     trackInvestorEvent('inv_complete', { path: newEntry ? 'new_entry' : revise ? 'revise' : 'initial', total: a.amount, accredited: a.accredited });
@@ -365,7 +380,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
         </>}
         {screen===5 && <><Field id="invest-name" label="Your name" value={a.name} onChange={v=>change('name',v)} autoComplete="name" required/><Field id="invest-email" label="Email address" value={a.email} onChange={v=>change('email',v)} type="email" autoComplete="email" required/><Field id="invest-phone" label="Phone number" value={a.phone||''} onChange={v=>change('phone',v)} type="tel" autoComplete="tel"/>
            <LocationPicker value={{city:a.city||'',state:a.state||'',country:a.country||'',location_manual:a.location_manual}}
-             onChange={location=>{setA(current=>({...current,...location}));setError('');}}/>
+             onChange={location=>{setA(current=>({...current,...location}));setError('');setCanStartFresh(false);}}/>
            <Field id="invest-zip" label="Postal code" value={a.zip||''} onChange={v=>change('zip',v)} autoComplete="postal-code"/>
           <div className="inv-section"><h2>Investor background</h2><p className="inv-label">Are you an accredited investor?</p><div className="inv-options"><Option label="Yes" type="radio" checked={a.accredited} onChange={()=>change('accredited',true)}/><Option label="No or not sure" type="radio" checked={!a.accredited} onChange={()=>change('accredited',false)}/></div></div>
           <div className="inv-section"><p className="inv-label">What experience do you bring? · choose any</p><div className="inv-options">{['New to investing','Invested in creative projects','Invested in private companies','Work in film or media'].map(value=><Option key={value} label={value} checked={a.experience.includes(value)} onChange={()=>change('experience',toggle(a.experience,value))}/>)}</div></div>
@@ -374,6 +389,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
            <p className="inv-small">By saving, you’re sharing information with Movie Show Investing for its launch MVP. This records non-binding interest only; no payment or signed confirmation takes place. See our <Link href="/privacy" className="underline" data-testid="link-invest-privacy">privacy policy</Link>.</p>
         </>}
         {error && <div className="inv-error" role="alert" data-testid="error-investor"><p>{error}</p>{checkLineup && <Link href="/lineup" data-testid="link-investor-conflict-lineup">Check my saved interest</Link>}</div>}
+        {screen===5 && canStartFresh && identityId!=='visitor' && <div className="inv-section" data-testid="investor-start-fresh-choice"><p><strong>Start a separate form?</strong> This will leave two separate records under the same email. The older guest interest stays unchanged and will not appear in this account. Linking it here later would require a separate review.</p><button type="button" className="inv-button secondary" data-testid="button-investor-start-fresh" disabled={saving || submit.isPending} onClick={()=>void finish(true)}>Start fresh and save this interest <ArrowRight size={16}/></button></div>}
         <div className="inv-foot"><div>{screen>1 && <button type="button" className="inv-button secondary" data-testid="button-invest-back" disabled={saving || match.isPending || submit.isPending} onClick={()=>void back()}><ArrowLeft size={16}/> Back</button>}</div><button type="button" className="inv-button" data-testid={screen===5?'button-save-interest':'button-invest-next'} disabled={saving || match.isPending || submit.isPending} onClick={()=>void (screen===5?finish():next())}>{submit.isPending?'Saving interest…':match.isPending?'Finding projects…':saving?'Saving…':screen===5?'Save non-binding interest':'Continue'} <ArrowRight size={16}/></button></div>
       </div>
     </div>

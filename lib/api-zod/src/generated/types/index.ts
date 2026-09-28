@@ -104,6 +104,8 @@ export * from './questionReportInput';
 export * from './questionReportResult';
 export * from './questionSubmission';
 export * from './questionTokenAnswerInput';
+export * from './saveInvestorIntent409';
+export * from './saveInvestorIntent409Code';
 export * from './saveProgressInput';
 export * from './saveProgressInputAnswers';
 export * from './searchLocationsParams';

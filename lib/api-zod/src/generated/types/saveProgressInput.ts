@@ -17,4 +17,6 @@ export interface SaveProgressInput {
   last_screen: number;
   answers: SaveProgressInputAnswers;
   completed?: boolean;
+  /** Investor worksheet identity captured on opening; the API rejects a save if the signed-in account changed */
+  expected_investor_owner?: string;
 }

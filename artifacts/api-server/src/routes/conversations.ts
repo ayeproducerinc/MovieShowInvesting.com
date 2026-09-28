@@ -143,14 +143,12 @@ router.post("/projects/:slug/conversations", async (req, res): Promise<void> => 
       [identity.email],
     );
     const identityConflict = uidInvestors.rows.length > 1
-      || emailInvestors.rows.length > 1
+      || Boolean(uidInvestors.rows[0] && uidInvestors.rows[0].email?.trim().toLowerCase() !== identity.email)
       || emailInvestors.rows.some((row) =>
         identity.provider === "firebase"
           ? (row.firebase_uid != null && row.firebase_uid !== identity.uid) || row.replit_uid != null
           : (row.replit_uid != null && row.replit_uid !== identity.uid) || row.firebase_uid != null
-      )
-      || Boolean(uidInvestors.rows[0] && emailInvestors.rows[0]
-        && uidInvestors.rows[0].id !== emailInvestors.rows[0].id);
+      );
     if (identityConflict) {
       await client.query("rollback");
         res.status(409).json({ error: "This verified account conflicts with an existing investor identity." });

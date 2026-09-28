@@ -171,6 +171,8 @@ export interface SaveProgressInput {
   last_screen: number;
   answers: SaveProgressInputAnswers;
   completed?: boolean;
+  /** Investor worksheet identity captured on opening; the API rejects a save if the signed-in account changed */
+  expected_investor_owner?: string;
 }
 
 export type FilmmakerSubmissionInputStage = typeof FilmmakerSubmissionInputStage[keyof typeof FilmmakerSubmissionInputStage];
@@ -680,6 +682,8 @@ export interface InvestorIntentInput {
   /** @minLength 1 */
   name: string;
   email: string;
+  /** Investor worksheet identity captured on opening; the API rejects a save if the signed-in account changed */
+  expected_investor_owner?: string;
   /**
      * Whole-dollar total intent of at least $100
      * @minimum 100
@@ -709,6 +713,8 @@ export interface InvestorIntentInput {
   zip?: string;
   /** Explicitly save a separate entry after an earlier confirmation */
   new_entry?: boolean;
+  /** Explicitly create a new verified-account intent while preserving an unclaimed guest intent with the same email */
+  start_fresh?: boolean;
 }
 
 export interface InvestorIntentResult {
@@ -1063,4 +1069,16 @@ export const GetExploreStage = {
   production: 'production',
   idea: 'idea',
 } as const;
+
+export type SaveInvestorIntent409Code = typeof SaveInvestorIntent409Code[keyof typeof SaveInvestorIntent409Code];
+
+
+export const SaveInvestorIntent409Code = {
+  guest_interest_conflict: 'guest_interest_conflict',
+} as const;
+
+export type SaveInvestorIntent409 = {
+  error: string;
+  code?: SaveInvestorIntent409Code;
+};
 

@@ -296,8 +296,8 @@ export const GetFlowProgressResponse = zod.object({
 
 
 /**
- * Unlinked visitor progress remains cookie-accessible. A filmmaker visitor linked to Firebase UID requires a verified Bearer token matching that UID; investor progress keeps its existing behavior.
- * @summary Save the current visitor's in-progress answers
+ * Unlinked visitor progress remains cookie-accessible. Investor progress under a verified account is stored separately from guest progress. A filmmaker visitor linked to Firebase UID requires a matching verified Bearer token.
+ * @summary Save visitor or account-scoped in-progress answers
  */
 
 
@@ -314,7 +314,8 @@ export const SaveFlowProgressBody = zod.object({
   "flow": zod.enum(['filmmaker', 'investor']),
   "last_screen": zod.number().int().min(1).max(saveFlowProgressBodyLastScreenMax),
   "answers": zod.record(zod.string(), zod.unknown()),
-  "completed": zod.boolean().optional()
+  "completed": zod.boolean().optional(),
+  "expected_investor_owner": zod.string().optional().describe('Investor worksheet identity captured on opening; the API rejects a save if the signed-in account changed')
 })
 
 
@@ -865,6 +866,7 @@ export const saveInvestorIntentBodyCountryRegExp = new RegExp('^[A-Z]{2}$');
 export const SaveInvestorIntentBody = zod.object({
   "name": zod.string().min(1),
   "email": zod.string().email(),
+  "expected_investor_owner": zod.string().optional().describe('Investor worksheet identity captured on opening; the API rejects a save if the signed-in account changed'),
   "amount": zod.number().int().min(saveInvestorIntentBodyAmountMin).max(saveInvestorIntentBodyAmountMax).describe('Whole-dollar total intent of at least $100'),
   "allocations": zod.array(zod.object({
   "project_id": zod.number().int().min(1),
@@ -887,7 +889,8 @@ export const SaveInvestorIntentBody = zod.object({
   "state": zod.string().optional(),
   "country": zod.string().regex(saveInvestorIntentBodyCountryRegExp),
   "zip": zod.string().optional(),
-  "new_entry": zod.boolean().optional().describe('Explicitly save a separate entry after an earlier confirmation')
+  "new_entry": zod.boolean().optional().describe('Explicitly save a separate entry after an earlier confirmation'),
+  "start_fresh": zod.boolean().optional().describe('Explicitly create a new verified-account intent while preserving an unclaimed guest intent with the same email')
 })
 
 

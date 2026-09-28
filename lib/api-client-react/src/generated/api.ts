@@ -85,6 +85,7 @@ import type {
   QuestionReportResult,
   QuestionSubmission,
   QuestionTokenAnswerInput,
+  SaveInvestorIntent409,
   SaveProgressInput,
   SearchLocationsParams,
   SiteStats,
@@ -1517,8 +1518,8 @@ export const getSaveFlowProgressUrl = () => {
 }
 
 /**
- * Unlinked visitor progress remains cookie-accessible. A filmmaker visitor linked to Firebase UID requires a verified Bearer token matching that UID; investor progress keeps its existing behavior.
- * @summary Save the current visitor's in-progress answers
+ * Unlinked visitor progress remains cookie-accessible. Investor progress under a verified account is stored separately from guest progress. A filmmaker visitor linked to Firebase UID requires a matching verified Bearer token.
+ * @summary Save visitor or account-scoped in-progress answers
  */
 export const saveFlowProgress = async (saveProgressInput: SaveProgressInput, options?: Parameters<typeof customFetch>[1]): Promise<FlowProgress> => {
 
@@ -1584,7 +1585,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SaveFlowProgressMutationVariables = {data: BodyType<SaveProgressInput>}
 
     /**
- * @summary Save the current visitor's in-progress answers
+ * @summary Save visitor or account-scoped in-progress answers
  */
 export const useSaveFlowProgress = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFlowProgress>>, TError,SaveFlowProgressMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -3243,7 +3244,7 @@ return customFetch<InvestorIntentResult>(getSaveInvestorIntentUrl(),
 
 export const getSaveInvestorIntentMutationKey = () => ['saveInvestorIntent'] as const;
 
-export const getSaveInvestorIntentMutationOptions = <TError = ErrorType<void>,
+export const getSaveInvestorIntentMutationOptions = <TError = ErrorType<void | SaveInvestorIntent409>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveInvestorIntent>>, TError,SaveInvestorIntentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof saveInvestorIntent>>, TError,SaveInvestorIntentMutationVariables, TContext> => {
 
@@ -3272,13 +3273,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SaveInvestorIntentMutationResult = NonNullable<Awaited<ReturnType<typeof saveInvestorIntent>>>
     export type SaveInvestorIntentMutationBody = BodyType<InvestorIntentInput>
-    export type SaveInvestorIntentMutationError = ErrorType<void>
+    export type SaveInvestorIntentMutationError = ErrorType<void | SaveInvestorIntent409>
     export type SaveInvestorIntentMutationVariables = {data: BodyType<InvestorIntentInput>}
 
     /**
  * @summary Save visitor-scoped intent or verified account intent and preferences
  */
-export const useSaveInvestorIntent = <TError = ErrorType<void>,
+export const useSaveInvestorIntent = <TError = ErrorType<void | SaveInvestorIntent409>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveInvestorIntent>>, TError,SaveInvestorIntentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof saveInvestorIntent>>,

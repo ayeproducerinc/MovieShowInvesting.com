@@ -12,6 +12,8 @@ export interface InvestorIntentInput {
   /** @minLength 1 */
   name: string;
   email: string;
+  /** Investor worksheet identity captured on opening; the API rejects a save if the signed-in account changed */
+  expected_investor_owner?: string;
   /**
      * Whole-dollar total intent of at least $100
      * @minimum 100
@@ -41,4 +43,6 @@ export interface InvestorIntentInput {
   zip?: string;
   /** Explicitly save a separate entry after an earlier confirmation */
   new_entry?: boolean;
+  /** Explicitly create a new verified-account intent while preserving an unclaimed guest intent with the same email */
+  start_fresh?: boolean;
 }

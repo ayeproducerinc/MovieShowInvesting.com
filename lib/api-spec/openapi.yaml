@@ -345,8 +345,8 @@ paths:
     post:
       operationId: saveFlowProgress
       tags: [progress]
-      summary: Save the current visitor's in-progress answers
-      description: Unlinked visitor progress remains cookie-accessible. A filmmaker visitor linked to Firebase UID requires a verified Bearer token matching that UID; investor progress keeps its existing behavior.
+      summary: Save visitor or account-scoped in-progress answers
+      description: Unlinked visitor progress remains cookie-accessible. Investor progress under a verified account is stored separately from guest progress. A filmmaker visitor linked to Firebase UID requires a matching verified Bearer token.
       security:
         - firebaseBearer: []
         - {}
@@ -952,6 +952,17 @@ paths:
         "400":
           description: Invalid intent amounts, allocations, or project selections
         "401": { description: Supplied bearer token is invalid }
+        "409":
+          description: Existing interest belongs to another identity or an unclaimed guest visit
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [error]
+                properties:
+                  error: { type: string }
+                  code: { type: string, enum: [guest_interest_conflict] }
   /investor/intents/current:
     get:
       operationId: getCurrentInvestorIntent
@@ -1477,6 +1488,7 @@ components:
           type: object
           additionalProperties: true
         completed: { type: boolean }
+        expected_investor_owner: { type: string, description: Investor worksheet identity captured on opening; the API rejects a save if the signed-in account changed }
     FilmmakerSubmissionInput:
       type: object
       additionalProperties: false
@@ -1830,6 +1842,7 @@ components:
       properties:
         name: { type: string, minLength: 1 }
         email: { type: string, format: email }
+        expected_investor_owner: { type: string, description: Investor worksheet identity captured on opening; the API rejects a save if the signed-in account changed }
         amount: { type: integer, minimum: 100, maximum: 2147483647, description: Whole-dollar total intent of at least $100, bounded by PostgreSQL integer storage }
         allocations:
           type: array
@@ -1860,6 +1873,7 @@ components:
         country: { type: string, pattern: "^[A-Z]{2}$" }
         zip: { type: string }
         new_entry: { type: boolean, description: Explicitly save a separate entry after an earlier confirmation }
+        start_fresh: { type: boolean, description: Explicitly create a new verified-account intent while preserving an unclaimed guest intent with the same email }
     InvestorIntentResult:
       type: object
       additionalProperties: false

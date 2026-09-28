@@ -150,6 +150,11 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
   if (req.get("authorization") && !identity) return;
   const data = parsed.data;
   const email = data.email.trim().toLowerCase();
+  const actualOwner = identity ? `${identity.provider}:${identity.uid}` : "visitor";
+  if (data.expected_investor_owner && data.expected_investor_owner !== actualOwner) {
+    res.status(409).json({ error: "The investor account changed while this worksheet was open. Reload before saving." });
+    return;
+  }
   if (identity && identity.email !== email) {
     res.status(403).json({ error: "The submitted email must match the verified account." });
     return;
@@ -216,6 +221,7 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
   const client = await pool.connect();
   let investorId: number | null = null;
   let conflict: string | null = null;
+  let conflictCode: string | null = null;
   try {
     await client.query("begin");
     const lockKeys = [
@@ -246,7 +252,6 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
       "select * from investors where lower(trim(email)) = $1 for update",
       [email],
     );
-    const emailOwner = matchingInvestors.rows[0];
     let uidOwner: InvestorRow | undefined;
     if (identity) {
       const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
@@ -275,39 +280,41 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
         visitorOwner = visitorMatches.rows[0];
       }
     }
-    const existing = emailOwner ?? uidOwner;
-    if (matchingInvestors.rows.length > 1) {
-      conflict = "This email has conflicting investor records and cannot be safely updated.";
-    } else if (emailOwner?.firebase_uid || emailOwner?.replit_uid) {
-      const sameOwner = Boolean(identity && (
-        identity.provider === "firebase" ? emailOwner.firebase_uid === identity.uid
-          : emailOwner.replit_uid === identity.uid
-      ));
-      if (!sameOwner) {
+    const sameAccount = (row: InvestorRow) => Boolean(identity && (
+      identity.provider === "firebase" ? row.firebase_uid === identity.uid
+        : row.replit_uid === identity.uid
+    ));
+    const guestRows = matchingInvestors.rows.filter(row => !row.firebase_uid && !row.replit_uid);
+    const guestFromThisVisit = guestRows.find(row => visitorId && row.visitor_id === visitorId);
+    const otherAccount = matchingInvestors.rows.find(row =>
+      (row.firebase_uid || row.replit_uid) && !sameAccount(row));
+    const startingFresh = data.start_fresh === true;
+    let existing: InvestorRow | undefined;
+    if (identity) {
+      // A verified email never transfers the guest's answers. start_fresh
+      // explicitly creates a separate account-owned record with no visitor ID.
+      existing = uidOwner;
+      if (otherAccount) {
         conflict = "This email is already associated with a different investor identity.";
+      } else if (!uidOwner && !startingFresh && guestRows.length) {
+        conflict = "This email has an unclaimed guest investor intent. Claim it from its original browser, or choose to start fresh with this account.";
+        conflictCode = "guest_interest_conflict";
+      } else if (startingFresh && !uidOwner && !guestRows.length) {
+        conflict = "There is no unclaimed guest interest to start separately from.";
+      } else if (!uidOwner && !startingFresh && visitorOwner && (!existing || visitorOwner.id !== existing.id)) {
+        conflict = "This visitor is already associated with a different investor intent.";
       }
-    } else if (emailOwner && identity && (!visitorId || emailOwner.visitor_id !== visitorId)) {
-      // A verified matching email is not proof that this account owns a guest
-      // intent. Only the original visitor cookie may link that guest record.
-      conflict = "This email has an investor intent from another visitor. Return to the original browser to link it, or contact support for owner recovery.";
-    } else if (emailOwner && !identity && (!visitorId || emailOwner.visitor_id !== visitorId)) {
-      conflict = "This email is already associated with a different investor identity.";
-    }
-    if (uidOwner && existing && uidOwner.id !== existing.id) {
-      conflict = "This account and email belong to different investor records.";
-    }
-    if (visitorOwner && existing && visitorOwner.id !== existing.id) {
-      conflict = "This visitor is already associated with a different investor intent.";
-    }
-    if (visitorOwner?.firebase_uid || visitorOwner?.replit_uid) {
-      const sameVisitorOwner = Boolean(identity && (
-        identity.provider === "firebase" ? visitorOwner.firebase_uid === identity.uid
-          : visitorOwner.replit_uid === identity.uid
-      ));
-      if (!sameVisitorOwner) conflict = "This visitor is linked to a different account.";
-    }
-    if (visitorOwner && !identity && visitorOwner.email?.trim().toLowerCase() !== email) {
-      conflict = "This visitor already has an investor intent with a different email.";
+    } else {
+      existing = guestFromThisVisit;
+      if (startingFresh) {
+        conflict = "Starting fresh requires a signed-in account.";
+      } else if (visitorOwner && visitorOwner.email?.trim().toLowerCase() !== email) {
+        conflict = "This visitor already has an investor intent with a different email.";
+      } else if (!existing && matchingInvestors.rows.length) {
+        conflict = "This email is already associated with a different investor identity.";
+      } else if (visitorOwner && (visitorOwner.firebase_uid || visitorOwner.replit_uid)) {
+        conflict = "This visitor is linked to a different account.";
+      }
     }
     const adding = data.new_entry === true;
     if (adding && (!identity || !existing?.confirmed_at)) {
@@ -339,7 +346,7 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
         data.call_opt_in,
         existing?.firebase_uid ?? (identity?.provider === "firebase" ? identity.uid : null),
         existing?.replit_uid ?? (identity?.provider === "replit" ? identity.uid : null),
-        existing?.visitor_id ?? visitorId,
+        uidOwner ? uidOwner.visitor_id : existing?.visitor_id ?? (identity ? null : visitorId),
         data.phone?.trim() || null,
         data.country,
       ];
@@ -434,7 +441,7 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
   }
 
   if (conflict) {
-    res.status(409).json({ error: conflict });
+    res.status(409).json({ error: conflict, ...(conflictCode ? { code: conflictCode } : {}) });
     return;
   }
   res.status(201).json(SaveInvestorIntentResponse.parse({
@@ -576,6 +583,15 @@ router.post("/investor/intents/claim", async (req, res): Promise<void> => {
       || (guest.replit_uid && (identity.provider !== "replit" || guest.replit_uid !== identity.uid))) {
       await client.query("rollback");
       res.status(403).json({ error: "This browser's saved interest does not belong to the verified account." });
+      return;
+    }
+    const { rows: separateAccounts } = await client.query<{ id: number }>(
+      "select id from investors where lower(trim(email)) = $1 and id <> $2 and (firebase_uid is not null or replit_uid is not null) for update",
+      [identity.email, guest.id],
+    );
+    if (separateAccounts.length) {
+      await client.query("rollback");
+      res.status(409).json({ error: "This email already has separate signed-in interest. The older guest record cannot be linked automatically." });
       return;
     }
     const { rows: accountRows } = await client.query<InvestorRow>(
