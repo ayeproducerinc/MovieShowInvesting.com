@@ -89,7 +89,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 8 — Pledge confirmation and lineup
 
-**Status:** partly implemented in development. The private `/lineup` page shows saved or confirmed non-binding interest and project allocations. Signed-in investors can review and sign the exact saved choices at `/lineup/confirm`, and original-browser guests can explicitly claim matching-email interest after sign-in. Eligible public project totals count confirmed allocations only; hidden or unapproved projects do not display public totals. Result/share cards, confirmation email, find-my-lineup recovery, payback/referral details, and the remaining launch checks are not built.
+**Status:** partly implemented in development. The private `/lineup` page shows saved or confirmed non-binding interest and project allocations. Signed-in investors can review and sign the exact saved choices at `/lineup/confirm`, and original-browser guests can explicitly claim matching-email interest after sign-in. Eligible public project totals count confirmed allocations only; hidden or unapproved projects do not display public totals. A private signed-interest result/share card and lineup figures based on real confirmed totals and the project's current payback offer are built. Referral counts have no approved definition or tracking source yet; analytics and the full filmmaker flow check remain open. The owner has deferred investor confirmation email for now, and email-dependent lineup recovery remains pending until email setup is revisited.
 **Deliverables:**
 
 - Investor result/share card and non-binding pledge-confirmation email containing the signed indication, securities notice, and required disclosures.
@@ -97,8 +97,9 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 - Private, view-only `/lineup` with confirmed status, per-project pledge and payback goals, live confirmed totals, and referral count; do not display private contact or accreditation details.
 - Find-my-lineup email flow with a uniform response and the specified rate limits.
 - Investor analytics events and final copy/disclosure audit.
+- End-to-end filmmaker flow check in development: sign-in and original-browser guest claim, starting and resuming a worksheet, submitting a project, managing and reopening it from My projects, public showcase eligibility, and the in-app alert after a genuine confirmed interest action. Do not fabricate confirmations or claim provider-dependent or production-domain checks passed when they cannot run.
 
-**Gate:** Visual Guide scenarios I7–I12 pass where possible before launch; final domain/provider checks remain in Phase 6.
+**Gate:** Visual Guide scenarios I7–I12 and the end-to-end filmmaker path pass where possible before launch; final domain/provider rechecks remain in Phase 6.
 
 ## Phase 6 — Final hardening and launch (after Phase 8)
 

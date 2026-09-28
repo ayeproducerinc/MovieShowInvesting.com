@@ -19,6 +19,11 @@
 .lineup-project-detail { min-width:0; }
 .lineup-project-detail h3 { font:400 clamp(31px,4vw,46px)/1.05 var(--app-font-serif); letter-spacing:-.03em; overflow-wrap:anywhere; margin:7px 0 12px; }
 .lineup-project-link { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--iv-wine); text-decoration:underline; text-underline-offset:4px; }
+.lineup-project-figures { margin-top:15px; color:#596064; font-size:12px; line-height:1.55; }
+.lineup-project-figures p { margin:5px 0; }
+.lineup-history-projects { list-style:none; margin:12px 0 0; padding:0; }
+.lineup-history-projects li { padding:12px 0; border-top:1px solid var(--iv-line); }
+.lineup-history-projects li strong { color:var(--iv-ink); }
 .lineup-row-amount { text-align:right; }
 .lineup-row-amount span { display:block; color:#687070; font:700 10px var(--app-font-mono); text-transform:uppercase; letter-spacing:.08em; }
 .lineup-row-amount strong { display:block; margin-top:7px; font:400 clamp(30px,4vw,45px)/1 var(--app-font-serif); }

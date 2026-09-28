@@ -21,7 +21,7 @@ export function ProjectShare({ slug, title, genre }: { slug: string; title: stri
   async function share() {
     if (!navigator.share) { await copy(); return; }
     try {
-      await navigator.share({ title: `${title} | Movie Show Investing`, text: `Take a look at ${title}. Investor pledges are not open yet.`, url });
+      await navigator.share({ title: `${cardTitle} | Movie Show Investing`, text: `Take a look at ${cardTitle}. You can express non-binding interest; no investment or payment is available.`, url });
       setFeedback('Share sheet opened.');
     } catch (error) {
       if ((error as DOMException).name !== 'AbortError') setFeedback('Sharing was unavailable. You can copy the link instead.');
@@ -32,7 +32,7 @@ export function ProjectShare({ slug, title, genre }: { slug: string; title: stri
     <h2>Pass the story along.</h2>
     <div className="dossier-share" aria-label="Project share card without financial terms">
       <span className="dossier-kicker">Movie Show Investing / An unlisted project</span>
-      <div><h2 data-testid="text-share-title">{cardTitle}</h2><p>A story in the making. Investor pledges are not open yet.</p></div>
+       <div><h2 data-testid="text-share-title">{cardTitle}</h2><p>A story in the making. Express non-binding interest; no investment or payment is available.</p></div>
       <span className="dossier-kicker">{genre || 'Independent film'} / Prelaunch</span>
     </div>
     <p className="dossier-status">This is an unlisted page, not a confidential one. Anyone with the link can view it. No investment is open.</p>
