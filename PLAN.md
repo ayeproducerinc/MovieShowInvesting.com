@@ -89,7 +89,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 8 — Pledge confirmation and lineup
 
-**Status:** partly implemented in development. The private `/lineup` page now shows the current saved, unconfirmed investor interest and project allocations using the existing account/visitor-scoped endpoint; signed confirmation, confirmed-only public totals, email recovery, and the rest of this phase have not started.
+**Status:** partly implemented in development. The private `/lineup` page shows saved or confirmed non-binding interest and project allocations. Signed-in investors can review and sign the exact saved choices at `/lineup/confirm`, and original-browser guests can explicitly claim matching-email interest after sign-in. Eligible public project totals count confirmed allocations only; hidden or unapproved projects do not display public totals. Result/share cards, confirmation email, find-my-lineup recovery, payback/referral details, and the remaining launch checks are not built.
 **Deliverables:**
 
 - Investor result/share card and non-binding pledge-confirmation email containing the signed indication, securities notice, and required disclosures.

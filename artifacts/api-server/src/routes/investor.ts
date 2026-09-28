@@ -2,6 +2,9 @@ import cookieParser from "cookie-parser";
 import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import {
+  ConfirmInvestorIntentBody,
+  ConfirmInvestorIntentResponse,
+  ClaimInvestorIntentResponse,
   GetCurrentInvestorIntentResponse,
   MatchInvestorBody,
   MatchInvestorResponse,
@@ -50,6 +53,9 @@ type InvestorRow = {
   stages: string[] | null;
   minima: Minimums | null;
   call_opt_in: boolean | null;
+  signature_name: string | null;
+  signed_at: Date | null;
+  confirmed_at: Date | null;
   firebase_uid: string | null;
   replit_uid: string | null;
   visitor_id: string | null;
@@ -301,6 +307,9 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
     if (visitorOwner && !identity && visitorOwner.email?.trim().toLowerCase() !== email) {
       conflict = "This visitor already has an investor intent with a different email.";
     }
+    if (existing?.confirmed_at && !conflict) {
+      conflict = "This investor interest has already been confirmed and cannot be replaced.";
+    }
 
     if (conflict) {
       await client.query("rollback");
@@ -435,7 +444,7 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
     return;
   }
 
-  const { rows: pendingAllocations } = await pool.query<{
+  const { rows: savedAllocations } = await pool.query<{
     project_id: number | null;
     amount: number;
     project_title: string | null;
@@ -446,15 +455,15 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
        coalesce(p.approved = true and p.showcase_requested = true and p.hidden = false
          and p.stage in ('idea', 'production', 'distribution'), false) as project_visible
      from pledges pl left join projects p on p.id = pl.project_id
-     where pl.investor_id = $1 and pl.confirmed = false order by pl.id`,
-    [investor.id],
+     where pl.investor_id = $1 and pl.confirmed = $2 order by pl.id`,
+    [investor.id, investor.confirmed_at !== null],
   );
   const intent = {
     investor_id: investor.id,
     name: investor.name ?? "",
     email: investor.email ?? "",
     amount: investor.investment_amount ?? Number.parseInt(investor.amount_choice ?? "0", 10),
-    allocations: pendingAllocations
+    allocations: savedAllocations
       .filter((allocation): allocation is typeof allocation & { project_id: number } => allocation.project_id !== null)
       .map((allocation) => ({
         project_id: allocation.project_id,
@@ -464,6 +473,8 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
         project_visible: allocation.project_visible,
       })),
     unallocated: investor.unallocated ?? false,
+    status: investor.confirmed_at ? "confirmed" : "saved",
+    confirmed_at: investor.confirmed_at?.toISOString() ?? null,
     accredited: investor.accredited === "yes",
     experience: investor.experience ?? [],
     motivations: investor.motivations ?? [],
@@ -478,6 +489,155 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
     zip: investor.zip,
   };
   res.json(GetCurrentInvestorIntentResponse.parse({ intent }));
+});
+
+router.post("/investor/intents/claim", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const identity = await resolveProtectedIdentity(req, res, true);
+  if (!identity) return;
+  const cookieCandidate = req.cookies?.[VISITOR_COOKIE];
+  const visitorId = typeof cookieCandidate === "string" && UUID.test(cookieCandidate) ? cookieCandidate : null;
+  if (!visitorId) {
+    res.status(404).json({ error: "No saved guest interest is available in this browser." });
+    return;
+  }
+
+  const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    for (const lockKey of [
+      `investor:email:${identity.email}`,
+      `investor:visitor:${visitorId}`,
+      `investor:${identity.provider}:${identity.uid}`,
+    ].sort()) {
+      await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [lockKey]);
+    }
+    const { rows: visitors } = await client.query<InvestorRow>(
+      "select * from investors where visitor_id = $1 for update", [visitorId],
+    );
+    const guest = visitors[0];
+    if (!guest) {
+      await client.query("rollback");
+      res.status(404).json({ error: "No saved guest interest is available in this browser." });
+      return;
+    }
+    if (guest.email?.trim().toLowerCase() !== identity.email
+      || (guest.firebase_uid && (identity.provider !== "firebase" || guest.firebase_uid !== identity.uid))
+      || (guest.replit_uid && (identity.provider !== "replit" || guest.replit_uid !== identity.uid))) {
+      await client.query("rollback");
+      res.status(403).json({ error: "This browser's saved interest does not belong to the verified account." });
+      return;
+    }
+    const { rows: accountRows } = await client.query<InvestorRow>(
+      `select * from investors where ${uidColumn} = $1 for update`, [identity.uid],
+    );
+    if (accountRows[0] && accountRows[0].id !== guest.id) {
+      await client.query("rollback");
+      res.status(409).json({ error: "This account already has a different investor interest record." });
+      return;
+    }
+    if (!accountRows[0]) {
+      await client.query(`update investors set ${uidColumn} = $1 where id = $2`, [identity.uid, guest.id]);
+    }
+    await client.query("commit");
+    res.json(ClaimInvestorIntentResponse.parse({ investor_id: guest.id, status: "linked" }));
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+});
+
+router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const identity = await resolveProtectedIdentity(req, res, true);
+  if (!identity) return;
+  const parsed = ConfirmInvestorIntentBody.safeParse(req.body);
+  if (!parsed.success || parsed.data.accepted !== true) {
+    res.status(400).json({ error: "A valid signature and explicit acknowledgment are required." });
+    return;
+  }
+  const submitted = parsed.data;
+  const signature = submitted.signature_name.trim().replace(/\s+/g, " ");
+  const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [
+      `investor:${identity.provider}:${identity.uid}`,
+    ]);
+    const { rows } = await client.query<InvestorRow>(
+      `select * from investors where ${uidColumn} = $1 for update`, [identity.uid],
+    );
+    const investor = rows[0];
+    if (!investor) {
+      await client.query("rollback");
+      res.status(404).json({ error: "No saved investor interest is linked to this account. Link your guest interest in its original browser first." });
+      return;
+    }
+    if (investor.email?.trim().toLowerCase() !== identity.email) {
+      await client.query("rollback");
+      res.status(403).json({ error: "This investor interest is not associated with the verified account email." });
+      return;
+    }
+    if (signature.toLocaleLowerCase() !== (investor.name ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase()) {
+      await client.query("rollback");
+      res.status(400).json({ error: "Type the full name saved with this interest to sign it." });
+      return;
+    }
+    const amount = investor.investment_amount ?? Number.parseInt(investor.amount_choice ?? "0", 10);
+    const { rows: pledges } = await client.query<{ id: number; project_id: number | null; amount: number; confirmed: boolean }>(
+      "select id, project_id, amount, confirmed from pledges where investor_id = $1 order by id for update",
+      [investor.id],
+    );
+    const expected = submitted.allocations.map(a => `${a.project_id}:${a.amount}`).sort();
+    const actual = pledges.map(p => `${p.project_id}:${p.amount}`).sort();
+    if (amount !== submitted.amount || expected.length !== actual.length || expected.some((item, index) => item !== actual[index])) {
+      await client.query("rollback");
+      res.status(409).json({ error: "Your saved amount or project choices changed. Review the lineup and try again." });
+      return;
+    }
+    if (investor.confirmed_at) {
+      if (investor.signature_name?.trim().toLocaleLowerCase() !== signature.toLocaleLowerCase()
+        || pledges.some(p => !p.confirmed)) {
+        await client.query("rollback");
+        res.status(409).json({ error: "This interest was already confirmed with a different signature or state." });
+        return;
+      }
+      await client.query("commit");
+      res.json(ConfirmInvestorIntentResponse.parse({
+        investor_id: investor.id, status: "confirmed", confirmed_at: investor.confirmed_at.toISOString(),
+      }));
+      return;
+    }
+    if (!Number.isSafeInteger(amount) || amount < 100
+      || (investor.unallocated ? pledges.length !== 0 : pledges.length === 0 || pledges.some(p => p.project_id === null)
+        || pledges.reduce((sum, p) => sum + p.amount, 0) !== amount)
+      || pledges.some(p => p.confirmed)) {
+      await client.query("rollback");
+      res.status(409).json({ error: "This saved interest is incomplete or has already changed. It cannot be confirmed." });
+      return;
+    }
+    // The investor confirms the exact saved choices, not a new public listing.
+    // An already-saved project may later be hidden; public totals still exclude
+    // hidden projects, while deleted projects are refused above (null project_id).
+    await client.query("update pledges set confirmed = true where investor_id = $1 and confirmed = false", [investor.id]);
+    const { rows: updated } = await client.query<{ confirmed_at: Date }>(
+      "update investors set signature_name = $1, signed_at = now(), confirmed_at = now() where id = $2 returning confirmed_at",
+      [signature, investor.id],
+    );
+    await client.query("commit");
+    res.json(ConfirmInvestorIntentResponse.parse({
+      investor_id: investor.id, status: "confirmed", confirmed_at: updated[0].confirmed_at.toISOString(),
+    }));
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
 });
 
 export default router;

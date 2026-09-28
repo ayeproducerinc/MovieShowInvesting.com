@@ -8,8 +8,10 @@ import { InvestorProjectCard } from '@/components/investor-project-card';
 import { LocationPicker } from '@/components/location-picker';
 import { cap, selectAutoBuildProjects, split } from '@/lib/investor-lineup';
 import { useAuth } from '@workspace/replit-auth-web';
-import { useFirebaseUser } from '@/components/firebase-bootstrap';
+import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
+import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import '../investor.css';
+import '../lineup.css';
 
 type Answers = InvestorIntentInput & { terms_read:boolean; location_manual:boolean; lineup: {project_id:number; amount:number}[] };
 const blank: Answers = { amount:100, name:'', email:'', phone:'', city:'', state:'', country:'', zip:'', location_manual:false, accredited:false, experience:[], motivations:[], favorite_genres:[], stages:[], minima:{distribution:null,production:null,idea:null}, allocations:[], unallocated:false, call_opt_in:false, terms_read:false, lineup:[] };
@@ -55,18 +57,25 @@ function GuestDraftConflictState() {
 export function InvestorDone() {
   const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
+  const firebaseReady = useFirebaseSessionReady();
+  const queryClient = useQueryClient();
+  const signedIn = Boolean(replitAuth.user || firebaseUser);
+  const ready = !replitAuth.isLoading && firebaseReady;
   const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
-  const current = useGetCurrentInvestorIntent({ query: { queryKey: [...getGetCurrentInvestorIntentQueryKey(), identityId], enabled: !replitAuth.isLoading } });
-  if (replitAuth.isLoading) return <section className="inv"><div className="page-wrap inv-state" role="status" aria-label="Checking sign-in"><div className="inv-skeleton" style={{height:95}}/><div className="inv-skeleton"/></div></section>;
+  const current = useGetCurrentInvestorIntent({ query: { queryKey: [...getGetCurrentInvestorIntentQueryKey(), identityId], enabled: ready, refetchOnMount: 'always' } });
+  if (!ready) return <section className="inv"><div className="page-wrap inv-state" role="status" aria-label="Checking sign-in"><div className="inv-skeleton" style={{height:95}}/><div className="inv-skeleton"/></div></section>;
   return <section className="inv"><div className="page-wrap">
-    {current.isLoading ? <div className="inv-state" aria-label="Loading saved interest"><div className="inv-skeleton" style={{height:95}}/><div className="inv-skeleton"/></div> :
+    {current.isPending || current.isFetching ? <div className="inv-state" role="status" aria-label="Loading saved interest"><div className="inv-skeleton" style={{height:95}}/><div className="inv-skeleton"/></div> :
     current.isError ? <ErrorState retry={()=>void current.refetch()}/> :
     current.data?.intent ? <div className="inv-state" style={{maxWidth:850}}>
-      <p className="inv-kicker">Interest saved / The next chapter</p><h1>Thank you, {current.data.intent.name.split(' ')[0]}.</h1>
-      <p data-testid="text-intent-saved">Your non-binding interest of {dollars(current.data.intent.amount)} has been saved. No money has been collected, and you have not made an investment. A signed confirmation step is not available yet.</p>
-      <p>Returns aren’t guaranteed. You may get back less, or nothing. We’ll use the details you shared to keep you informed about what happens next.</p>
-       <div className="inv-actions"><Link href="/lineup" className="inv-button" data-testid="link-done-lineup">View my saved lineup <ArrowRight size={16}/></Link><Link href="/explore" className="inv-button secondary" data-testid="link-done-explore">Explore projects</Link><Link href="/messages" className="inv-button secondary" data-testid="link-done-messages">Messages</Link></div>
-    </div> : <div className="inv-state"><p className="inv-kicker">Nothing saved yet</p><h1>Your story starts here.</h1><p>There is no saved investor interest associated with this visit.</p><Link className="inv-button" href="/invest" data-testid="link-done-invest">Start the worksheet <ArrowRight size={16}/></Link></div>}
+      <p className="inv-kicker">{current.data.intent.status === 'confirmed' ? 'Interest confirmed / Private record' : 'Interest saved / The next chapter'}</p><h1>{current.data.intent.status === 'confirmed' ? 'Your interest is confirmed.' : `Thank you, ${current.data.intent.name.split(' ')[0]}.`}</h1>
+      <p data-testid="text-intent-saved">Your non-binding interest of {dollars(current.data.intent.amount)} is {current.data.intent.status === 'confirmed' ? 'confirmed' : 'saved, but not confirmed'}. Returns aren’t guaranteed. You may get back less, or nothing.</p>
+      <p>No money has been collected, and you have not made an investment.</p>
+      {current.data.intent.status === 'confirmed' && <div className="lineup-done-allocations" data-testid="done-confirmed-allocations"><p className="inv-kicker">Confirmed project choices</p>{current.data.intent.unallocated ? <p>{dollars(current.data.intent.amount)} is unallocated to projects.</p> : current.data.intent.allocations.length ? <ul>{current.data.intent.allocations.map(row => <li key={row.project_id} data-testid={`done-allocation-${row.project_id}`}><span>{row.project_title ?? `Project #${row.project_id}`}</span><strong>{dollars(row.amount)}</strong></li>)}</ul> : <p>No project allocations are on record.</p>}</div>}
+      <p>Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.</p>
+      <div className="inv-actions">{current.data.intent.status === 'saved' && (signedIn ? <Link href="/lineup/confirm" className="inv-button" data-testid="link-done-confirm">Review & confirm <ArrowRight size={16}/></Link> : <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-done-sign-in" label="Sign in to confirm" />)}<Link href="/lineup" className={`inv-button ${current.data.intent.status === 'saved' ? 'secondary' : ''}`} data-testid="link-done-lineup">View my {current.data.intent.status === 'confirmed' ? 'confirmed' : 'saved'} lineup <ArrowRight size={16}/></Link><Link href="/explore" className="inv-button secondary" data-testid="link-done-explore">Explore projects</Link></div>
+      {!signedIn && current.data.intent.status === 'saved' && <p className="inv-small">If this is guest interest, sign in and explicitly claim it from this original browser on your lineup if it is not linked to your account.</p>}
+    </div> : <div className="inv-state"><p className="inv-kicker">Nothing linked yet</p><h1>Your story starts here.</h1><p>There is no saved investor interest associated with this {signedIn ? 'account' : 'visit'}. {signedIn ? 'If you saved as a guest in this browser, choose to claim it from your lineup.' : ''}</p><div className="inv-actions">{signedIn && <Link className="inv-button" href="/lineup" data-testid="link-done-claim">Check for guest interest <ArrowRight size={16}/></Link>}<Link className="inv-button secondary" href="/invest" data-testid="link-done-invest">Start the worksheet <ArrowRight size={16}/></Link></div></div>}
   </div></section>;
 }
 

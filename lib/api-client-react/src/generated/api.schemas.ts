@@ -693,6 +693,43 @@ export interface InvestorIntentResult {
   status: 'saved';
 }
 
+export interface InvestorIntentClaimResult {
+  /** @minimum 1 */
+  investor_id: number;
+  status: 'linked';
+}
+
+export interface InvestorIntentConfirmationInput {
+  /**
+     * @minLength 2
+     * @maxLength 120
+     */
+  signature_name: string;
+  accepted: true;
+  /**
+     * @minimum 100
+     * @maximum 2147483647
+     */
+  amount: number;
+  /** @maxItems 5 */
+  allocations: InvestorAllocationInput[];
+}
+
+export interface InvestorIntentConfirmationResult {
+  /** @minimum 1 */
+  investor_id: number;
+  status: 'confirmed';
+  confirmed_at: string;
+}
+
+export type InvestorIntentViewStatus = typeof InvestorIntentViewStatus[keyof typeof InvestorIntentViewStatus];
+
+
+export const InvestorIntentViewStatus = {
+  saved: 'saved',
+  confirmed: 'confirmed',
+} as const;
+
 export interface InvestorIntentView {
   /** @minimum 1 */
   investor_id: number;
@@ -705,6 +742,9 @@ export interface InvestorIntentView {
   amount: number;
   allocations: InvestorAllocationView[];
   unallocated: boolean;
+  status: InvestorIntentViewStatus;
+  /** @nullable */
+  confirmed_at: string | null;
   accredited: boolean;
   experience: string[];
   motivations: string[];

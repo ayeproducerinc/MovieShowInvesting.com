@@ -1060,12 +1060,19 @@ export async function getPublicProjectBySlug(slug: string) {
     .leftJoin(filmmakersTable, eq(projectsTable.filmmakerId, filmmakersTable.id))
     .where(and(eq(projectsTable.slug, slug), eq(projectsTable.hidden, false)));
   if (!project?.slug || !project.title) return null;
-  const [pledges] = await db.select({ total: sql<number>`coalesce(sum(${schema.pledgesTable.amount}), 0)` })
-    .from(schema.pledgesTable)
-    .where(and(
-      eq(schema.pledgesTable.projectId, project.id),
-      eq(schema.pledgesTable.confirmed, true),
-    ));
+  // An unlisted project page can remain reachable while the project is not
+  // eligible for Explore. Do not publish its historical confirmed interest.
+  let confirmedPledgeTotal = 0;
+  if (project.approved === true && project.showcaseRequested === true
+    && ["idea", "production", "distribution"].includes(project.stage ?? "")) {
+    const [pledges] = await db.select({ total: sql<number>`coalesce(sum(${schema.pledgesTable.amount}), 0)` })
+      .from(schema.pledgesTable)
+      .where(and(
+        eq(schema.pledgesTable.projectId, project.id),
+        eq(schema.pledgesTable.confirmed, true),
+      ));
+    confirmedPledgeTotal = Number(pledges.total);
+  }
   let phoneVerified = Boolean(project.phoneVerified);
   if (!phoneVerified && project.firebaseUid) {
     const [accountPhone] = await db.select({ id: filmmakersTable.id })
@@ -1091,7 +1098,7 @@ export async function getPublicProjectBySlug(slug: string) {
     trailerUrl: project.trailerUrl,
     posterUrl: project.posterUrl,
     shareImageUrl: project.shareImageUrl,
-    confirmedPledgeTotal: Number(pledges.total),
+    confirmedPledgeTotal,
     approved: project.approved,
     showcaseRequested: Boolean(project.showcaseRequested),
     phoneVerified,

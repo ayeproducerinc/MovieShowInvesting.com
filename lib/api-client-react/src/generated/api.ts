@@ -61,6 +61,9 @@ import type {
   FlowProgress,
   GetExploreParams,
   HealthStatus,
+  InvestorIntentClaimResult,
+  InvestorIntentConfirmationInput,
+  InvestorIntentConfirmationResult,
   InvestorIntentCurrent,
   InvestorIntentInput,
   InvestorIntentResult,
@@ -3209,6 +3212,170 @@ export function useGetCurrentInvestorIntent<TData = Awaited<ReturnType<typeof ge
 
 
 
+
+export const getClaimInvestorIntentUrl = () => {
+
+
+
+
+  return `/api/investor/intents/claim`
+}
+
+/**
+ * Requires the original visitor cookie and a verified account whose email matches the saved guest intent. Does not alter the amount or allocations.
+ * @summary Link an unclaimed guest intent from this browser to the verified account
+ */
+export const claimInvestorIntent = async ( options?: Parameters<typeof customFetch>[1]): Promise<InvestorIntentClaimResult> => {
+
+  return customFetch<InvestorIntentClaimResult>(getClaimInvestorIntentUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getClaimInvestorIntentMutationKey = () => ['claimInvestorIntent'] as const;
+
+export const getClaimInvestorIntentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimInvestorIntent>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimInvestorIntent>>, TError,void, TContext> => {
+
+const mutationKey = getClaimInvestorIntentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimInvestorIntent>>, void> = () => {
+
+
+          return  claimInvestorIntent(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimInvestorIntentMutationResult = NonNullable<Awaited<ReturnType<typeof claimInvestorIntent>>>
+
+    export type ClaimInvestorIntentMutationError = ErrorType<void>
+
+
+    /**
+ * @summary Link an unclaimed guest intent from this browser to the verified account
+ */
+export const useClaimInvestorIntent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimInvestorIntent>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimInvestorIntent>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClaimInvestorIntentMutationOptions(options));
+    }
+
+export const getConfirmInvestorIntentUrl = () => {
+
+
+
+
+  return `/api/investor/intents/confirm`
+}
+
+/**
+ * Confirmation is idempotent for the same saved interest. No money is collected. Project allocations become public-count eligible only on successful confirmation.
+ * @summary Sign and confirm the account's saved non-binding interest
+ */
+export const confirmInvestorIntent = async (investorIntentConfirmationInput: InvestorIntentConfirmationInput, options?: Parameters<typeof customFetch>[1]): Promise<InvestorIntentConfirmationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InvestorIntentConfirmationResult>(getConfirmInvestorIntentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(investorIntentConfirmationInput)
+  }
+);}
+
+
+
+
+
+export const getConfirmInvestorIntentMutationKey = () => ['confirmInvestorIntent'] as const;
+
+export const getConfirmInvestorIntentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmInvestorIntent>>, TError,ConfirmInvestorIntentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmInvestorIntent>>, TError,ConfirmInvestorIntentMutationVariables, TContext> => {
+
+const mutationKey = getConfirmInvestorIntentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmInvestorIntent>>, ConfirmInvestorIntentMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  confirmInvestorIntent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmInvestorIntentMutationResult = NonNullable<Awaited<ReturnType<typeof confirmInvestorIntent>>>
+    export type ConfirmInvestorIntentMutationBody = BodyType<InvestorIntentConfirmationInput>
+    export type ConfirmInvestorIntentMutationError = ErrorType<void>
+    export type ConfirmInvestorIntentMutationVariables = {data: BodyType<InvestorIntentConfirmationInput>}
+
+    /**
+ * @summary Sign and confirm the account's saved non-binding interest
+ */
+export const useConfirmInvestorIntent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmInvestorIntent>>, TError,ConfirmInvestorIntentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmInvestorIntent>>,
+        TError,
+        ConfirmInvestorIntentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getConfirmInvestorIntentMutationOptions(options));
+    }
 
 export const getGetMessagingConfigUrl = () => {
 

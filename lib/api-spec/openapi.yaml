@@ -930,6 +930,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/InvestorIntentCurrent"
         "401": { description: Supplied bearer token is invalid }
+  /investor/intents/claim:
+    post:
+      operationId: claimInvestorIntent
+      tags: [investor]
+      summary: Link an unclaimed guest intent from this browser to the verified account
+      description: Requires the original visitor cookie and a verified account whose email matches the saved guest intent. Does not alter the amount or allocations.
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Guest intent is linked to the account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestorIntentClaimResult"
+        "401": { description: Verified sign-in required }
+        "403": { description: Account email does not match or visitor belongs to another account }
+        "404": { description: No guest intent on this browser }
+        "409": { description: Account already has a different investor intent }
+  /investor/intents/confirm:
+    post:
+      operationId: confirmInvestorIntent
+      tags: [investor]
+      summary: Sign and confirm the account's saved non-binding interest
+      description: Confirmation is idempotent for the same saved interest. No money is collected. Project allocations become public-count eligible only on successful confirmation.
+      security:
+        - firebaseBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestorIntentConfirmationInput"
+      responses:
+        "200":
+          description: Interest confirmed, or identical confirmation already recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestorIntentConfirmationResult"
+        "400": { description: Signature or acknowledgment is invalid }
+        "401": { description: Verified sign-in required }
+        "403": { description: Account email does not match the saved interest }
+        "404": { description: No saved intent for this account }
+        "409": { description: "Saved amount or project choices changed, or a selected project is no longer available" }
   /messaging/config:
     get:
       operationId: getMessagingConfig
@@ -1761,10 +1806,38 @@ components:
       properties:
         investor_id: { type: integer, minimum: 1 }
         status: { type: string, const: saved }
+    InvestorIntentClaimResult:
+      type: object
+      additionalProperties: false
+      required: [investor_id, status]
+      properties:
+        investor_id: { type: integer, minimum: 1 }
+        status: { type: string, const: linked }
+    InvestorIntentConfirmationInput:
+      type: object
+      additionalProperties: false
+      required: [signature_name, accepted, amount, allocations]
+      properties:
+        signature_name: { type: string, minLength: 2, maxLength: 120 }
+        accepted: { type: boolean, const: true }
+        amount: { type: integer, minimum: 100, maximum: 2147483647 }
+        allocations:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/InvestorAllocationInput"
+    InvestorIntentConfirmationResult:
+      type: object
+      additionalProperties: false
+      required: [investor_id, status, confirmed_at]
+      properties:
+        investor_id: { type: integer, minimum: 1 }
+        status: { type: string, const: confirmed }
+        confirmed_at: { type: string, format: date-time }
     InvestorIntentView:
       type: object
       additionalProperties: false
-      required: [investor_id, name, email, amount, allocations, unallocated, accredited, experience, motivations, favorite_genres, stages, minima, call_opt_in]
+      required: [investor_id, name, email, amount, allocations, unallocated, status, confirmed_at, accredited, experience, motivations, favorite_genres, stages, minima, call_opt_in]
       properties:
         investor_id: { type: integer, minimum: 1 }
         name: { type: string }
@@ -1775,6 +1848,8 @@ components:
           items:
             $ref: "#/components/schemas/InvestorAllocationView"
         unallocated: { type: boolean }
+        status: { type: string, enum: [saved, confirmed] }
+        confirmed_at: { type: ["string", "null"], format: date-time }
         accredited: { type: boolean }
         experience:
           type: array

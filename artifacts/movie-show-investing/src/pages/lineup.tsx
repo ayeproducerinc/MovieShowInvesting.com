@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { ArrowRight, RotateCcw } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@workspace/replit-auth-web';
-import { getGetCurrentInvestorIntentQueryKey, useGetCurrentInvestorIntent } from '@workspace/api-client-react';
+import { getGetCurrentInvestorIntentQueryKey, useClaimInvestorIntent, useGetCurrentInvestorIntent } from '@workspace/api-client-react';
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import '../investor.css';
@@ -22,6 +23,8 @@ export default function Lineup() {
   const signedIn = Boolean(replitAuth.user || firebaseUser);
   const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
   const ready = !replitAuth.isLoading && firebaseReady;
+  const claim = useClaimInvestorIntent();
+  const [claimError, setClaimError] = useState('');
   const current = useGetCurrentInvestorIntent({
     query: {
       queryKey: [...getGetCurrentInvestorIntentQueryKey(), identityId],
@@ -32,37 +35,47 @@ export default function Lineup() {
   });
   const intent = current.data?.intent;
   const allocated = intent?.allocations.reduce((sum, row) => sum + row.amount, 0) ?? 0;
-  const allInterestIsPending = Boolean(intent && (intent.unallocated || allocated === intent.amount));
+  const confirmed = intent?.status === 'confirmed';
+  async function claimGuestInterest() {
+    setClaimError('');
+    try {
+      await claim.mutateAsync();
+      await queryClient.invalidateQueries({ queryKey: getGetCurrentInvestorIntentQueryKey() });
+    } catch {
+      setClaimError('We couldn’t link guest interest to this account. This only works in the original browser with a matching verified email. No interest was changed.');
+    }
+  }
 
   return <section className="inv lineup-page"><div className="page-wrap">
     <div className="inv-top"><Link href="/explore" className="inv-kicker">Movie Show Investing / Explore</Link><span className="inv-kicker">Private view</span></div>
     <div className="lineup-heading">
-      <p className="inv-kicker">Your investor desk / Saved interest</p>
-      <h1>Your saved <em>lineup.</em></h1>
-      <p>This is a record of your non-binding interest, not a signed pledge or an investment. No money has been collected.</p>
+      <p className="inv-kicker">Your investor desk / Private record</p>
+      <h1>Your <em>lineup.</em></h1>
+      <p>Your saved interest and project choices live here. Confirmation records your acknowledgment, but does not make an investment. No money has been collected.</p>
     </div>
 
-    {!ready || current.isPending ? <div className="lineup-loading" role="status" aria-label="Loading your saved lineup"><div className="inv-skeleton" style={{height:120}}/><div className="inv-skeleton" style={{height:180}}/></div> :
+    {!ready || current.isPending || current.isFetching ? <div className="lineup-loading" role="status" aria-label="Loading your saved lineup"><div className="inv-skeleton" style={{height:120}}/><div className="inv-skeleton" style={{height:180}}/></div> :
     current.isError ? <div className="lineup-empty" role="alert"><p className="inv-kicker">Connection interrupted</p><h2>We couldn’t open your lineup.</h2><p>Your saved interest has not been changed. Please try again.</p><button type="button" className="inv-button" onClick={() => void current.refetch()} data-testid="button-retry-lineup"><RotateCcw size={16}/> Try again</button></div> :
-    !intent ? <div className="lineup-empty" data-testid="lineup-empty"><p className="inv-kicker">{signedIn ? 'No saved interest found' : 'Private lineup'}</p><h2>{signedIn ? 'Nothing is linked to this account.' : 'Sign in to see your saved lineup.'}</h2><p>{signedIn ? 'If you saved with a different account, sign out and use that account instead. An unlinked guest lineup is only available when signed out in its original browser.' : 'Use the same account you used to save your interest. If you saved as a guest, return to the original browser while signed out.'}</p><div className="inv-actions">{!signedIn && <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-lineup-sign-in" label="Sign in to view lineup" />}<Link href="/invest" className="inv-button secondary" data-testid="link-lineup-invest">Start the investor worksheet <ArrowRight size={16}/></Link></div></div> :
+    !intent ? <div className="lineup-empty" data-testid="lineup-empty"><p className="inv-kicker">{signedIn ? 'No linked interest' : 'Private lineup'}</p><h2>{signedIn ? 'Nothing is linked to this account.' : 'Sign in to see your saved lineup.'}</h2><p>{signedIn ? 'Saved as a guest in this browser? You can choose to link that original-browser interest to your signed-in account. The verified account email must match the guest record. We will never link it automatically.' : 'Sign in with the account you used to save interest. If you saved as a guest, return to the original browser to find that record.'}</p><div className="inv-actions">{signedIn ? <button type="button" className="inv-button" data-testid="button-claim-guest-intent" disabled={claim.isPending} onClick={() => void claimGuestInterest()}>{claim.isPending ? 'Checking original-browser interest…' : 'Claim guest interest from this browser'} <ArrowRight size={16}/></button> : <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-lineup-sign-in" label="Sign in to view lineup" />}<Link href="/invest" className="inv-button secondary" data-testid="link-lineup-invest">Start the investor worksheet <ArrowRight size={16}/></Link></div>{claimError && <p role="alert" className="lineup-claim-error" data-testid="error-claim-intent">{claimError}</p>}</div> :
     <>
       <div className="lineup-summary" data-testid="lineup-summary">
-        <div><span className="inv-kicker">Total saved interest / USD</span><strong data-testid="lineup-total">{dollars(intent.amount)}</strong></div>
-        <div className="lineup-summary-status"><span className="lineup-status">{allInterestIsPending ? 'Saved · Not confirmed' : 'Saved interest · Partial view'}</span><p>{allInterestIsPending ? 'View-only for now. A separate signed confirmation step is not available yet.' : 'Only unconfirmed project choices appear below. The saved total includes interest not shown in these choices.'}</p></div>
+        <div className="lineup-summary-main"><span className="inv-kicker">Total {confirmed ? 'confirmed' : 'saved'} interest / USD</span><strong data-testid="lineup-total">{dollars(intent.amount)}</strong><p className="lineup-risk">Returns aren’t guaranteed. You may get back less, or nothing.</p></div>
+        <div className="lineup-summary-status"><span className="lineup-status" data-testid="status-lineup">{confirmed ? 'Confirmed · Non-binding' : 'Saved · Not confirmed'}</span><p>{confirmed ? `Confirmed${intent.confirmed_at ? ` on ${new Date(intent.confirmed_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}. No investment or payment has been made.` : 'Your saved interest is awaiting your signed acknowledgment. No investment or payment has been made.'}</p></div>
       </div>
+      {confirmed ? <div className="lineup-confirm-callout lineup-confirmed" role="status"><div><p className="inv-kicker">Signed acknowledgment on record</p><h2>Interest confirmed.</h2><p>These are your confirmed non-binding allocations. You can return here any time to review them.</p></div></div> : signedIn ? <div className="lineup-confirm-callout"><div><p className="inv-kicker">Next step / Your acknowledgment</p><h2>Ready to confirm?</h2><p>Review the exact saved amount and allocations, then sign with your saved full name. Your interest remains non-binding.</p></div><Link href="/lineup/confirm" className="inv-button" data-testid="link-lineup-confirm">Review & confirm <ArrowRight size={16}/></Link></div> : <div className="lineup-confirm-callout"><div><p className="inv-kicker">Next step / Sign in</p><h2>Sign in to confirm.</h2><p>This guest interest is saved, but confirmation needs an account. After signing in, explicitly claim it from this original browser if it is not linked.</p></div><GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-lineup-confirm-sign-in" label="Sign in to confirm" /></div>}
       <div className="lineup-section-head"><div><p className="inv-kicker">Project choices</p><h2>{intent.unallocated ? 'Not allocated yet.' : 'Where your interest goes.'}</h2></div><span>{intent.allocations.length} {intent.allocations.length === 1 ? 'project' : 'projects'}</span></div>
-      {intent.unallocated ? <div className="lineup-unallocated" data-testid="lineup-unallocated"><strong>{dollars(intent.amount)} unallocated</strong><p>You saved interest without choosing a project. No project allocation has been recorded.</p></div> :
+      {intent.unallocated ? <div className="lineup-unallocated" data-testid="lineup-unallocated"><strong>{dollars(intent.amount)} unallocated</strong><p>You {confirmed ? 'confirmed' : 'saved'} interest without choosing a project. No project allocation has been recorded.</p></div> :
       intent.allocations.length ? <>
         <div className="lineup-rows">{intent.allocations.map((row, index) => {
           return <article className="lineup-row" key={row.project_id} data-testid={`lineup-project-${row.project_id}`}>
             <span className="lineup-number">{String(index + 1).padStart(2, '0')}</span>
-            <div className="lineup-project-detail"><p className="inv-kicker">{row.project_visible ? 'Approved project' : 'Not currently listed'}</p><h3>{row.project_title ?? `Project #${row.project_id}`}</h3>{row.project_visible && row.project_slug && <Link href={`/project/${row.project_slug}`} className="lineup-project-link">View project <ArrowRight size={14}/></Link>}</div>
-            <div className="lineup-row-amount"><span>Saved interest</span><strong>{dollars(row.amount)}</strong></div>
+             <div className="lineup-project-detail"><p className="inv-kicker">{row.project_visible ? 'Approved project' : 'Not currently listed'}</p><h3>{row.project_title ?? `Project #${row.project_id}`}</h3>{row.project_visible && row.project_slug && <Link href={`/project/${row.project_slug}`} className="lineup-project-link" data-testid={`link-lineup-project-${row.project_id}`}>View project <ArrowRight size={14}/></Link>}</div>
+             <div className="lineup-row-amount"><span>{confirmed ? 'Confirmed allocation' : 'Saved interest'}</span><strong>{dollars(row.amount)}</strong></div>
           </article>;
         })}</div>
-        {allocated < intent.amount && <p className="lineup-help" role="status">Your saved total includes {dollars(intent.amount - allocated)} that is not attached to an unconfirmed project choice shown here.</p>}
-      </> : <div className="lineup-unallocated" role="status"><strong>No project allocations are on record.</strong><p>Your saved total remains {dollars(intent.amount)}.</p></div>}
-      <p className="lineup-disclaimer">Pledges are non-binding. No money is collected. This is not an offer to sell securities. Returns aren’t guaranteed; you may get back less, or nothing.</p>
+        {allocated < intent.amount && <p className="lineup-help" role="status">Your {confirmed ? 'confirmed' : 'saved'} total includes {dollars(intent.amount - allocated)} not attached to a project choice shown here.</p>}
+      </> : <div className="lineup-unallocated" role="status"><strong>No project allocations are on record.</strong><p>Your {confirmed ? 'confirmed' : 'saved'} total remains {dollars(intent.amount)}.</p></div>}
+      <div className="lineup-legal"><p>Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.</p><p>No money is collected. This is not an offer to sell securities.</p></div>
       <div className="inv-actions lineup-actions"><Link href="/explore" className="inv-button secondary">Explore projects <ArrowRight size={16}/></Link><Link href="/messages" className="inv-button secondary">Messages <ArrowRight size={16}/></Link></div>
     </>}
   </div></section>;

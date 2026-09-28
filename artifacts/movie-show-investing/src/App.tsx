@@ -21,6 +21,7 @@ import NotFound from '@/pages/not-found';
 import Explore from '@/pages/explore';
 import Investor, { InvestorDone } from '@/pages/investor';
 import Lineup from '@/pages/lineup';
+import LineupConfirm from '@/pages/lineup-confirm';
 import Conversation from '@/pages/conversation';
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const metadata: Record<string, [string, string]> = {
   '/invest': ['Express interest | Movie Show Investing', 'Explore independent film projects and save non-binding investor interest. No money is collected.'],
   '/invest/done': ['Interest saved | Movie Show Investing', 'Your non-binding interest has been saved. No money has been collected.'],
   '/lineup': ['My saved lineup | Movie Show Investing', 'A private view of your saved, non-binding project interest. No money has been collected.'],
+  '/lineup/confirm': ['Review & confirm interest | Movie Show Investing', 'Review your saved amount and allocations and sign to confirm non-binding interest. No money is collected.'],
   '/messages': ['Messages | Movie Show Investing', 'Your private project conversations.'],
    '/start/filmmaker': ['Filmmaker worksheet | Movie Show Investing', 'Share your project and explore illustrative terms in a guided worksheet.'],
    '/start/filmmaker/done': ['Thank you | Movie Show Investing', 'Your filmmaker answers have been received.'],
@@ -85,6 +87,7 @@ function PublicPages() {
         <Route path="/invest/done" component={InvestorDone} />
         <Route path="/invest" component={Investor} />
         <Route path="/lineup" component={Lineup} />
+        <Route path="/lineup/confirm" component={LineupConfirm} />
         <Route path="/messages/:id" component={Conversation} />
         <Route path="/messages" component={Conversation} />
           <Route path="/start/filmmaker/done" component={FilmmakerDone} />

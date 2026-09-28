@@ -883,6 +883,8 @@ export const GetCurrentInvestorIntentResponse = zod.object({
   "project_visible": zod.boolean().describe('Whether the project is currently approved and visible in Explore')
 })),
   "unallocated": zod.boolean(),
+  "status": zod.enum(['saved', 'confirmed']),
+  "confirmed_at": zod.coerce.date().nullable(),
   "accredited": zod.boolean(),
   "experience": zod.array(zod.string()),
   "motivations": zod.array(zod.string()),
@@ -900,6 +902,57 @@ export const GetCurrentInvestorIntentResponse = zod.object({
   "country": zod.string().nullish(),
   "zip": zod.string().nullish()
 }),zod.null()])
+})
+
+
+/**
+ * Requires the original visitor cookie and a verified account whose email matches the saved guest intent. Does not alter the amount or allocations.
+ * @summary Link an unclaimed guest intent from this browser to the verified account
+ */
+
+
+
+export const ClaimInvestorIntentResponse = zod.object({
+  "investor_id": zod.number().int().min(1),
+  "status": zod.literal("linked")
+})
+
+
+/**
+ * Confirmation is idempotent for the same saved interest. No money is collected. Project allocations become public-count eligible only on successful confirmation.
+ * @summary Sign and confirm the account's saved non-binding interest
+ */
+export const confirmInvestorIntentBodySignatureNameMin = 2;
+export const confirmInvestorIntentBodySignatureNameMax = 120;
+
+export const confirmInvestorIntentBodyAmountMin = 100;
+export const confirmInvestorIntentBodyAmountMax = 2147483647;
+
+
+export const confirmInvestorIntentBodyAllocationsItemAmountMin = 25;
+export const confirmInvestorIntentBodyAllocationsItemAmountMax = 2147483647;
+
+export const confirmInvestorIntentBodyAllocationsMax = 5;
+
+
+
+export const ConfirmInvestorIntentBody = zod.object({
+  "signature_name": zod.string().min(confirmInvestorIntentBodySignatureNameMin).max(confirmInvestorIntentBodySignatureNameMax),
+  "accepted": zod.literal(true),
+  "amount": zod.number().int().min(confirmInvestorIntentBodyAmountMin).max(confirmInvestorIntentBodyAmountMax),
+  "allocations": zod.array(zod.object({
+  "project_id": zod.number().int().min(1),
+  "amount": zod.number().int().min(confirmInvestorIntentBodyAllocationsItemAmountMin).max(confirmInvestorIntentBodyAllocationsItemAmountMax).describe('Whole-dollar allocation of at least $25')
+})).max(confirmInvestorIntentBodyAllocationsMax)
+})
+
+
+
+
+export const ConfirmInvestorIntentResponse = zod.object({
+  "investor_id": zod.number().int().min(1),
+  "status": zod.literal("confirmed"),
+  "confirmed_at": zod.coerce.date()
 })
 
 

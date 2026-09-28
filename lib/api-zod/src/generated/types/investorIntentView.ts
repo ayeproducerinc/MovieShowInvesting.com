@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { InvestorAllocationView } from './investorAllocationView';
+import type { InvestorIntentViewStatus } from './investorIntentViewStatus';
 import type { InvestorMinima } from './investorMinima';
 
 export interface InvestorIntentView {
@@ -20,6 +21,9 @@ export interface InvestorIntentView {
   amount: number;
   allocations: InvestorAllocationView[];
   unallocated: boolean;
+  status: InvestorIntentViewStatus;
+  /** @nullable */
+  confirmed_at: Date | null;
   accredited: boolean;
   experience: string[];
   motivations: string[];
