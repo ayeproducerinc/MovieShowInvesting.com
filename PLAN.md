@@ -44,7 +44,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 4 — Project page, result, share, and showcase
 
-**Status:** in progress — result, share, unlisted page, showcase, and media upload code are built. Owner-scoped Bunny Stream and Storage/CDN uploads were verified with temporary media, then cleaned up. Embedded trailer playback still needs a real-browser check after the preview browser reported a codec error; the F6–F8 gate remains open.
+**Status:** complete under the owner's assumption that email-link sign-in works; the live multi-project/cross-device account check remains deferred until Firebase's email-sending quota resets. Result, share, unlisted page, showcase, and media upload code are built. Owner-scoped Bunny Stream and Storage/CDN uploads were verified with temporary media, then cleaned up. An existing Bunny trailer played and advanced without error in a separate Chromium browser; the preview browser's codec error is environment-specific, and the public page also offers an open-in-new-tab link.
 **Deliverables:**
 
 - Filmmaker result screen using the selected offer, a share card without dollar amounts, and share/copy actions.
@@ -55,7 +55,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 - Social link-preview metadata; unapproved pages are noindex. Only approved, non-hidden projects may appear in Explore.
 - YouTube/Vimeo oEmbed thumbnails where applicable.
 
-**Gate:** Visual Guide scenarios F6–F8 pass for chosen-offer numbers, share image/preview, approval queue, and upload limits. F7’s Explore visibility check waits for Phase 7, when Explore exists; approval and hide state must already work in admin.
+**Gate:** F6 chosen-offer calculations and F7 approval/hide were checked against the implementation; an existing project's saved share image returned 200 and matched its crawler metadata; Bunny playback advanced in Chromium; upload size/type enforcement and owner-scoped media persistence were verified earlier. The live multi-project/cross-device sign-in gate is accepted provisionally at the owner's request while the Firebase email quota blocks new links. F7’s Explore visibility check waits for Phase 7, when Explore exists.
 
 ## Phase 5 — Email, sign-in, verification, and filmmaker questions
 

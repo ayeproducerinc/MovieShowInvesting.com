@@ -8,4 +8,5 @@
 - [Bunny video size semantics](bunny-video-size-semantics.md) — Bunny Stream storageSize is asynchronous encoded output, not the uploaded source byte count.
 - [Shared Bunny media](shared-bunny-media.md) — reuse The AYeList's Bunny resources; keep trailers in the Stream collection and images in the dedicated Storage folder.
 - [Stream thumbnail fallback](bunny-thumbnail-access.md) — shared Stream CDN thumbnails stayed blocked; the owner approved poster-or-video-placeholder previews for this MVP.
+- [Bunny browser playback](bunny-browser-playback.md) — an embedded preview's HLS codec error can be browser-specific; confirm playback elsewhere before changing media.
 - [Multi-project ownership boundaries](multi-project-ownership.md) — real projects must survive a new submission; browser-wide selection is not a safe editing boundary across tabs.
