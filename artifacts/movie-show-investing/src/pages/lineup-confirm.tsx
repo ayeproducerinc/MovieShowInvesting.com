@@ -36,7 +36,7 @@ export default function LineupConfirm() {
   const [error, setError] = useState('');
   const [stale, setStale] = useState(false);
   const intent = current.data?.intent;
-  const reviewKey = intent ? JSON.stringify([intent.investor_id, intent.name, intent.amount, intent.unallocated, intent.status, intent.allocations.map(row => [row.project_id, row.amount])]) : '';
+  const reviewKey = intent ? JSON.stringify([intent.investor_id, intent.entry_id, intent.name, intent.amount, intent.unallocated, intent.status, intent.allocations.map(row => [row.project_id, row.amount])]) : '';
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,7 +49,7 @@ export default function LineupConfirm() {
     try {
       const fresh = await current.refetch();
       const latest = fresh.data?.intent;
-      const latestKey = latest ? JSON.stringify([latest.investor_id, latest.name, latest.amount, latest.unallocated, latest.status, latest.allocations.map(row => [row.project_id, row.amount])]) : '';
+      const latestKey = latest ? JSON.stringify([latest.investor_id, latest.entry_id, latest.name, latest.amount, latest.unallocated, latest.status, latest.allocations.map(row => [row.project_id, row.amount])]) : '';
       if (fresh.isError || !latest || latestKey !== reviewKey) {
         setStale(true);
         return;
@@ -62,6 +62,7 @@ export default function LineupConfirm() {
       await confirm.mutateAsync({ data: {
         signature_name: signature,
         accepted: true,
+         entry_id: latest.entry_id,
         amount: latest.amount,
         allocations: latest.allocations.map(row => ({ project_id: row.project_id, amount: row.amount })),
       } });
@@ -76,7 +77,7 @@ export default function LineupConfirm() {
       // A lost response can follow a committed confirmation. Ask the server
       // before telling the investor whether the action succeeded.
       const reconciled = await current.refetch();
-      if (reconciled.data?.intent?.status === 'confirmed') {
+      if (reconciled.data?.intent?.status === 'confirmed' && reconciled.data.intent.entry_id === intent.entry_id) {
         await queryClient.invalidateQueries({ queryKey: getGetCurrentInvestorIntentQueryKey() });
         navigate('/lineup');
         return;

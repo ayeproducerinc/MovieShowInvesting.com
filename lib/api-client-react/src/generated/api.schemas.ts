@@ -554,6 +554,8 @@ export interface FilmmakerImageUpload {
 }
 
 export interface PublicProject {
+  /** @minimum 1 */
+  id: number;
   slug: string;
   title: string;
   /** @nullable */
@@ -703,6 +705,8 @@ export interface InvestorIntentInput {
   /** @pattern ^[A-Z]{2}$ */
   country: string;
   zip?: string;
+  /** Explicitly save a separate entry after an earlier confirmation */
+  new_entry?: boolean;
 }
 
 export interface InvestorIntentResult {
@@ -729,6 +733,12 @@ export interface InvestorIntentConfirmationInput {
      * @maximum 2147483647
      */
   amount: number;
+  /**
+     * Identifies the exact reviewed entry; null for the original record
+     * @minimum 1
+     * @nullable
+     */
+  entry_id?: number | null;
   /** @maxItems 5 */
   allocations: InvestorAllocationInput[];
 }
@@ -751,6 +761,11 @@ export const InvestorIntentViewStatus = {
 export interface InvestorIntentView {
   /** @minimum 1 */
   investor_id: number;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  entry_id: number | null;
   name: string;
   email: string;
   /**
@@ -782,8 +797,23 @@ export interface InvestorIntentView {
   zip?: string | null;
 }
 
+export interface InvestorInterestHistoryItem {
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  entry_id: number | null;
+  /** @minimum 100 */
+  amount: number;
+  name: string;
+  confirmed_at: string;
+  unallocated: boolean;
+  allocations: InvestorAllocationView[];
+}
+
 export interface InvestorIntentCurrent {
   intent: InvestorIntentView | null;
+  history: InvestorInterestHistoryItem[];
 }
 
 export interface MessagingConfig {

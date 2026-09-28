@@ -1085,6 +1085,7 @@ export async function getPublicProjectBySlug(slug: string) {
     phoneVerified = Boolean(accountPhone);
   }
   return {
+    id: project.id,
     slug: project.slug,
     title: project.title,
     format: project.format,

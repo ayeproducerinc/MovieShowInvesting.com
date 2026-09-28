@@ -7,6 +7,8 @@
  */
 
 export interface PublicProject {
+  /** @minimum 1 */
+  id: number;
   slug: string;
   title: string;
   /** @nullable */

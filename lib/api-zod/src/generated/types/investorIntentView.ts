@@ -12,6 +12,11 @@ import type { InvestorMinima } from './investorMinima';
 export interface InvestorIntentView {
   /** @minimum 1 */
   investor_id: number;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  entry_id: number | null;
   name: string;
   email: string;
   /**

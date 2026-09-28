@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowUpRight, RotateCcw } from 'lucide-react';
 import { Link, useParams } from 'wouter';
-import { getGetPublicProjectQueryKey, useGetPublicProject } from '@workspace/api-client-react';
+import { getGetCurrentInvestorIntentQueryKey, getGetPublicProjectQueryKey, useGetCurrentInvestorIntent, useGetPublicProject } from '@workspace/api-client-react';
+import { useAuth } from '@workspace/replit-auth-web';
+import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { ProjectShare } from '@/components/project-share';
 import { ProjectQuestionForm } from '@/components/project-question-form';
 import { ProjectConversationEntry } from '@/components/project-conversation-entry';
@@ -31,6 +33,18 @@ export default function Project() {
   const slug = params.slug || '';
   const project = useGetPublicProject(slug, { query: { enabled: !!slug, queryKey: getGetPublicProjectQueryKey(slug), retry: (count, error) => error.status !== 404 && count < 2 } });
   const data = project.data;
+  const replitAuth = useAuth();
+  const firebaseUser = useFirebaseUser();
+  const firebaseReady = useFirebaseSessionReady();
+  const authReady = !replitAuth.isLoading && firebaseReady;
+  const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
+  const current = useGetCurrentInvestorIntent({ query: {
+    queryKey: [...getGetCurrentInvestorIntentQueryKey(), identityId],
+    enabled: authReady && !!data?.approved && !!data?.showcase_requested,
+    refetchOnMount: 'always',
+  } });
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => setDismissed(false), [slug]);
   useEffect(() => {
     let robots = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
     const previous = robots?.content;
@@ -69,10 +83,23 @@ export default function Project() {
   const trailer = safeUrl(data.trailer_url);
   const bunnyEmbed = safeBunnyEmbed(data.trailer_url);
   const labels = [data.format, data.genre, data.stage].filter(Boolean).join(' / ');
+  const eligible = data.approved && data.showcase_requested && ['idea', 'production', 'distribution'].includes(data.stage || '');
+  const intent = current.data?.intent;
+  const previousHere = current.data?.history.some(entry => entry.allocations.some(row => row.project_id === data.id));
+  const target = `/invest?project=${encodeURIComponent(data.slug)}`;
   return <section className="dossier"><div className="page-wrap">
     <SecuritiesNotice/>
     <div className="dossier-head"><Link href="/" className="dossier-kicker" data-testid="link-project-brand">Movie Show Investing / Projects</Link><span className="dossier-kicker">{data.approved && data.showcase_requested ? 'Showcase approved' : 'Unlisted / shared by link'}</span></div>
-    <div className="dossier-hero"><p className="dossier-kicker">{labels || 'Independent project'} / Prelaunch</p><h1 className="dossier-title" data-testid="text-project-title">{data.title}<em>.</em></h1>{data.logline && <p className="dossier-lead" data-testid="text-project-logline">{data.logline}</p>}</div>
+    <div className="dossier-hero"><p className="dossier-kicker">{labels || 'Independent project'} / Prelaunch</p><h1 className="dossier-title" data-testid="text-project-title">{data.title}<em>.</em></h1>{data.logline && <p className="dossier-lead" data-testid="text-project-logline">{data.logline}</p>}
+      {eligible && <div style={{marginTop: 28}} data-testid="project-interest-action">
+        {!authReady || current.isPending || current.isFetching ? <p role="status">Checking your saved interest…</p> :
+          current.isError ? <p role="alert">We couldn’t check your saved interest. <button type="button" onClick={() => void current.refetch()}>Try again</button></p> :
+          intent?.status === 'saved' ? <div className="dossier-notice"><p>You have saved non-binding interest that is not yet confirmed. No new interest has been recorded for this project.</p><div style={{display:'flex',flexWrap:'wrap',gap:12,marginTop:20}}><Link href="/lineup" className="dossier-button" data-testid="link-project-continue-interest">Continue saved interest <ArrowUpRight size={16}/></Link><Link href={`${target}&revise=1`} className="dossier-button" data-testid="link-project-revise-interest">Revise pending interest for this project <ArrowUpRight size={16}/></Link></div></div> :
+          intent?.status === 'confirmed' && previousHere && !dismissed ? <div className="dossier-notice" data-testid="prompt-project-more-interest"><p>You already confirmed interest in this project. A new amount will be a separate non-binding entry, reviewed and signed again; your earlier interest stays unchanged.</p><div style={{display:'flex',flexWrap:'wrap',gap:12,marginTop:20}}><Link href={`${target}&new=1`} className="dossier-button" data-testid="link-project-add-more">Add more interest to this project <ArrowUpRight size={16}/></Link><Link href="/lineup" className="dossier-button">View my lineup <ArrowUpRight size={16}/></Link><button type="button" className="dossier-button" onClick={() => setDismissed(true)} data-testid="button-dismiss-project-interest">Dismiss</button></div></div> :
+          <Link href={`${target}${intent?.status === 'confirmed' ? '&new=1' : ''}`} className="dossier-button" data-testid="link-project-pledge">{intent?.status === 'confirmed' ? 'Pledge more interest in this project' : 'Pledge interest in this project'} <ArrowUpRight size={16}/></Link>}
+        <p className="dossier-status">Non-binding interest only. No investment or payment is made.</p>
+      </div>}
+    </div>
     <div className="dossier-rule"/>
     <div className="dossier-grid">
       <div>

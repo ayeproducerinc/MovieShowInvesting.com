@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { InvestorIntentView } from './investorIntentView';
+import type { InvestorInterestHistoryItem } from './investorInterestHistoryItem';
 
 export interface InvestorIntentCurrent {
   intent: InvestorIntentView | null;
+  history: InvestorInterestHistoryItem[];
 }

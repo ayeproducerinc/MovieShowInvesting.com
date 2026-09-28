@@ -131,6 +131,7 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
     return;
   }
   const response = {
+    id: project.id,
     slug: project.slug,
     title: project.title,
     format: project.format,

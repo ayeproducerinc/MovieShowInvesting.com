@@ -61,6 +61,7 @@ type InvestorRow = {
   replit_uid: string | null;
   visitor_id: string | null;
 };
+type EntryRow = { id: number; name: string; amount: number; unallocated: boolean; signature_name: string | null; confirmed_at: Date | null };
 
 function safeImageUrl(value: string | null): string | null {
   if (!value || value.length > 2048) return null;
@@ -308,7 +309,10 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
     if (visitorOwner && !identity && visitorOwner.email?.trim().toLowerCase() !== email) {
       conflict = "This visitor already has an investor intent with a different email.";
     }
-    if (existing?.confirmed_at && !conflict) {
+    const adding = data.new_entry === true;
+    if (adding && (!identity || !existing?.confirmed_at)) {
+      conflict = "A separate entry requires an account with previously confirmed interest.";
+    } else if (existing?.confirmed_at && !adding && !conflict) {
       conflict = "This investor interest has already been confirmed and cannot be replaced.";
     }
 
@@ -339,7 +343,32 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
         data.phone?.trim() || null,
         data.country,
       ];
-      if (existing) {
+      if (adding && existing) {
+        investorId = existing.id;
+        const pending = await client.query<{ id: number }>(
+          "select id from interest_entries where investor_id = $1 and confirmed_at is null for update", [investorId],
+        );
+        let entryId = pending.rows[0]?.id;
+        if (entryId) {
+          await client.query(
+            "update interest_entries set name = $1, amount = $2, unallocated = $3 where id = $4",
+            [data.name.trim(), data.amount, data.unallocated, entryId],
+          );
+          await client.query("delete from pledges where entry_id = $1 and confirmed = false", [entryId]);
+        } else {
+          const created = await client.query<{ id: number }>(
+            "insert into interest_entries (investor_id, name, amount, unallocated) values ($1, $2, $3, $4) returning id",
+            [investorId, data.name.trim(), data.amount, data.unallocated],
+          );
+          entryId = created.rows[0].id;
+        }
+        for (const allocation of allocations) {
+          await client.query(
+            "insert into pledges (investor_id, entry_id, project_id, amount, confirmed) values ($1, $2, $3, $4, false)",
+            [investorId, entryId, allocation.project_id, allocation.amount],
+          );
+        }
+      } else if (existing) {
         investorId = existing.id;
         await client.query(`
           update investors set
@@ -367,15 +396,17 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
         investorId = inserted.rows[0].id;
       }
 
-      await client.query("delete from pledges where investor_id = $1 and confirmed = false", [investorId]);
-      for (const allocation of allocations) {
-        await client.query(
-          "insert into pledges (investor_id, project_id, amount, confirmed) values ($1, $2, $3, false)",
-          [investorId, allocation.project_id, allocation.amount],
-        );
+      if (!adding) {
+        await client.query("delete from pledges where investor_id = $1 and entry_id is null and confirmed = false", [investorId]);
+        for (const allocation of allocations) {
+          await client.query(
+            "insert into pledges (investor_id, project_id, amount, confirmed) values ($1, $2, $3, false)",
+            [investorId, allocation.project_id, allocation.amount],
+          );
+        }
       }
 
-      for (const slate of SLATES) {
+      if (!adding) for (const slate of SLATES) {
         const minimum = minimums[slate];
         const prior = await client.query<{ id: number }>(
           "select id from investor_minimums where investor_id = $1 and slate = $2",
@@ -441,41 +472,58 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
     investor = rows[0];
   }
   if (!investor) {
-    res.json(GetCurrentInvestorIntentResponse.parse({ intent: null }));
+    res.json(GetCurrentInvestorIntentResponse.parse({ intent: null, history: [] }));
     return;
   }
 
+  const { rows: entries } = await pool.query<EntryRow>(
+    "select id, name, amount, unallocated, signature_name, confirmed_at from interest_entries where investor_id = $1 order by id desc",
+    [investor.id],
+  );
+  const active = entries.find(entry => !entry.confirmed_at) ?? entries.find(entry => entry.confirmed_at);
   const { rows: savedAllocations } = await pool.query<{
+    entry_id: number | null;
+    confirmed: boolean;
     project_id: number | null;
     amount: number;
     project_title: string | null;
     project_slug: string | null;
     project_visible: boolean;
   }>(
-    `select pl.project_id, pl.amount, p.title as project_title, p.slug as project_slug,
+    `select pl.entry_id, pl.confirmed, pl.project_id, pl.amount, p.title as project_title, p.slug as project_slug,
        coalesce(p.approved = true and p.showcase_requested = true and p.hidden = false
          and p.stage in ('idea', 'production', 'distribution'), false) as project_visible
      from pledges pl left join projects p on p.id = pl.project_id
-     where pl.investor_id = $1 and pl.confirmed = $2 order by pl.id`,
-    [investor.id, investor.confirmed_at !== null],
+      where pl.investor_id = $1 order by pl.id`,
+    [investor.id],
   );
+  const viewAllocations = (entryId: number | null, confirmed: boolean) => savedAllocations
+    .filter(row => row.entry_id === entryId && row.confirmed === confirmed && row.project_id !== null)
+    .map(row => ({
+      project_id: row.project_id!, amount: row.amount, project_title: row.project_title,
+      project_slug: row.project_slug, project_visible: row.project_visible,
+    }));
+  const history = [
+    ...(investor.confirmed_at ? [{
+      entry_id: null, name: investor.name ?? "", amount: investor.investment_amount ?? Number.parseInt(investor.amount_choice ?? "0", 10),
+      confirmed_at: investor.confirmed_at.toISOString(), unallocated: investor.unallocated ?? false,
+      allocations: viewAllocations(null, true),
+    }] : []),
+    ...entries.filter(entry => entry.confirmed_at).reverse().map(entry => ({
+      entry_id: entry.id, name: entry.name, amount: entry.amount, confirmed_at: entry.confirmed_at!.toISOString(),
+      unallocated: entry.unallocated, allocations: viewAllocations(entry.id, true),
+    })),
+  ];
   const intent = {
     investor_id: investor.id,
-    name: investor.name ?? "",
+    entry_id: active?.id ?? null,
+    name: active?.name ?? investor.name ?? "",
     email: investor.email ?? "",
-    amount: investor.investment_amount ?? Number.parseInt(investor.amount_choice ?? "0", 10),
-    allocations: savedAllocations
-      .filter((allocation): allocation is typeof allocation & { project_id: number } => allocation.project_id !== null)
-      .map((allocation) => ({
-        project_id: allocation.project_id,
-        amount: allocation.amount,
-        project_title: allocation.project_title,
-        project_slug: allocation.project_slug,
-        project_visible: allocation.project_visible,
-      })),
-    unallocated: investor.unallocated ?? false,
-    status: investor.confirmed_at ? "confirmed" : "saved",
-    confirmed_at: investor.confirmed_at?.toISOString() ?? null,
+    amount: active?.amount ?? investor.investment_amount ?? Number.parseInt(investor.amount_choice ?? "0", 10),
+    allocations: viewAllocations(active?.id ?? null, active ? !!active.confirmed_at : !!investor.confirmed_at),
+    unallocated: active?.unallocated ?? investor.unallocated ?? false,
+    status: active ? active.confirmed_at ? "confirmed" : "saved" : investor.confirmed_at ? "confirmed" : "saved",
+    confirmed_at: active ? active.confirmed_at?.toISOString() ?? null : investor.confirmed_at?.toISOString() ?? null,
     accredited: investor.accredited === "yes",
     experience: investor.experience ?? [],
     motivations: investor.motivations ?? [],
@@ -489,7 +537,7 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
     country: investor.country,
     zip: investor.zip,
   };
-  res.json(GetCurrentInvestorIntentResponse.parse({ intent }));
+  res.json(GetCurrentInvestorIntentResponse.parse({ intent, history }));
 });
 
 router.post("/investor/intents/claim", async (req, res): Promise<void> => {
@@ -584,15 +632,25 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
       res.status(403).json({ error: "This investor interest is not associated with the verified account email." });
       return;
     }
-    if (signature.toLocaleLowerCase() !== (investor.name ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase()) {
+    const { rows: entries } = await client.query<EntryRow>(
+      "select id, name, amount, unallocated, signature_name, confirmed_at from interest_entries where investor_id = $1 order by id desc for update",
+      [investor.id],
+    );
+    const active = entries.find(entry => !entry.confirmed_at) ?? entries.find(entry => entry.confirmed_at);
+    if ((submitted.entry_id ?? null) !== (active?.id ?? null)) {
+      await client.query("rollback");
+      res.status(409).json({ error: "A different interest entry is now current. Review the latest lineup before signing." });
+      return;
+    }
+    if (signature.toLocaleLowerCase() !== (active?.name ?? investor.name ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase()) {
       await client.query("rollback");
       res.status(400).json({ error: "Type the full name saved with this interest to sign it." });
       return;
     }
-    const amount = investor.investment_amount ?? Number.parseInt(investor.amount_choice ?? "0", 10);
+    const amount = active?.amount ?? investor.investment_amount ?? Number.parseInt(investor.amount_choice ?? "0", 10);
     const { rows: pledges } = await client.query<{ id: number; project_id: number | null; amount: number; confirmed: boolean }>(
-      "select id, project_id, amount, confirmed from pledges where investor_id = $1 order by id for update",
-      [investor.id],
+      "select id, project_id, amount, confirmed from pledges where investor_id = $1 and entry_id is not distinct from $2 order by id for update",
+      [investor.id, active?.id ?? null],
     );
     const expected = submitted.allocations.map(a => `${a.project_id}:${a.amount}`).sort();
     const actual = pledges.map(p => `${p.project_id}:${p.amount}`).sort();
@@ -601,8 +659,8 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
       res.status(409).json({ error: "Your saved amount or project choices changed. Review the lineup and try again." });
       return;
     }
-    if (investor.confirmed_at) {
-      if (investor.signature_name?.trim().toLocaleLowerCase() !== signature.toLocaleLowerCase()
+    if (active?.confirmed_at || !active && investor.confirmed_at) {
+      if ((active?.signature_name ?? investor.signature_name)?.trim().toLocaleLowerCase() !== signature.toLocaleLowerCase()
         || pledges.some(p => !p.confirmed)) {
         await client.query("rollback");
         res.status(409).json({ error: "This interest was already confirmed with a different signature or state." });
@@ -610,12 +668,12 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
       }
       await client.query("commit");
       res.json(ConfirmInvestorIntentResponse.parse({
-        investor_id: investor.id, status: "confirmed", confirmed_at: investor.confirmed_at.toISOString(),
+        investor_id: investor.id, status: "confirmed", confirmed_at: (active?.confirmed_at ?? investor.confirmed_at)!.toISOString(),
       }));
       return;
     }
     if (!Number.isSafeInteger(amount) || amount < 100
-      || (investor.unallocated ? pledges.length !== 0 : pledges.length === 0 || pledges.some(p => p.project_id === null)
+      || ((active?.unallocated ?? investor.unallocated) ? pledges.length !== 0 : pledges.length === 0 || pledges.some(p => p.project_id === null)
         || pledges.reduce((sum, p) => sum + p.amount, 0) !== amount)
       || pledges.some(p => p.confirmed)) {
       await client.query("rollback");
@@ -625,10 +683,15 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
     // The investor confirms the exact saved choices, not a new public listing.
     // An already-saved project may later be hidden; public totals still exclude
     // hidden projects, while deleted projects are refused above (null project_id).
-    await client.query("update pledges set confirmed = true where investor_id = $1 and confirmed = false", [investor.id]);
+    await client.query(
+      "update pledges set confirmed = true where investor_id = $1 and entry_id is not distinct from $2 and confirmed = false",
+      [investor.id, active?.id ?? null],
+    );
     const { rows: updated } = await client.query<{ confirmed_at: Date }>(
-      "update investors set signature_name = $1, signed_at = now(), confirmed_at = now() where id = $2 returning confirmed_at",
-      [signature, investor.id],
+      active
+        ? "update interest_entries set signature_name = $1, confirmed_at = now() where id = $2 returning confirmed_at"
+        : "update investors set signature_name = $1, signed_at = now(), confirmed_at = now() where id = $2 returning confirmed_at",
+      [signature, active?.id ?? investor.id],
     );
     const alerts = await client.query<{ id: number; owner_key: string }>(
       `with added as (
@@ -637,14 +700,14 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
        from pledges pl
        join projects p on p.id = pl.project_id
        join filmmakers f on f.id = p.filmmaker_id
-       where pl.investor_id = $1 and pl.confirmed = true
+        where pl.investor_id = $1 and pl.entry_id is not distinct from $2 and pl.confirmed = true
          and (f.firebase_uid is not null or f.replit_uid is not null)
        on conflict (pledge_id) do nothing returning id, filmmaker_id
        )
        select added.id, case when f.firebase_uid is not null then 'firebase:' || f.firebase_uid
          else 'replit:' || f.replit_uid end as owner_key
        from added join filmmakers f on f.id = added.filmmaker_id`,
-      [investor.id],
+      [investor.id, active?.id ?? null],
     );
     newAlerts = alerts.rows;
     await client.query("commit");

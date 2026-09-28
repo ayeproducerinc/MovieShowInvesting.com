@@ -3,11 +3,13 @@ import { boolean, check, integer, pgTable, serial, timestamp } from "drizzle-orm
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { investorsTable } from "./investors";
+import { interestEntriesTable } from "./interest-entries";
 import { projectsTable } from "./projects";
 
 export const pledgesTable = pgTable("pledges", {
   id: serial("id").primaryKey(),
   investorId: integer("investor_id").notNull().references(() => investorsTable.id, { onDelete: "cascade" }),
+  entryId: integer("entry_id").references(() => interestEntriesTable.id, { onDelete: "cascade" }),
   projectId: integer("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   amount: integer("amount").notNull(),
   confirmed: boolean("confirmed").notNull().default(false),

@@ -1726,8 +1726,9 @@ components:
     PublicProject:
       type: object
       additionalProperties: false
-      required: [slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, confirmed_pledge_total, approved, showcase_requested, phone_verified]
+      required: [id, slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, confirmed_pledge_total, approved, showcase_requested, phone_verified]
       properties:
+        id: { type: integer, minimum: 1 }
         slug: { type: string }
         title: { type: string }
         format: { type: ["string", "null"] }
@@ -1855,6 +1856,7 @@ components:
         state: { type: string }
         country: { type: string, pattern: "^[A-Z]{2}$" }
         zip: { type: string }
+        new_entry: { type: boolean, description: Explicitly save a separate entry after an earlier confirmation }
     InvestorIntentResult:
       type: object
       additionalProperties: false
@@ -1877,6 +1879,7 @@ components:
         signature_name: { type: string, minLength: 2, maxLength: 120 }
         accepted: { type: boolean, const: true }
         amount: { type: integer, minimum: 100, maximum: 2147483647 }
+        entry_id: { type: ["integer", "null"], minimum: 1, description: Identifies the exact reviewed entry; null for the original record }
         allocations:
           type: array
           maxItems: 5
@@ -1893,9 +1896,10 @@ components:
     InvestorIntentView:
       type: object
       additionalProperties: false
-      required: [investor_id, name, email, amount, allocations, unallocated, status, confirmed_at, accredited, experience, motivations, favorite_genres, stages, minima, call_opt_in]
+      required: [investor_id, entry_id, name, email, amount, allocations, unallocated, status, confirmed_at, accredited, experience, motivations, favorite_genres, stages, minima, call_opt_in]
       properties:
         investor_id: { type: integer, minimum: 1 }
+        entry_id: { type: ["integer", "null"], minimum: 1 }
         name: { type: string }
         email: { type: string, format: email }
         amount: { type: integer, minimum: 1, maximum: 2147483647 }
@@ -1930,12 +1934,30 @@ components:
     InvestorIntentCurrent:
       type: object
       additionalProperties: false
-      required: [intent]
+      required: [intent, history]
       properties:
         intent:
           oneOf:
             - $ref: "#/components/schemas/InvestorIntentView"
             - type: "null"
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvestorInterestHistoryItem"
+    InvestorInterestHistoryItem:
+      type: object
+      additionalProperties: false
+      required: [entry_id, amount, name, confirmed_at, unallocated, allocations]
+      properties:
+        entry_id: { type: ["integer", "null"], minimum: 1 }
+        amount: { type: integer, minimum: 100 }
+        name: { type: string }
+        confirmed_at: { type: string, format: date-time }
+        unallocated: { type: boolean }
+        allocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvestorAllocationView"
     MessagingConfig:
       type: object
       additionalProperties: false

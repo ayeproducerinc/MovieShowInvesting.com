@@ -716,11 +716,13 @@ export const GetPublicProjectParams = zod.object({
   "slug": zod.coerce.string().min(1).max(getPublicProjectPathSlugMax).regex(getPublicProjectPathSlugRegExp)
 })
 
+
 export const getPublicProjectResponseConfirmedPledgeTotalMin = 0;
 
 
 
 export const GetPublicProjectResponse = zod.object({
+  "id": zod.number().int().min(1),
   "slug": zod.string(),
   "title": zod.string(),
   "format": zod.string().nullable(),
@@ -883,7 +885,8 @@ export const SaveInvestorIntentBody = zod.object({
   "city": zod.string().min(1),
   "state": zod.string().optional(),
   "country": zod.string().regex(saveInvestorIntentBodyCountryRegExp),
-  "zip": zod.string().optional()
+  "zip": zod.string().optional(),
+  "new_entry": zod.boolean().optional().describe('Explicitly save a separate entry after an earlier confirmation')
 })
 
 
@@ -899,6 +902,7 @@ export const SaveInvestorIntentResponse = zod.object({
  * @summary Read visitor-scoped intent or verified account intent
  */
 
+
 export const getCurrentInvestorIntentResponseIntentOneAmountMax = 2147483647;
 
 
@@ -911,10 +915,17 @@ export const getCurrentInvestorIntentResponseIntentOneMinimaProductionMin = 125;
 export const getCurrentInvestorIntentResponseIntentOneMinimaIdeaMin = 125;
 
 
+export const getCurrentInvestorIntentResponseHistoryItemAmountMin = 100;
+
+
+export const getCurrentInvestorIntentResponseHistoryItemAllocationsItemAmountMax = 2147483647;
+
+
 
 export const GetCurrentInvestorIntentResponse = zod.object({
   "intent": zod.union([zod.object({
   "investor_id": zod.number().int().min(1),
+  "entry_id": zod.number().int().min(1).nullable(),
   "name": zod.string(),
   "email": zod.string().email(),
   "amount": zod.number().int().min(1).max(getCurrentInvestorIntentResponseIntentOneAmountMax),
@@ -944,7 +955,21 @@ export const GetCurrentInvestorIntentResponse = zod.object({
   "state": zod.string().nullish(),
   "country": zod.string().nullish(),
   "zip": zod.string().nullish()
-}),zod.null()])
+}),zod.null()]),
+  "history": zod.array(zod.object({
+  "entry_id": zod.number().int().min(1).nullable(),
+  "amount": zod.number().int().min(getCurrentInvestorIntentResponseHistoryItemAmountMin),
+  "name": zod.string(),
+  "confirmed_at": zod.coerce.date(),
+  "unallocated": zod.boolean(),
+  "allocations": zod.array(zod.object({
+  "project_id": zod.number().int().min(1),
+  "amount": zod.number().int().min(1).max(getCurrentInvestorIntentResponseHistoryItemAllocationsItemAmountMax),
+  "project_title": zod.string().nullable().describe('Saved project\'s title'),
+  "project_slug": zod.string().nullable(),
+  "project_visible": zod.boolean().describe('Whether the project is currently approved and visible in Explore')
+}))
+}))
 })
 
 
@@ -972,6 +997,7 @@ export const confirmInvestorIntentBodyAmountMin = 100;
 export const confirmInvestorIntentBodyAmountMax = 2147483647;
 
 
+
 export const confirmInvestorIntentBodyAllocationsItemAmountMin = 25;
 export const confirmInvestorIntentBodyAllocationsItemAmountMax = 2147483647;
 
@@ -983,6 +1009,7 @@ export const ConfirmInvestorIntentBody = zod.object({
   "signature_name": zod.string().min(confirmInvestorIntentBodySignatureNameMin).max(confirmInvestorIntentBodySignatureNameMax),
   "accepted": zod.literal(true),
   "amount": zod.number().int().min(confirmInvestorIntentBodyAmountMin).max(confirmInvestorIntentBodyAmountMax),
+  "entry_id": zod.number().int().min(1).nullish().describe('Identifies the exact reviewed entry; null for the original record'),
   "allocations": zod.array(zod.object({
   "project_id": zod.number().int().min(1),
   "amount": zod.number().int().min(confirmInvestorIntentBodyAllocationsItemAmountMin).max(confirmInvestorIntentBodyAllocationsItemAmountMax).describe('Whole-dollar allocation of at least $25')

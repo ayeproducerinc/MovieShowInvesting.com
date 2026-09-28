@@ -84,6 +84,7 @@ export * from './investorIntentInput';
 export * from './investorIntentResult';
 export * from './investorIntentView';
 export * from './investorIntentViewStatus';
+export * from './investorInterestHistoryItem';
 export * from './investorMatches';
 export * from './investorMatchInput';
 export * from './investorMinima';

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { getGetCurrentInvestorIntentQueryKey, getGetFlowProgressQueryKey, useGetCurrentInvestorIntent, useGetExplore, useGetFlowProgress, useMatchInvestor, useSaveFlowProgress, useSaveInvestorIntent } from '@workspace/api-client-react';
+import { getGetCurrentInvestorIntentQueryKey, getGetFlowProgressQueryKey, useGetCurrentInvestorIntent, useGetExplore, useGetFlowProgress, useGetPriceGroup, useMatchInvestor, useSaveFlowProgress, useSaveInvestorIntent } from '@workspace/api-client-react';
 import type { ExploreProject, InvestorIntentInput } from '@workspace/api-client-react';
 import { InvestorProjectCard } from '@/components/investor-project-card';
 import { LocationPicker } from '@/components/location-picker';
@@ -13,7 +13,7 @@ import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import '../investor.css';
 import '../lineup.css';
 
-type Answers = InvestorIntentInput & { terms_read:boolean; location_manual:boolean; lineup: {project_id:number; amount:number}[] };
+type Answers = InvestorIntentInput & { terms_read:boolean; location_manual:boolean; lineup: {project_id:number; amount:number}[]; entry_context?:string };
 const blank: Answers = { amount:100, name:'', email:'', phone:'', city:'', state:'', country:'', zip:'', location_manual:false, accredited:false, experience:[], motivations:[], favorite_genres:[], stages:[], minima:{distribution:null,production:null,idea:null}, allocations:[], unallocated:false, call_opt_in:false, terms_read:false, lineup:[] };
 const headings = ['Your amount','The ground rules','Your interests','The lineup','About you'];
 const descriptions = [
@@ -72,6 +72,7 @@ export function InvestorDone() {
       <p data-testid="text-intent-saved">Your non-binding interest of {dollars(current.data.intent.amount)} is {current.data.intent.status === 'confirmed' ? 'confirmed' : 'saved, but not confirmed'}. Returns aren’t guaranteed. You may get back less, or nothing.</p>
       <p>No money has been collected, and you have not made an investment.</p>
       {current.data.intent.status === 'confirmed' && <div className="lineup-done-allocations" data-testid="done-confirmed-allocations"><p className="inv-kicker">Confirmed project choices</p>{current.data.intent.unallocated ? <p>{dollars(current.data.intent.amount)} is unallocated to projects.</p> : current.data.intent.allocations.length ? <ul>{current.data.intent.allocations.map(row => <li key={row.project_id} data-testid={`done-allocation-${row.project_id}`}><span>{row.project_title ?? `Project #${row.project_id}`}</span><strong>{dollars(row.amount)}</strong></li>)}</ul> : <p>No project allocations are on record.</p>}</div>}
+      {current.data.history.length > 0 && <div className="lineup-done-allocations" data-testid="done-interest-history"><p className="inv-kicker">Your signed entries</p><p>{current.data.history.length} separate confirmed {current.data.history.length === 1 ? 'entry' : 'entries'} · {dollars(current.data.history.reduce((total, entry) => total + entry.amount, 0))} cumulative non-binding interest. Saved, unsigned interest is not included.</p><ul>{[...current.data.history].reverse().map((entry, index)=><li key={entry.entry_id ?? 'original'}><span>Entry {current.data.history.length-index} · {entry.unallocated ? 'Unallocated' : entry.allocations.map(row=>row.project_title ?? `Project #${row.project_id}`).join(', ') || 'Project no longer listed'} · {new Date(entry.confirmed_at).toLocaleDateString('en-US')}</span><strong>{dollars(entry.amount)}</strong></li>)}</ul></div>}
       <p>Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.</p>
       <div className="inv-actions">{current.data.intent.status === 'saved' && (signedIn ? <Link href="/lineup/confirm" className="inv-button" data-testid="link-done-confirm">Review & confirm <ArrowRight size={16}/></Link> : <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-done-sign-in" label="Sign in to confirm" />)}<Link href="/lineup" className={`inv-button ${current.data.intent.status === 'saved' ? 'secondary' : ''}`} data-testid="link-done-lineup">View my {current.data.intent.status === 'confirmed' ? 'confirmed' : 'saved'} lineup <ArrowRight size={16}/></Link><Link href="/explore" className="inv-button secondary" data-testid="link-done-explore">Explore projects</Link></div>
       {!signedIn && current.data.intent.status === 'saved' && <p className="inv-small">If this is guest interest, sign in and explicitly claim it from this original browser on your lineup if it is not linked to your account.</p>}
@@ -82,15 +83,22 @@ export function InvestorDone() {
 export default function Investor() {
   const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
+  const firebaseReady = useFirebaseSessionReady();
   const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
-  return <InvestorWorksheet key={identityId} identityId={identityId} authLoading={replitAuth.isLoading} />;
+  const search = window.location.search;
+  return <InvestorWorksheet key={`${identityId}:${search}`} identityId={identityId} authLoading={replitAuth.isLoading || !firebaseReady} />;
 }
 
 function InvestorWorksheet({ identityId, authLoading }: { identityId: string; authLoading: boolean }) {
+  const params = new URLSearchParams(window.location.search);
+  const targetSlug = params.get('project');
+  const newEntry = params.get('new') === '1';
+  const revise = params.get('revise') === '1';
   const [,navigate] = useLocation();
   const queryClient = useQueryClient();
-  const progress = useGetFlowProgress('investor',{query:{queryKey:[...getGetFlowProgressQueryKey('investor'),identityId],enabled:!authLoading,retry:(count,error)=>error.status!==404 && count<2}});
-  const current = useGetCurrentInvestorIntent({query:{queryKey:[...getGetCurrentInvestorIntentQueryKey(),identityId],enabled:!authLoading,retry:(count,error)=>error.status!==404 && count<2}});
+  const visitor = useGetPriceGroup();
+  const progress = useGetFlowProgress('investor',{query:{queryKey:[...getGetFlowProgressQueryKey('investor'),identityId],enabled:!authLoading && visitor.isSuccess,retry:(count,error)=>error.status!==404 && count<2}});
+  const current = useGetCurrentInvestorIntent({query:{queryKey:[...getGetCurrentInvestorIntentQueryKey(),identityId],enabled:!authLoading && visitor.isSuccess,retry:(count,error)=>error.status!==404 && count<2}});
   const explore = useGetExplore();
   const match = useMatchInvestor();
   const save = useSaveFlowProgress();
@@ -98,6 +106,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
   const [a,setA] = useState<Answers>(blank);
   const [screen,setScreen] = useState(1);
   const [ready,setReady] = useState(false);
+  const [selectionNeeded,setSelectionNeeded] = useState(false);
   const [matches,setMatches] = useState<ExploreProject[]>([]);
   const [matchState,setMatchState] = useState<'idle'|'loading'|'matches'|'no-matches'|'unavailable'>('idle');
   const [showAllAvailable,setShowAllAvailable] = useState(false);
@@ -114,22 +123,52 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
   saveFn.current = save.mutateAsync;
   useEffect(()=>{
     if (initialised.current) return;
+    if (!explore.isSuccess || !current.isSuccess || !progress.data && !progress.isError) return;
+    const target = explore.data.projects.find(p=>p.slug===targetSlug);
+    if (targetSlug && !target) return;
+    if (newEntry && current.data.intent?.status==='confirmed') {
+      if (identityId==='visitor') return;
+      initialised.current=true;
+      const previous=current.data.intent;
+      const context=`new:${targetSlug}:${previous.confirmed_at}`;
+      const draft=progress.data?.answers as Answers | undefined;
+      if (draft?.entry_context===context) {
+        setA({...blank,...draft});setScreen(Math.max(1,Math.min(5,progress.data!.last_screen)));
+      } else {
+        const start:Answers={...blank,amount:100,name:previous.name,email:previous.email,phone:previous.phone ?? '',city:previous.city ?? '',state:previous.state ?? '',country:previous.country ?? '',zip:previous.zip ?? '',location_manual:true,accredited:previous.accredited,experience:previous.experience,motivations:previous.motivations,favorite_genres:previous.favorite_genres,stages:previous.stages,minima:previous.minima,call_opt_in:previous.call_opt_in,lineup:target?[{project_id:target.id,amount:100}]:[],entry_context:context};
+        setA(start); setScreen(1);
+      }
+      setReady(true);
+      return;
+    }
+    if ((revise || newEntry) && current.data.intent?.status==='saved') {
+      initialised.current=true;
+      const existing=current.data.intent;
+      const restored={...blank,amount:existing.amount,name:existing.name,email:existing.email,phone:existing.phone ?? '',city:existing.city ?? '',state:existing.state ?? '',country:existing.country ?? '',zip:existing.zip ?? '',location_manual:true,accredited:existing.accredited,experience:existing.experience,motivations:existing.motivations,favorite_genres:existing.favorite_genres,stages:existing.stages,minima:existing.minima,call_opt_in:existing.call_opt_in,unallocated:existing.unallocated,lineup:existing.allocations.map(row=>({project_id:row.project_id,amount:row.amount}))} as Answers;
+      setA(restored); setScreen(4); setSelectionNeeded(!!target && !restored.lineup.some(row=>row.project_id===target.id)); setReady(true);
+      return;
+    }
     if (progress.data) {
       initialised.current = true;
       const restored = {...blank,...progress.data.answers, minima:{...blank.minima,...(progress.data.answers.minima as object || {})}} as Answers;
       if (!('location_manual' in progress.data.answers) && restored.city && !restored.country) restored.location_manual = true;
       const step = Math.max(1,Math.min(5,progress.data.last_screen));
+      if (target && !restored.lineup.some(row=>row.project_id===target.id)) setSelectionNeeded(true);
       setA(restored); setScreen(step); lastSaved.current=JSON.stringify({screen:step,a:restored}); setReady(true);
-    } else if (progress.error?.status===404) { initialised.current=true; setReady(true); }
-  },[progress.data,progress.error]);
+    } else if (progress.error?.status===404) {
+      initialised.current=true;
+      if(target) setA({...blank,lineup:[{project_id:target.id,amount:100}]});
+      setReady(true);
+    }
+  },[progress.data,progress.error,explore.isSuccess,current.isSuccess]);
   useEffect(()=>{
-    if (!ready || screen!==4 || !explore.isSuccess || matchState!=='idle' || restoredMatchStarted.current) return;
+    if (!ready || selectionNeeded || screen!==4 || !explore.isSuccess || matchState!=='idle' || restoredMatchStarted.current) return;
     restoredMatchStarted.current=true;
     void findCandidates(a,false).catch(()=>setError('We could not restore your project matches. Browse available projects manually, or retry matching.'));
-  },[ready,screen,explore.isSuccess,matchState]);
-  useEffect(()=>{if (current.data?.intent && !progress.isLoading && progress.error?.status!==409) navigate('/invest/done');},[current.data?.intent,progress.isLoading,progress.error,navigate]);
+  },[ready,selectionNeeded,screen,explore.isSuccess,matchState]);
+  useEffect(()=>{if (current.data?.intent && !newEntry && !revise && !progress.isLoading && progress.error?.status!==409) navigate('/invest/done');},[current.data?.intent,progress.isLoading,progress.error,navigate]);
   useEffect(()=>{
-    if (!ready) return;
+    if (!ready || selectionNeeded) return;
     const json=JSON.stringify({screen,a});
     if (json===lastSaved.current) return;
     timer.current=window.setTimeout(()=>{
@@ -139,7 +178,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
       operation.then(()=>{lastSaved.current=json;setError('');}).catch(()=>setError('We could not save your progress. Please check your connection before continuing.')).finally(()=>{if(queue.current===operation)setSaving(false);});
     },850);
     return ()=>{if(timer.current!==null)window.clearTimeout(timer.current);};
-  },[a,screen,ready]);
+  },[a,screen,ready,selectionNeeded]);
   const change = <K extends keyof Answers>(key:K,value:Answers[K])=>{setA(prev=>({...prev,[key]:value}));setError('');};
   function minimumChoice(stage:MinimumStage) {
     if(otherMinimumSelected[stage]) return 'other';
@@ -241,7 +280,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
       await persist(5,a);
       const {terms_read: _terms, lineup: _lineup, location_manual: _manual, ...input}=a;
       void _terms; void _lineup; void _manual;
-      await submit.mutateAsync({data:{...input,name:a.name.trim(),email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,allocations:a.unallocated?[]:a.lineup,unallocated:a.unallocated}});
+      await submit.mutateAsync({data:{...input,new_entry:newEntry || current.data?.intent?.entry_id != null && current.data.intent.status==='saved',name:a.name.trim(),email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,allocations:a.unallocated?[]:a.lineup,unallocated:a.unallocated}});
       await queryClient.invalidateQueries({queryKey:getGetCurrentInvestorIntentQueryKey()});
       navigate('/invest/done');
     } catch {setError('Your interest could not be saved. Nothing has been submitted; please try again.');}
@@ -253,8 +292,14 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
     change('lineup',split(a.amount,projects));
   }
   if(progress.isError && progress.error?.status===409) return <section className="inv"><GuestDraftConflictState/></section>;
-  if(authLoading || progress.isLoading || current.isLoading || explore.isLoading || !ready && !progress.isError) return <section className="inv"><div className="page-wrap inv-state" aria-label="Loading investor worksheet"><p className="inv-kicker">Opening your worksheet</p><div className="inv-skeleton" style={{height:85}}/><div className="inv-skeleton" style={{height:150}}/></div></section>;
-  if(progress.isError && progress.error?.status!==404 || current.isError && current.error?.status!==404 || explore.isError) return <section className="inv"><ErrorState retry={()=>{void progress.refetch();void current.refetch();void explore.refetch();}}/></section>;
+  if(authLoading || visitor.isPending || progress.isLoading || current.isLoading || explore.isLoading || !ready && !progress.isError && !visitor.isError) return <section className="inv"><div className="page-wrap inv-state" aria-label="Loading investor worksheet"><p className="inv-kicker">Opening your worksheet</p><div className="inv-skeleton" style={{height:85}}/><div className="inv-skeleton" style={{height:150}}/></div></section>;
+  if(visitor.isError || progress.isError && progress.error?.status!==404 || current.isError && current.error?.status!==404 || explore.isError) return <section className="inv"><ErrorState retry={()=>{void visitor.refetch();void progress.refetch();void current.refetch();void explore.refetch();}}/></section>;
+  if (targetSlug && !available.some(p=>p.slug===targetSlug)) return <section className="inv"><div className="page-wrap inv-state" role="alert"><h1>This project is not available for new interest.</h1><p>No saved or signed interest was changed.</p><Link href="/explore" className="inv-button">Explore available projects</Link></div></section>;
+  if (newEntry && (identityId==='visitor' || !current.data?.history.length) || revise && current.data?.intent?.status!=='saved') return <section className="inv"><div className="page-wrap inv-state"><h1>This worksheet cannot be started here.</h1><p>Review your saved interest first. A separate entry requires previously confirmed account interest.</p><Link href="/lineup" className="inv-button">View my lineup</Link></div></section>;
+  if (selectionNeeded) {
+    const target=available.find(p=>p.slug===targetSlug)!;
+    return <section className="inv"><div className="page-wrap inv-state"><h1>Choose how to continue.</h1><p>Your existing {revise?'saved interest':'worksheet'} has different project choices. Nothing has been replaced. To include {target.title}, explicitly replace the draft lineup or keep your existing choices and add it manually at the allocation step.</p><div className="inv-actions"><button type="button" className="inv-button" data-testid="button-replace-draft-lineup" onClick={()=>{setA(prev=>({...prev,unallocated:false,lineup:[{project_id:target.id,amount:prev.amount}]}));setScreen(4);setSelectionNeeded(false);}}>Replace draft lineup with {target.title}</button><button type="button" className="inv-button secondary" onClick={()=>{setScreen(4);setSelectionNeeded(false);}}>Keep existing choices</button></div></div></section>;
+  }
   return <section className="inv"><div className="page-wrap">
     <div className="inv-top"><Link href="/explore" className="inv-kicker" data-testid="link-invest-explore">Movie Show Investing / Explore</Link><span className="inv-kicker" data-testid="text-invest-step">Step {screen} / 5</span></div>
     <div className="inv-progress" aria-label={`Step ${screen} of 5`}>{headings.map((h,i)=><span key={h} className={i<screen?'active':''} title={h}/>)}</div>

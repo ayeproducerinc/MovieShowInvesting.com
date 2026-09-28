@@ -19,6 +19,12 @@ export interface InvestorIntentConfirmationInput {
      * @maximum 2147483647
      */
   amount: number;
+  /**
+     * Identifies the exact reviewed entry; null for the original record
+     * @minimum 1
+     * @nullable
+     */
+  entry_id?: number | null;
   /** @maxItems 5 */
   allocations: InvestorAllocationInput[];
 }

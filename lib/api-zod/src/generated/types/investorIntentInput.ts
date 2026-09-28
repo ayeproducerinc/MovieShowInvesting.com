@@ -39,4 +39,6 @@ export interface InvestorIntentInput {
   /** @pattern ^[A-Z]{2}$ */
   country: string;
   zip?: string;
+  /** Explicitly save a separate entry after an earlier confirmation */
+  new_entry?: boolean;
 }
