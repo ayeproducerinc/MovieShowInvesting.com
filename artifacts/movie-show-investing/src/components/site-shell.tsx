@@ -7,7 +7,6 @@ import { leaveFilmmakerAccount } from '@workspace/api-client-react';
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { clearFilmmakerAction } from '@/lib/filmmaker-intent';
 import { useAuth } from '@workspace/replit-auth-web';
-import { switchToSso } from '@/lib/auth-switch';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 
 const navigation = [
@@ -27,7 +26,6 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const replitAuth = useAuth();
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
-  const [switchingSso, setSwitchingSso] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   async function leave() {
     if (replitAuth.user) {
@@ -61,19 +59,6 @@ export function SiteShell({ children }: { children: ReactNode }) {
     }
   }
   const signedIn = replitAuth.user || (!replitAuth.isLoading && user);
-  async function beginSso() {
-    if (switchingSso) return;
-    setSwitchingSso(true);
-    setSignOutError('');
-    try {
-      const result = await switchToSso(getInitializedAuth(), queryClient, replitAuth.login);
-      if (!result.ok) setSignOutError(result.message);
-    } catch {
-      setSignOutError('Single sign-on could not be started. Please try again.');
-    } finally {
-      setSwitchingSso(false);
-    }
-  }
   return (
     <div className="min-h-[100dvh] flex flex-col">
       <header className="relative z-20 border-b hairline bg-[#f4f0e7]">
@@ -95,12 +80,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
               {signedIn ? <>
                 <Link href="/me/projects" data-testid="link-header-my-projects" className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">My projects</Link>
                 <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} replitUser={Boolean(replitAuth.user)} replitLogout={replitAuth.logout} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-semibold whitespace-nowrap underline underline-offset-4" testId="button-header-google-sign-in" />
-                {!replitAuth.user && <button type="button" onClick={() => void beginSso()} disabled={switchingSso || replitAuth.isLoading || !firebaseReady} className="text-[12px] font-semibold whitespace-nowrap underline underline-offset-4">Continue with single sign-on</button>}
+                {replitAuth.user && <span className="max-w-36 text-[11px] leading-tight text-[#535c60]">Existing session active. Sign out before Google sign-in.</span>}
                 <button type="button" data-testid="button-header-sign-out" onClick={() => void leave()} disabled={signingOut || replitAuth.isLoading} className="text-[12px] font-semibold whitespace-nowrap underline underline-offset-4">Sign out</button>
               </> : <>
-                <Link href="/me/projects" data-testid="link-header-sign-in" onClick={clearFilmmakerAction} className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">Sign in</Link>
-                <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold whitespace-nowrap text-[#902f4d]" testId="button-header-google-sign-in" />
-                <button type="button" onClick={() => void beginSso()} disabled={switchingSso || replitAuth.isLoading || !firebaseReady} className="text-[12px] font-semibold whitespace-nowrap underline underline-offset-4">Continue with single sign-on</button>
+                <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold whitespace-nowrap text-[#902f4d]" testId="button-header-google-sign-in" label="Sign in" />
               </>}
             </div>
             <button type="button" data-testid="button-toggle-menu" className="inline-flex h-10 w-10 items-center justify-center border border-[#26303d] md:hidden" aria-expanded={open} aria-label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen(!open)}>{open ? <X size={19} /> : <Menu size={19} />}</button>
@@ -110,10 +93,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
           {signedIn ? <>
             <Link href="/me/projects" data-testid="link-mobile-my-projects" onClick={() => setOpen(false)} className="text-[12px] font-bold text-[#902f4d]">My projects</Link>
             <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} replitUser={Boolean(replitAuth.user)} replitLogout={replitAuth.logout} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-semibold underline underline-offset-4" testId="button-mobile-google-sign-in" />
+            {replitAuth.user && <span className="max-w-28 text-[10px] leading-tight text-[#535c60]">Existing session active. Sign out before Google sign-in.</span>}
             <button type="button" data-testid="button-mobile-sign-out" onClick={() => void leave()} disabled={signingOut || replitAuth.isLoading} className="text-[12px] font-semibold underline underline-offset-4">Sign out</button>
           </> : <>
-            <Link href="/me/projects" data-testid="link-mobile-sign-in" onClick={() => { clearFilmmakerAction(); setOpen(false); }} className="text-[12px] font-bold text-[#902f4d]">Sign in</Link>
-            <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold text-[#902f4d]" testId="button-mobile-google-sign-in" />
+            <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold text-[#902f4d]" testId="button-mobile-google-sign-in" label="Sign in" />
           </>}
         </div>
         {open && <nav className="absolute top-full left-0 right-0 border-b border-[#bcb4a7] bg-[#f4f0e7] px-5 pb-5 shadow-lg md:hidden" aria-label="Mobile navigation">

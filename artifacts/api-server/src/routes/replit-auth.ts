@@ -9,21 +9,15 @@ import {
   LogoutBrowserSessionResponse,
 } from "@workspace/api-zod";
 import { Router, type IRouter, type Request, type Response } from "express";
-import * as oidc from "openid-client";
 
 import {
   clearSecureCookie,
-  createSession,
   deleteSession,
-  getOidcConfig,
   getSafeReturnTo,
   getTrustedOrigin,
   OIDC_COOKIE_PREFIX,
-  OIDC_TTL,
   SESSION_COOKIE,
-  SESSION_TTL,
   setSecureCookie,
-  upsertVerifiedOidcUser,
 } from "../lib/replit-auth";
 
 const router: IRouter = Router();
@@ -48,14 +42,6 @@ function setFreshVisitorCookie(req: Request, res: Response, visitorId: string): 
   });
 }
 
-function getCallbackUrl(req: Request, origin: string): URL {
-  const callbackUrl = new URL(req.originalUrl, origin);
-  if (callbackUrl.origin !== origin || callbackUrl.pathname !== "/api/callback") {
-    throw new Error("OIDC callback URL does not match the trusted origin.");
-  }
-  return callbackUrl;
-}
-
 router.get("/auth/user", (req: Request, res: Response) => {
   res.json(
     GetCurrentAuthUserResponse.parse({
@@ -64,95 +50,14 @@ router.get("/auth/user", (req: Request, res: Response) => {
   );
 });
 
-router.get("/login", async (req: Request, res: Response) => {
-  const origin = getTrustedOrigin(req);
-  const config = await getOidcConfig();
-  const callbackUrl = `${origin}/api/callback`;
-  const state = oidc.randomState();
-  const nonce = oidc.randomNonce();
-  const codeVerifier = oidc.randomPKCECodeVerifier();
-  const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier);
-  const authorizationUrl = oidc.buildAuthorizationUrl(config, {
-    redirect_uri: callbackUrl,
-    scope: "openid email profile",
-    code_challenge: codeChallenge,
-    code_challenge_method: "S256",
-    state,
-    nonce,
-  });
-
-  setSecureCookie(res, `${OIDC_COOKIE_PREFIX}state`, state, OIDC_TTL);
-  setSecureCookie(res, `${OIDC_COOKIE_PREFIX}nonce`, nonce, OIDC_TTL);
-  setSecureCookie(res, `${OIDC_COOKIE_PREFIX}verifier`, codeVerifier, OIDC_TTL);
-  setSecureCookie(
-    res,
-    `${OIDC_COOKIE_PREFIX}returnTo`,
-    getSafeReturnTo(req.query.returnTo, origin),
-    OIDC_TTL,
-  );
-  res.redirect(authorizationUrl.href);
+router.get("/login", (_req: Request, res: Response) => {
+  clearOidcCookies(res);
+  res.redirect(302, "/me/projects");
 });
 
-router.get("/callback", async (req: Request, res: Response) => {
-  let origin: string;
-  try {
-    origin = getTrustedOrigin(req);
-  } catch {
-    res.status(400).send("Authentication callback host is not trusted.");
-    return;
-  }
-
-  const state = req.cookies?.[`${OIDC_COOKIE_PREFIX}state`];
-  const nonce = req.cookies?.[`${OIDC_COOKIE_PREFIX}nonce`];
-  const codeVerifier = req.cookies?.[`${OIDC_COOKIE_PREFIX}verifier`];
-  const returnTo = getSafeReturnTo(req.cookies?.[`${OIDC_COOKIE_PREFIX}returnTo`], origin);
+router.get("/callback", (_req: Request, res: Response) => {
   clearOidcCookies(res);
-  if (
-    typeof state !== "string" ||
-    typeof nonce !== "string" ||
-    typeof codeVerifier !== "string"
-  ) {
-    res.status(400).send("Authentication request expired. Please sign in again.");
-    return;
-  }
-
-  let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
-  try {
-    const config = await getOidcConfig();
-    tokens = await oidc.authorizationCodeGrant(config, getCallbackUrl(req, origin), {
-      pkceCodeVerifier: codeVerifier,
-      expectedState: state,
-      expectedNonce: nonce,
-      idTokenExpected: true,
-    });
-  } catch {
-    res.status(401).send("Sign-in verification failed. Please start again.");
-    return;
-  }
-
-  const claims = tokens.claims();
-  if (!claims) {
-    res.status(401).send("The identity provider did not return a verified identity.");
-    return;
-  }
-
-  let user;
-  try {
-    user = await upsertVerifiedOidcUser(claims);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.message.includes("verified email") || error.message.includes("invalid email"))
-    ) {
-      res.status(403).send("Sign-in requires a valid, verified email address.");
-      return;
-    }
-    throw error;
-  }
-
-  const sid = await createSession(user);
-  setSecureCookie(res, SESSION_COOKIE, sid, SESSION_TTL);
-  res.redirect(returnTo);
+  res.status(410).send("This sign-in method is unavailable. Use Sign in at /me/projects.");
 });
 
 router.post("/logout", async (req: Request, res: Response) => {

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import {
   claimFilmmakerProject, getGetFilmmakerProjectsQueryKey, getGetFilmmakerQuestionsQueryKey,
@@ -18,17 +18,16 @@ import {
 } from '@/components/filmmaker-phone-verification';
 import { FilmmakerQuestionsDesk } from '@/components/filmmaker-questions-desk';
 import { FilmmakerConversationsDesk } from '@/components/filmmaker-conversations-desk';
-import { useFilmmakerEmailLink } from '@/hooks/use-filmmaker-email-link';
+import { useFilmmakerAuth } from '@/hooks/use-filmmaker-auth';
 import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 import { useAuth } from '@workspace/replit-auth-web';
-import { switchToSso, switchToFirebase } from '@/lib/auth-switch';
 import { getInitializedAuth } from '@/components/firebase-bootstrap';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 
 function accountError(error: unknown): string {
   if (error && typeof error === 'object' && 'status' in error) {
-    if (error.status === 409) return 'This browser has an earlier submission or an unfinished worksheet that cannot be switched away from yet. Finish that worksheet here, or sign in with the email used on your completed submission.';
-    if (error.status === 403) return 'This browser’s current worksheet belongs to a different account or email. Sign in with the email used on that submission to link it. Your other projects have not changed.';
+    if (error.status === 409) return 'This browser has an earlier submission or an unfinished worksheet that cannot be switched away from yet. Finish that worksheet here before managing another project.';
+    if (error.status === 403) return 'This browser’s current worksheet belongs to a different account. Sign in with the Google account associated with that submission. Your other projects have not changed.';
     if (error.status === 401) return 'Your sign-in has expired. Sign in again to manage your projects.';
   }
   return 'We couldn’t complete that action. Your saved projects have not changed. Please try again.';
@@ -37,16 +36,14 @@ function accountError(error: unknown): string {
 export default function FilmmakerProjects() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
-  const auth = useFilmmakerEmailLink();
+  const auth = useFilmmakerAuth();
   const replitAuth = useAuth();
   const ssoUser = replitAuth.user;
-  const [email, setEmail] = useState('');
   const [actionError, setActionError] = useState('');
   const [claimError, setClaimError] = useState('');
   const [claiming, setClaiming] = useState(false);
   const [acting, setActing] = useState(false);
   const [initialAction] = useState(pendingFilmmakerAction);
-  const [claimDoneUid, setClaimDoneUid] = useState<string | null>(null);
   const claimedUid = useRef<string | null>(null);
   const uid = auth.user?.uid;
   const identityId = ssoUser?.id ?? uid;
@@ -55,7 +52,7 @@ export default function FilmmakerProjects() {
   const projects = useGetFilmmakerProjects({
     query: {
       queryKey: [...getGetFilmmakerProjectsQueryKey(), identityId],
-      enabled: !!identityId && !replitAuth.isLoading && (Boolean(ssoUser) || auth.ready) && !auth.linkPresent,
+      enabled: !!identityId && !replitAuth.isLoading && (Boolean(ssoUser) || auth.ready),
       retry: (count, error) => error.status !== 401 && error.status !== 403 && count < 2,
       refetchOnMount: 'always',
     },
@@ -88,7 +85,7 @@ export default function FilmmakerProjects() {
         }
       }
       const linkAndContinue = async () => {
-        // Serialize visitor-cookie changes and a one-time action across email-link tabs.
+        // Serialize visitor-cookie changes and a one-time action across tabs.
         await getPriceGroup();
         await claimFilmmakerProject();
         if (user && !ssoUser) await synchronizeFilmmakerPhone(user);
@@ -100,7 +97,6 @@ export default function FilmmakerProjects() {
           await queryClient.invalidateQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
           navigate('/start/filmmaker');
         } else {
-          setClaimDoneUid(identityId);
           if (initialAction === 'manage') clearFilmmakerAction();
         }
       };
@@ -114,10 +110,10 @@ export default function FilmmakerProjects() {
   }, [queryClient, identityId, user, ssoUser, replitAuth.isLoading, initialAction, navigate, start]);
 
   useEffect(() => {
-    if (!identityId || replitAuth.isLoading || (!ssoUser && !auth.ready) || auth.linkPresent || claimedUid.current === identityId) return;
+    if (!identityId || replitAuth.isLoading || (!ssoUser && !auth.ready) || claimedUid.current === identityId) return;
     claimedUid.current = identityId;
     void linkCurrentVisit();
-  }, [identityId, ssoUser, replitAuth.isLoading, auth.ready, auth.linkPresent, linkCurrentVisit]);
+  }, [identityId, ssoUser, replitAuth.isLoading, auth.ready, linkCurrentVisit]);
 
   function clearVisitorQueries() {
     queryClient.removeQueries({ queryKey: getGetFilmmakerResultQueryKey() });
@@ -159,7 +155,6 @@ export default function FilmmakerProjects() {
       for (const project of projects.data?.projects ?? []) queryClient.removeQueries({ queryKey: getGetFilmmakerQuestionsQueryKey(project.id) });
       queryClient.removeQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
       claimedUid.current = null;
-      setClaimDoneUid(null);
       clearFilmmakerAction();
     } catch (error) {
       setActionError(accountError(error));
@@ -168,55 +163,28 @@ export default function FilmmakerProjects() {
     }
   }
 
-  async function submitEmail(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (auth.linkPresent) await auth.complete(email);
-    else await auth.requestLink(email);
-  }
-
-  async function beginSso() {
-    setActionError('');
-    const result = await switchToSso(getInitializedAuth(), queryClient, replitAuth.login);
-    if (!result.ok) setActionError(result.message);
-  }
-
     if (replitAuth.isLoading || (!ssoUser && (auth.configPending || (!auth.configError && !auth.ready)))) {
     return <section className="dossier"><div className="page-wrap dossier-hero" role="status"><p className="dossier-kicker">Your filmmaker desk</p><h1 className="dossier-title">Finding your<br/><em>projects.</em></h1></div></section>;
   }
   if (!ssoUser && auth.configError && !auth.user) {
-    return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Account sign-in unavailable</p><h1 className="dossier-title">We can’t open<br/><em>your desk yet.</em></h1><p className="dossier-lead" role="alert">Firebase sign-in isn’t configured right now. Your existing submission has not changed. Please try again later.</p>{actionError && <p className="dossier-status" role="alert">{actionError}</p>}<GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} className="dossier-button" testId="button-filmmaker-google-sign-in" /><button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 16 }} onClick={() => void auth.retryConfig()}>Check again <RotateCcw size={17}/></button><button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 16 }} disabled={replitAuth.isLoading} onClick={() => void beginSso()}>Continue with single sign-on <ArrowRight size={17}/></button></div></section>;
+    return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Account sign-in unavailable</p><h1 className="dossier-title">We can’t open<br/><em>your desk yet.</em></h1><p className="dossier-lead" role="alert">{auth.authError || 'Google sign-in isn’t configured right now. Your existing submission has not changed. Please try again later.'}</p>{actionError && <p className="dossier-status" role="alert">{actionError}</p>}<GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} className="dossier-button" testId="button-filmmaker-google-sign-in" label="Sign in" /><button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 16 }} onClick={() => void auth.retryConfig()}>Check again <RotateCcw size={17}/></button></div></section>;
   }
-  if (!identityId || (!ssoUser && (auth.linkPresent || auth.busy))) {
+  if (!identityId) {
     return <section className="dossier"><div className="page-wrap dossier-hero" style={{ maxWidth: 850 }}>
       <p className="dossier-kicker">Private filmmaker access</p>
       <h1 className="dossier-title">One place for<br/><em>every project.</em></h1>
-      <p className="dossier-lead">{auth.linkPresent
-        ? 'Confirm the email address that received this link to finish signing in.'
-        : 'Sign in to start another film, return to a saved draft, or manage your projects on another device.'}</p>
-      <p className="dossier-notice" style={{ marginTop: 26 }}>Already submitted without signing in? Open this page in the browser where you submitted it and sign in with the same email once to add it to your account. Your saved project and public link will stay intact.</p>
+      <p className="dossier-lead">Sign in with Google to start another film, return to a saved draft, or manage your projects on another device.</p>
+      <p className="dossier-notice" style={{ marginTop: 26 }}>Already submitted without signing in? Open this page in the browser where you submitted it and sign in with Google to securely claim submissions saved in that browser. Your saved project and public link will stay intact; accounts are never merged based only on matching email addresses.</p>
       <div style={{ marginTop: 28 }}>
         <GoogleSignInButton
           auth={getInitializedAuth()}
           queryClient={queryClient}
-          replitUser={Boolean(ssoUser)}
-          replitLogout={replitAuth.logout}
           disabled={replitAuth.isLoading}
           className="dossier-button"
           testId="button-filmmaker-google-sign-in"
+          label="Sign in"
         />
       </div>
-      <details style={{ maxWidth: 480, marginTop: 24 }} open={auth.linkPresent}>
-        <summary className="dossier-kicker" style={{ cursor: 'pointer' }}>{auth.linkPresent ? 'Complete or recover email-link sign-in' : 'Use email-link recovery instead'}</summary>
-        <form onSubmit={event => void submitEmail(event)} style={{ marginTop: 18 }}>
-          <label htmlFor="filmmaker-sign-in-email" className="dossier-kicker">Your email address</label>
-          <input id="filmmaker-sign-in-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" data-testid="input-filmmaker-email" style={{ display: 'block', width: '100%', minHeight: 52, border: '1px solid #a6a4a0', padding: '12px 15px', margin: '10px 0 16px', color: '#202936', background: '#fff' }} />
-          <button type="submit" className="dossier-button" disabled={auth.busy}>{auth.linkPresent ? 'Finish sign-in' : 'Email me a sign-in link'} <ArrowRight size={17}/></button>
-        </form>
-      </details>
-      {auth.busy && <p className="dossier-status" role="status">Working on your sign-in…</p>}
-      {auth.sentTo && <p className="dossier-status" role="status">Check {auth.sentTo} for your sign-in link. You can keep this page open.</p>}
-      {auth.feedback && <p className="dossier-status" role="alert">{auth.feedback}</p>}
-      {auth.linkPresent && auth.feedback && <button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 16 }} disabled={auth.busy || !email.trim()} onClick={() => void auth.requestLink(email)}>Request a new link <ArrowRight size={17}/></button>}
       <p className="dossier-status" style={{ marginTop: 28 }}><Link href="/">Back to the site</Link></p>
     </div></section>;
   }
@@ -231,9 +199,8 @@ export default function FilmmakerProjects() {
   }));
   return <>
     {(ssoUser || user) && <div className="page-wrap" style={{ marginTop: 24, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-      <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} replitUser={Boolean(ssoUser)} replitLogout={replitAuth.logout} disabled={replitAuth.isLoading} className="dossier-button dossier-button-outline" testId="button-filmmaker-google-link" label={ssoUser ? 'Switch to Google sign-in' : undefined} />
-      {!ssoUser && <button type="button" className="dossier-button dossier-button-outline" disabled={replitAuth.isLoading} onClick={() => void beginSso()}>Continue with single sign-on</button>}
-      {ssoUser && <button type="button" className="dossier-button dossier-button-outline" onClick={() => switchToFirebase(queryClient, replitAuth.logout)}>Use an email-link account instead</button>}
+      <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} replitUser={Boolean(ssoUser)} replitLogout={replitAuth.logout} disabled={replitAuth.isLoading} className="dossier-button dossier-button-outline" testId="button-filmmaker-google-link" label={ssoUser ? 'Sign in' : undefined} />
+      {ssoUser && <p className="dossier-notice">An existing session is active. Sign out before signing in with Google.</p>}
     </div>}
     {claimError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{claimError} <Link href="/start/filmmaker">Open this browser’s worksheet</Link> · <button type="button" onClick={() => void linkCurrentVisit()}>Try linking again</button></div>}
     {actionError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{actionError}</div>}
@@ -245,7 +212,7 @@ export default function FilmmakerProjects() {
       loading={projects.isPending || claiming}
       busy={acting || claiming}
       error={projects.isError ? accountError(projects.error) : null}
-      phoneVerificationSlot={auth.user && !ssoUser ? <FilmmakerPhoneVerification user={auth.user} verified={projects.data?.phone_verified ?? false} /> : ssoUser ? <p className="dossier-notice">Phone verification is available only for email-link accounts.</p> : null}
+      phoneVerificationSlot={auth.user && !ssoUser ? <FilmmakerPhoneVerification user={auth.user} verified={projects.data?.phone_verified ?? false} /> : ssoUser ? <p className="dossier-notice">Phone verification is available after signing in with Google.</p> : null}
       onStart={() => void perform(() => start.mutateAsync(), '/start/filmmaker')}
       onResume={() => void perform(() => resume.mutateAsync(), '/start/filmmaker')}
       onOpen={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}

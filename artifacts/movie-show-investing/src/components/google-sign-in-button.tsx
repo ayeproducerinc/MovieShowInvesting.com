@@ -49,7 +49,7 @@ export function GoogleSignInButton({
     setFeedback('');
     if (replitUser && replitLogout) {
       switchToFirebase(queryClient, replitLogout);
-      setFeedback('Your single sign-on session is being signed out. After sign-out finishes, select this button again to continue with Google.');
+      setFeedback('An existing session is being signed out. After sign-out finishes, select Sign in again.');
       return;
     }
     if (!auth) {
@@ -118,10 +118,10 @@ export function GoogleSignInButton({
   }
 
   const buttonLabel = label ?? (replitUser
-    ? 'Continue with Google'
+    ? 'Sign in'
     : googleLinked
-      ? preparedUid === firebaseUser?.uid ? 'Choose Google account' : 'Switch Google account'
-      : firebaseUser ? 'Link Google account' : 'Continue with Google');
+      ? 'Choose Google account'
+      : 'Sign in');
 
   return <span className="inline-flex flex-col items-stretch gap-2">
     <button

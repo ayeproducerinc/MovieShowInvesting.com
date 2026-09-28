@@ -66,38 +66,6 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
-function emailLinkTarget() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('mode') !== 'signIn' || !params.has('oobCode')) return null;
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-  const adminPath = `${base}/admin`;
-  const projectsPath = `${base}/me/projects`;
-  const investPath = `${base}/invest`;
-  const messagesPath = `${base}/messages`;
-  let path = adminPath;
-  try {
-    const continuation = params.get('continueUrl');
-    if (continuation) {
-      const target = new URL(continuation);
-      if (target.origin === window.location.origin) {
-        if (target.pathname === projectsPath) path = projectsPath;
-        else if (target.pathname === investPath || target.pathname === `${investPath}/done`) path = target.pathname;
-        else if (target.pathname === messagesPath || /^\/messages\/[1-9]\d*$/.test(target.pathname.slice(base.length))) path = target.pathname;
-      }
-    }
-  } catch { /* Unknown email-link continuation keeps the existing admin fallback. */ }
-  if (window.location.pathname === path || window.location.pathname === adminPath || window.location.pathname === projectsPath || window.location.pathname === investPath || window.location.pathname === messagesPath || window.location.pathname.startsWith(`${messagesPath}/`)) return null;
-  const continuation = params.get('continueUrl');
-  const intent = continuation && (() => {
-    try {
-      const target = new URL(continuation);
-      const action = target.searchParams.get('action');
-      return target.origin === window.location.origin && target.pathname === projectsPath && (action === 'start' || action === 'manage') ? action : null;
-    } catch { return null; }
-  })();
-  return `${window.location.origin}${path}${path === projectsPath && intent ? `?action=${intent}&` + window.location.search.slice(1) : window.location.search}${window.location.hash}`;
-}
-
 function PublicPages() {
   const visit = useVisitAttribution();
   return <>
@@ -137,12 +105,6 @@ function PublicPages() {
 }
 
 function App() {
-  const redirectTarget = emailLinkTarget();
-  useEffect(() => {
-    if (redirectTarget) window.location.replace(redirectTarget);
-  }, [redirectTarget]);
-  if (redirectTarget) return <div role="status" aria-label="Opening email-link sign-in" />;
-
   return <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>

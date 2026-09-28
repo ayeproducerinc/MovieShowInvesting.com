@@ -249,6 +249,10 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
       if (!sameOwner) {
         conflict = "This email is already associated with a different investor identity.";
       }
+    } else if (emailOwner && identity && (!visitorId || emailOwner.visitor_id !== visitorId)) {
+      // A verified matching email is not proof that this account owns a guest
+      // intent. Only the original visitor cookie may link that guest record.
+      conflict = "This email has an investor intent from another visitor. Return to the original browser to link it, or contact support for owner recovery.";
     } else if (emailOwner && !identity && (!visitorId || emailOwner.visitor_id !== visitorId)) {
       conflict = "This email is already associated with a different investor identity.";
     }

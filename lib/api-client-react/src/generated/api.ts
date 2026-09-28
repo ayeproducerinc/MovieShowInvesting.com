@@ -208,7 +208,7 @@ export const getBeginBrowserLoginUrl = (params?: BeginBrowserLoginParams,) => {
 }
 
 /**
- * @summary Start browser OIDC sign-in
+ * @summary Redirect legacy login links to the Google sign-in screen
  */
 export const beginBrowserLogin = async (params?: BeginBrowserLoginParams, options?: Parameters<typeof customFetch>[1]): Promise<unknown> => {
 
@@ -255,7 +255,7 @@ export type BeginBrowserLoginQueryError = ErrorType<void>
 
 
 /**
- * @summary Start browser OIDC sign-in
+ * @summary Redirect legacy login links to the Google sign-in screen
  */
 
 export function useBeginBrowserLogin<TData = Awaited<ReturnType<typeof beginBrowserLogin>>, TError = ErrorType<void>>(
@@ -285,7 +285,7 @@ export const getHandleBrowserLoginCallbackUrl = () => {
 }
 
 /**
- * @summary Complete browser OIDC sign-in
+ * @summary Reject deprecated browser OIDC callbacks
  */
 export const handleBrowserLoginCallback = async ( options?: Parameters<typeof customFetch>[1]): Promise<unknown> => {
 
@@ -332,7 +332,7 @@ export type HandleBrowserLoginCallbackQueryError = ErrorType<void>
 
 
 /**
- * @summary Complete browser OIDC sign-in
+ * @summary Reject deprecated browser OIDC callbacks
  */
 
 export function useHandleBrowserLoginCallback<TData = Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError = ErrorType<void>>(

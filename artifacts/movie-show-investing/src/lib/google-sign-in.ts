@@ -28,7 +28,7 @@ export async function signInWithGoogle(auth: Auth) {
       case 'auth/cancelled-popup-request':
         throw new Error('Google sign-in was cancelled. You can try again whenever you are ready.');
       case 'auth/account-exists-with-different-credential':
-        throw new Error('A Google account with this email already exists under another sign-in method. Sign in with that existing method first, then choose Continue with Google to link it. For email-link accounts, use the email-link recovery option. We will not transfer an account based only on a matching email address.');
+        throw new Error('A Google account with this email already exists under another sign-in method. Sign in to that existing account first. We will not transfer or merge accounts based only on a matching email address.');
       case 'auth/credential-already-in-use':
         throw new Error('That Google account is already linked to another Movie Show Investing account. Sign in with the account it is linked to; accounts cannot be merged automatically.');
       case 'auth/provider-already-linked':
@@ -42,8 +42,8 @@ export async function signInWithGoogle(auth: Auth) {
         throw new Error('Firebase could not connect. Check your connection and try again.');
       default:
         throw new Error(code
-          ? `Google sign-in could not be completed (${code}). Please try again or use email-link recovery.`
-          : 'Google sign-in could not be completed. Please try again or use email-link recovery.');
+          ? `Google sign-in could not be completed (${code}). Please try again.`
+          : 'Google sign-in could not be completed. Please try again.');
     }
   }
 }

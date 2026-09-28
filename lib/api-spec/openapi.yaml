@@ -49,21 +49,21 @@ paths:
     get:
       operationId: beginBrowserLogin
       tags: [auth]
-      summary: Start browser OIDC sign-in
+      summary: Redirect legacy login links to the Google sign-in screen
       parameters:
         - name: returnTo
           in: query
           required: false
           schema: { type: string }
       responses:
-        "302": { description: Redirect to the OIDC authorization endpoint }
+        "302": { description: Redirect to the filmmaker Google sign-in screen }
   /callback:
     get:
       operationId: handleBrowserLoginCallback
       tags: [auth]
-      summary: Complete browser OIDC sign-in
+      summary: Reject deprecated browser OIDC callbacks
       responses:
-        "302": { description: Redirect to the validated post-login path }
+        "410": { description: Replit OIDC callbacks are no longer accepted }
   /logout:
     post:
       operationId: logoutBrowserSession

@@ -23,7 +23,7 @@ export const GetCurrentAuthUserResponse = zod.object({
 
 
 /**
- * @summary Start browser OIDC sign-in
+ * @summary Redirect legacy login links to the Google sign-in screen
  */
 export const BeginBrowserLoginQueryParams = zod.object({
   "returnTo": zod.coerce.string().optional()
@@ -33,7 +33,7 @@ export const BeginBrowserLoginResponse = zod.void()
 
 
 /**
- * @summary Complete browser OIDC sign-in
+ * @summary Reject deprecated browser OIDC callbacks
  */
 export const HandleBrowserLoginCallbackResponse = zod.void()
 
