@@ -21,6 +21,7 @@ import {
   requireMatchingFilmmakerContext,
 } from "../lib/filmmaker-auth";
 import { recordTransactionalEmailStatus, sendTransactionalEmail } from "../lib/mailjet";
+import { reserveFilmmakerSubmissionAttempt } from "../lib/filmmaker-submission-limit";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -31,6 +32,7 @@ const SHOWCASE_FIELDS = new Set([
   "showcase_requested", "synopsis", "team_links", "money_use", "distribution_plan", "trailer_url",
 ]);
 const INPUT_FIELDS = new Set([
+  "website",
   "no_project_yet", "stage", "title", "format", "genre", "genre_other",
   "logline", "trailer_url", "pilot_url", "budget", "budget_from_example", "deal_answer",
   "offer_per100", "offer_other_text", "wants_lower", "payback_terms", "payback_terms_other",
@@ -94,6 +96,11 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid filmmaker submission." });
     return;
   }
+  const { website, ...data } = parsed.data;
+  if (website?.trim()) {
+    res.status(400).json({ error: "Invalid filmmaker submission." });
+    return;
+  }
 
   const cookieId = req.cookies?.[VISITOR_COOKIE];
   if (typeof cookieId !== "string" || !UUID.test(cookieId)) {
@@ -112,7 +119,6 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
   }
   const identity = access.identity ?? await authenticateFilmmaker(req, res, false);
 
-  const data = parsed.data;
   if (!data.no_project_yet) {
     const requiredProjectValues: Array<[string, unknown]> = [
       ["stage", data.stage],
@@ -138,6 +144,18 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
       res.status(400).json({ error: "Project, offer, and funding details are required for project submissions." });
       return;
     }
+  }
+
+  try {
+    if (!await reserveFilmmakerSubmissionAttempt(req.ip ?? "unknown", cookieId)) {
+      res.setHeader("Retry-After", "3600");
+      res.status(429).json({ error: "Too many submission attempts. Please try again later." });
+      return;
+    }
+  } catch {
+    req.log.error("Filmmaker submission rate limiter unavailable");
+    res.status(503).json({ error: "Submission is temporarily unavailable. Please try again later." });
+    return;
   }
 
   try {

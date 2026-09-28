@@ -351,6 +351,7 @@ export const submitFilmmakerBodyCountryRegExp = new RegExp('^[A-Z]{2}$');
 
 
 export const SubmitFilmmakerBody = zod.object({
+  "website": zod.string().optional().describe('Leave blank. Bot-detection field; never stored with the submission.'),
   "no_project_yet": zod.boolean(),
   "stage": zod.enum(['distribution', 'production', 'idea']).optional(),
   "title": zod.string().optional(),

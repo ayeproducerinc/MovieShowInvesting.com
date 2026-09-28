@@ -222,6 +222,8 @@ export const FilmmakerSubmissionInputPaybackTerms = {
 } as const;
 
 export interface FilmmakerSubmissionInput {
+  /** Leave blank. Bot-detection field; never stored with the submission. */
+  website?: string;
   no_project_yet: boolean;
   stage?: FilmmakerSubmissionInputStage;
   title?: string;

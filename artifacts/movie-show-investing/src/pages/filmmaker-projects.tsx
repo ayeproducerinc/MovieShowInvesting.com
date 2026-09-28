@@ -88,7 +88,9 @@ export default function FilmmakerProjects() {
         await claimFilmmakerProject();
         if (user && !ssoUser) await synchronizeFilmmakerPhone(user);
         await queryClient.invalidateQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
-        if (initialAction === 'start' && navigator.locks && hasPendingStartAction()) {
+        const requestedStart = hasPendingStartAction()
+          || new URLSearchParams(window.location.search).get('action') === 'start';
+        if (initialAction === 'start' && requestedStart) {
           await start.mutateAsync();
           clearVisitorQueries();
           clearFilmmakerAction();

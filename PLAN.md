@@ -103,7 +103,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 6 — Final hardening and launch (after Phase 8)
 
-**Status:** not started; explicitly deferred until after Phase 8.
+**Status:** partly implemented in development: the filmmaker final-submission form now has an optional bot-trap field, and the API applies database-backed, hashed per-network and per-visitor attempt limits before creating a submission. The development table exists; the filled bot-trap rejection was checked, but a genuine successful submission and the full rate-limit boundary have not been exercised in an isolated test environment. Turnstile, launch legal review, production-domain setup, provider checks, and Clarity remain pending; this phase is not launch-ready.
 **Deliverables:**
 
 - Mixpanel and Microsoft Clarity events specified in the Prompt Guide.

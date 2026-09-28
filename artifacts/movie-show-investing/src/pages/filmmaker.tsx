@@ -91,6 +91,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
   const [hydrated, setHydrated] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [validation, setValidation] = useState('');
+  const [website, setWebsite] = useState('');
   const [saving, setSaving] = useState(false);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const screenRef = useRef(1);
@@ -207,13 +208,15 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
     if (editTimer.current !== null) window.clearTimeout(editTimer.current);
     try {
       await persist(6, a);
-      await submit.mutateAsync({ data:payload(a) });
+      await submit.mutateAsync({ data:{ ...payload(a), website } });
       if (identityId === 'visitor') showGuestConfirmation();
       navigate('/start/filmmaker/done');
     } catch (error) {
       const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
       setSaveError(status === 409 || status === 403 || status === 404
         ? 'This draft is no longer selected for this visit. Copy any unsaved answers, then open My projects to resume the draft or start another project.'
+        : status === 429
+          ? 'Too many submission attempts from this browser or network. Please try again later. Your worksheet is still saved.'
         : 'We could not submit your information. Nothing has been confirmed. Please try again.');
     }
   }
@@ -320,6 +323,11 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
           <div className="fm-section"><Field id="funding-experience" label="What was your experience?" value={a.funding_experience} onChange={v=>change('funding_experience',v)} required multiline placeholder="What worked, what didn’t, or what you wish had been different"/></div>
         </>}
         {screen === 6 && <>{a.no_project_yet && <div className="fm-note">You’re joining the conversation without a project. We won’t ask for a budget or deal terms.</div>}
+          <div className="absolute -left-[10000px] h-px w-px overflow-hidden" aria-hidden="true">
+            <label htmlFor="filmmaker-website">Leave this field blank</label>
+            <input id="filmmaker-website" name="website" type="text" autoComplete="off" tabIndex={-1}
+              value={website} onChange={event => setWebsite(event.target.value)} />
+          </div>
           <Field id="name" label="Your name" value={a.name} onChange={v=>change('name',v)} required/>
           <Field id="email" label="Email address" value={a.email} onChange={v=>change('email',v)} type="email" required/>
           <Field id="phone" label="Phone number" value={a.phone} onChange={v=>change('phone',v)} type="tel"/>

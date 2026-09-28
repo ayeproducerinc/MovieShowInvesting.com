@@ -417,6 +417,8 @@ paths:
           description: Firebase verification is unavailable
         "409":
           description: Draft context header is missing or does not match the current draft
+        "429":
+          description: Too many submissions from this visitor or network in the past hour
   /filmmakers/result:
     get:
       operationId: getFilmmakerResult
@@ -1480,6 +1482,7 @@ components:
       additionalProperties: false
       required: [no_project_yet, name, email, city, favorite_genres, chat_opt_in]
       properties:
+        website: { type: string, description: "Leave blank. Bot-detection field; never stored with the submission." }
         no_project_yet: { type: boolean }
         stage: { type: string, enum: [distribution, production, idea] }
         title: { type: string }
