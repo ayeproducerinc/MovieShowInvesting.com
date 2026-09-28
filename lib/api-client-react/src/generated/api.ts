@@ -44,6 +44,8 @@ import type {
   FilmmakerAccountLeave,
   FilmmakerDraftState,
   FilmmakerImageUpload,
+  FilmmakerInterestAlert,
+  FilmmakerInterestAlerts,
   FilmmakerMediaConfig,
   FilmmakerPhoneVerification,
   FilmmakerProjectClaim,
@@ -1839,6 +1841,157 @@ export function useGetFilmmakerProjects<TData = Awaited<ReturnType<typeof getFil
 
 
 
+
+export const getGetFilmmakerInterestAlertsUrl = () => {
+
+
+
+
+  return `/api/filmmakers/interest-alerts`
+}
+
+/**
+ * @summary List private confirmed non-binding interest alerts for account-owned projects
+ */
+export const getFilmmakerInterestAlerts = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerInterestAlerts> => {
+
+  return customFetch<FilmmakerInterestAlerts>(getGetFilmmakerInterestAlertsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFilmmakerInterestAlertsQueryKey = () => {
+    return [
+    `/api/filmmakers/interest-alerts`
+    ] as const;
+    }
+
+
+export const getGetFilmmakerInterestAlertsQueryOptions = <TData = Awaited<ReturnType<typeof getFilmmakerInterestAlerts>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerInterestAlerts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFilmmakerInterestAlertsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFilmmakerInterestAlerts>>> = ({ signal }) => getFilmmakerInterestAlerts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerInterestAlerts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFilmmakerInterestAlertsQueryResult = NonNullable<Awaited<ReturnType<typeof getFilmmakerInterestAlerts>>>
+export type GetFilmmakerInterestAlertsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List private confirmed non-binding interest alerts for account-owned projects
+ */
+
+export function useGetFilmmakerInterestAlerts<TData = Awaited<ReturnType<typeof getFilmmakerInterestAlerts>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerInterestAlerts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFilmmakerInterestAlertsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReadFilmmakerInterestAlertUrl = (alertId: number,) => {
+
+
+
+
+  return `/api/filmmakers/interest-alerts/${alertId}/read`
+}
+
+/**
+ * @summary Mark an account-owned interest alert as read
+ */
+export const readFilmmakerInterestAlert = async (alertId: number, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerInterestAlert> => {
+
+  return customFetch<FilmmakerInterestAlert>(getReadFilmmakerInterestAlertUrl(alertId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReadFilmmakerInterestAlertMutationKey = () => ['readFilmmakerInterestAlert'] as const;
+
+export const getReadFilmmakerInterestAlertMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof readFilmmakerInterestAlert>>, TError,ReadFilmmakerInterestAlertMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof readFilmmakerInterestAlert>>, TError,ReadFilmmakerInterestAlertMutationVariables, TContext> => {
+
+const mutationKey = getReadFilmmakerInterestAlertMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof readFilmmakerInterestAlert>>, ReadFilmmakerInterestAlertMutationVariables> = (props) => {
+          const {alertId} = props ?? {};
+
+          return  readFilmmakerInterestAlert(alertId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReadFilmmakerInterestAlertMutationResult = NonNullable<Awaited<ReturnType<typeof readFilmmakerInterestAlert>>>
+
+    export type ReadFilmmakerInterestAlertMutationError = ErrorType<void>
+    export type ReadFilmmakerInterestAlertMutationVariables = {alertId: number}
+
+    /**
+ * @summary Mark an account-owned interest alert as read
+ */
+export const useReadFilmmakerInterestAlert = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof readFilmmakerInterestAlert>>, TError,ReadFilmmakerInterestAlertMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof readFilmmakerInterestAlert>>,
+        TError,
+        ReadFilmmakerInterestAlertMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReadFilmmakerInterestAlertMutationOptions(options));
+    }
 
 export const getVerifyFilmmakerPhoneUrl = () => {
 

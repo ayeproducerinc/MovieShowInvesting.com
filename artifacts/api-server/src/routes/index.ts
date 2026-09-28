@@ -12,6 +12,7 @@ import projectsRouter from "./projects";
 import questionsRouter from "./questions";
 import exploreRouter from "./explore";
 import investorRouter from "./investor";
+import interestAlertsRouter from "./interest-alerts";
 import conversationsRouter from "./conversations";
 import adminConversationsRouter from "./admin-conversations";
 import replitAuthRouter from "./replit-auth";
@@ -32,6 +33,7 @@ router.use(projectsRouter);
 router.use(questionsRouter);
 router.use(exploreRouter);
 router.use(investorRouter);
+router.use(interestAlertsRouter);
 router.use(conversationsRouter);
 router.use(adminConversationsRouter);
 

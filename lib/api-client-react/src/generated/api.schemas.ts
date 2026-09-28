@@ -396,6 +396,24 @@ export interface FilmmakerProjects {
   phone_verified: boolean;
 }
 
+export interface FilmmakerInterestAlert {
+  /** @minimum 1 */
+  id: number;
+  /** @minimum 1 */
+  project_id: number;
+  /** @nullable */
+  project_title: string | null;
+  /** @nullable */
+  project_slug: string | null;
+  created_at: string;
+  /** @nullable */
+  read_at: string | null;
+}
+
+export interface FilmmakerInterestAlerts {
+  alerts: FilmmakerInterestAlert[];
+}
+
 export interface FilmmakerPhoneVerification {
   phone_verified: boolean;
 }

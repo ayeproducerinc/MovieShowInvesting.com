@@ -10,7 +10,7 @@
 - [Stream thumbnail fallback](bunny-thumbnail-access.md) — shared Stream CDN thumbnails stayed blocked; the owner approved poster-or-video-placeholder previews for this MVP.
 - [Bunny browser playback](bunny-browser-playback.md) — an embedded preview's HLS codec error can be browser-specific; confirm playback elsewhere before changing media.
 - [Multi-project ownership boundaries](multi-project-ownership.md) — real projects must survive a new submission; browser-wide selection is not a safe editing boundary across tabs.
-- [Question email delivery uncertainty](question-email-delivery-uncertainty.md) — ambiguous Mailjet answer outcomes must stay closed to retries until reconciled, preventing duplicate private replies.
+- [Transactional email uncertainty](question-email-delivery-uncertainty.md) — reserve email delivery before sending; ambiguous Mailjet outcomes must not be retried automatically.
 - [Account-switch visitor handoff](account-switch-visitor-handoff.md) — rotate account-owned visitor cookies with the old identity, and separate network preparation from popup activation.
 - [Legacy message sender identity](legacy-message-sender-identity.md) — do not guess the provider of historical messages that lack provider-qualified sender identity.
 - [Mixed-provider thread access](mixed-provider-thread-access.md) — nullable opposite-provider UIDs require NULL-safe exclusion checks in private conversation queries.

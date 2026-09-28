@@ -40,6 +40,8 @@ export * from './filmmakerDraftState';
 export * from './filmmakerDraftStateStatus';
 export * from './filmmakerImageUpload';
 export * from './filmmakerImageUploadKind';
+export * from './filmmakerInterestAlert';
+export * from './filmmakerInterestAlerts';
 export * from './filmmakerMediaConfig';
 export * from './filmmakerMediaConfigImageTypesItem';
 export * from './filmmakerMediaConfigTrailerTypesItem';

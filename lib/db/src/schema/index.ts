@@ -22,6 +22,7 @@ export * from "./filmmakers";
 export * from "./projects";
 export * from "./investors";
 export * from "./pledges";
+export * from "./interest-alerts";
 export * from "./investor-minimums";
 export * from "./messages";
 export * from "./flow-progress";

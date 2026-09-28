@@ -462,6 +462,42 @@ paths:
           description: Firebase email must be verified
         "503":
           description: Firebase verification is unavailable
+  /filmmakers/interest-alerts:
+    get:
+      operationId: getFilmmakerInterestAlerts
+      tags: [filmmakers]
+      summary: List private confirmed non-binding interest alerts for account-owned projects
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Owner-scoped alerts, without investor details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerInterestAlerts"
+        "401": { description: Verified sign-in required }
+  /filmmakers/interest-alerts/{alertId}/read:
+    post:
+      operationId: readFilmmakerInterestAlert
+      tags: [filmmakers]
+      summary: Mark an account-owned interest alert as read
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: alertId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Alert marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerInterestAlert"
+        "401": { description: Verified sign-in required }
+        "404": { description: Alert not owned by this account }
   /filmmakers/phone-verification:
     post:
       operationId: verifyFilmmakerPhone
@@ -1549,6 +1585,26 @@ components:
             $ref: "#/components/schemas/FilmmakerProjectListItem"
         has_resumable_draft: { type: boolean }
         phone_verified: { type: boolean }
+    FilmmakerInterestAlert:
+      type: object
+      additionalProperties: false
+      required: [id, project_id, project_title, project_slug, created_at, read_at]
+      properties:
+        id: { type: integer, minimum: 1 }
+        project_id: { type: integer, minimum: 1 }
+        project_title: { type: ["string", "null"] }
+        project_slug: { type: ["string", "null"] }
+        created_at: { type: string, format: date-time }
+        read_at: { type: ["string", "null"], format: date-time }
+    FilmmakerInterestAlerts:
+      type: object
+      additionalProperties: false
+      required: [alerts]
+      properties:
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilmmakerInterestAlert"
     FilmmakerPhoneVerification:
       type: object
       additionalProperties: false

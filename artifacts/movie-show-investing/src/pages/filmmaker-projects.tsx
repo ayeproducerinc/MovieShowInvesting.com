@@ -18,6 +18,7 @@ import {
 } from '@/components/filmmaker-phone-verification';
 import { FilmmakerQuestionsDesk } from '@/components/filmmaker-questions-desk';
 import { FilmmakerConversationsDesk } from '@/components/filmmaker-conversations-desk';
+import { FilmmakerInterestAlerts } from '@/components/filmmaker-interest-alerts';
 import { useFilmmakerAuth } from '@/hooks/use-filmmaker-auth';
 import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 import { useAuth } from '@workspace/replit-auth-web';
@@ -175,6 +176,7 @@ export default function FilmmakerProjects() {
       onOpen={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}
       onRetry={() => { void projects.refetch(); if (!ssoUser) void linkCurrentVisit(); }}
     />
+    {!projects.isPending && !projects.isError && !claiming && identityId && <FilmmakerInterestAlerts key={identityId} uid={identityId} busy={acting} onOpenProject={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}/>}
     {!projects.isPending && !projects.isError && !claiming && <FilmmakerQuestionsDesk projects={projects.data?.projects ?? []}/>}
     {!projects.isPending && !projects.isError && !claiming && identityId && <FilmmakerConversationsDesk uid={identityId} projectIds={(projects.data?.projects ?? []).map(project => project.id)}/>}
   </>;

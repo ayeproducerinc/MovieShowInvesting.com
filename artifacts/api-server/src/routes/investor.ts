@@ -12,6 +12,7 @@ import {
   SaveInvestorIntentResponse,
 } from "@workspace/api-zod";
 import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
+import { deliverInterestAlertEmail } from "../lib/interest-alert-email";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -563,6 +564,7 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
   const signature = submitted.signature_name.trim().replace(/\s+/g, " ");
   const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
   const client = await pool.connect();
+  let newAlerts: { id: number; owner_key: string }[] = [];
   try {
     await client.query("begin");
     await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [
@@ -628,7 +630,34 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
       "update investors set signature_name = $1, signed_at = now(), confirmed_at = now() where id = $2 returning confirmed_at",
       [signature, investor.id],
     );
+    const alerts = await client.query<{ id: number; owner_key: string }>(
+      `with added as (
+       insert into interest_alerts (pledge_id, project_id, filmmaker_id)
+       select pl.id, p.id, f.id
+       from pledges pl
+       join projects p on p.id = pl.project_id
+       join filmmakers f on f.id = p.filmmaker_id
+       where pl.investor_id = $1 and pl.confirmed = true
+         and (f.firebase_uid is not null or f.replit_uid is not null)
+       on conflict (pledge_id) do nothing returning id, filmmaker_id
+       )
+       select added.id, case when f.firebase_uid is not null then 'firebase:' || f.firebase_uid
+         else 'replit:' || f.replit_uid end as owner_key
+       from added join filmmakers f on f.id = added.filmmaker_id`,
+      [investor.id],
+    );
+    newAlerts = alerts.rows;
     await client.query("commit");
+    // The committed confirmation and in-app alert do not depend on Mailjet.
+    const ownerKeys = new Set(newAlerts.map(alert => alert.owner_key));
+    for (const ownerKey of ownerKeys) {
+      const alertIds = newAlerts.filter(alert => alert.owner_key === ownerKey).map(alert => alert.id);
+      try {
+        await deliverInterestAlertEmail(alertIds);
+      } catch {
+        req.log.warn({ alertId: alertIds[0] }, "Interest alert email preparation failed; confirmation remains valid");
+      }
+    }
     res.json(ConfirmInvestorIntentResponse.parse({
       investor_id: investor.id, status: "confirmed", confirmed_at: updated[0].confirmed_at.toISOString(),
     }));

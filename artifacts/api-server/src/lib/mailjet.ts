@@ -32,17 +32,18 @@ export async function recordTransactionalEmailStatus(
  * Sends a transactional email through Mailjet and records a body-free status
  * entry. The function is intentionally reusable by later transactional flows.
  */
-export async function sendTransactionalEmail(email: TransactionalEmail): Promise<TransactionalEmailStatus> {
+export async function sendTransactionalEmailDetailed(email: TransactionalEmail): Promise<{ status: TransactionalEmailStatus; uncertain: boolean }> {
   const apiKey = process.env.MAILJET_API_KEY;
   const secretKey = process.env.MAILJET_SECRET_KEY;
   const senderEmail = process.env.MAILJET_SENDER_EMAIL;
 
   if (!apiKey || !secretKey || !senderEmail) {
     await logEmail(email.to, email.type, "unconfigured");
-    return "unconfigured";
+    return { status: "unconfigured", uncertain: false };
   }
 
   let status: TransactionalEmailStatus = "failed";
+  let uncertain = false;
   try {
     const credentials = Buffer.from(`${apiKey}:${secretKey}`).toString("base64");
     const response = await fetch("https://api.mailjet.com/v3.1/send", {
@@ -77,9 +78,15 @@ export async function sendTransactionalEmail(email: TransactionalEmail): Promise
     status = accepted ? "sent" : "failed";
     if (!accepted) logger.warn({ type: email.type, httpStatus: response.status }, "Mailjet did not accept transactional email");
   } catch {
+    // A timeout or unreadable response does not prove Mailjet rejected the send.
+    uncertain = true;
     logger.warn({ type: email.type }, "Mailjet transactional email request failed");
   }
 
   await logEmail(email.to, email.type, status);
-  return status;
+  return { status, uncertain };
+}
+
+export async function sendTransactionalEmail(email: TransactionalEmail): Promise<TransactionalEmailStatus> {
+  return (await sendTransactionalEmailDetailed(email)).status;
 }

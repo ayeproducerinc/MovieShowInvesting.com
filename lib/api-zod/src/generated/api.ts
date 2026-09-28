@@ -454,6 +454,49 @@ export const GetFilmmakerProjectsResponse = zod.object({
 
 
 /**
+ * @summary List private confirmed non-binding interest alerts for account-owned projects
+ */
+
+
+
+
+export const GetFilmmakerInterestAlertsResponse = zod.object({
+  "alerts": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "project_id": zod.number().int().min(1),
+  "project_title": zod.string().nullable(),
+  "project_slug": zod.string().nullable(),
+  "created_at": zod.coerce.date(),
+  "read_at": zod.coerce.date().nullable()
+}))
+})
+
+
+/**
+ * @summary Mark an account-owned interest alert as read
+ */
+
+
+
+export const ReadFilmmakerInterestAlertParams = zod.object({
+  "alertId": zod.coerce.number().int().min(1)
+})
+
+
+
+
+
+export const ReadFilmmakerInterestAlertResponse = zod.object({
+  "id": zod.number().int().min(1),
+  "project_id": zod.number().int().min(1),
+  "project_title": zod.string().nullable(),
+  "project_slug": zod.string().nullable(),
+  "created_at": zod.coerce.date(),
+  "read_at": zod.coerce.date().nullable()
+})
+
+
+/**
  * Requires a verified Firebase email. Saves the phone_number claim decoded from the refreshed Firebase ID token across every filmmaker record attached to this UID, or clears phoneVerified for every record when the current token has no phone_number claim.
  * @summary Synchronize or revoke the signed-in filmmaker's Firebase phone verification
  */
