@@ -194,8 +194,7 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
   </>;
 }
 
-function Dashboard({ userId, email, auth, onSignOut, replitUser, replitLogout, authFeedback }: { userId: string; email: string; auth: Auth | null; onSignOut: () => void; replitUser: boolean; replitLogout: (returnTo?: string) => void; authFeedback: string }) {
-  const queryClient = useQueryClient();
+function Dashboard({ userId, email, onSignOut }: { userId: string; email: string; onSignOut: () => void }) {
   const [active, setActive] = useState<AdminSection>('summary');
   const [conversationMode, setConversationMode] = useState(false);
   const section = SECTIONS.find(item => item.id === active)!;
@@ -213,7 +212,7 @@ function Dashboard({ userId, email, auth, onSignOut, replitUser, replitLogout, a
           </button>)}
           <button type="button" aria-current={conversationMode ? 'page' : undefined} onClick={() => setConversationMode(true)} data-testid="button-section-conversations"><span className="admin-nav-number">11</span>Conversations</button>
         </nav>
-         <div className="admin-sidebar-foot">Private administration<br />{email}<br /><br /><GoogleSignInButton auth={auth} queryClient={queryClient} replitUser={replitUser} replitLogout={replitLogout} className="admin-link admin-mono" testId="button-admin-google-link" label={replitUser ? 'Sign in' : undefined} /><br />{replitUser && <span>Previous session active. Sign out before using Google.</span>}{authFeedback && <p role="alert" className="admin-feedback">{authFeedback}</p>}<br />No payments are collected here.</div>
+          <div className="admin-sidebar-foot">Private administration<br />{email}<br /><br />No payments are collected here.</div>
       </aside>
       <main className="admin-main">
         <div className="admin-main-inner">
@@ -328,15 +327,15 @@ export default function Admin() {
   }
 
   if (replitAuth.isLoading) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
-  if (!replitAuth.user && configPending) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
-  if (!replitAuth.user && (configError || (config && (!config.apiKey || !config.authDomain || !config.projectId || !config.appId)))) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
+  if (!replitAuth.user && !user && configPending) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
+  if (!replitAuth.user && !user && (configError || (config && (!config.apiKey || !config.authDomain || !config.projectId || !config.appId)))) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
     <Notice icon={<ShieldAlert size={20} />} title="Sign-in is not configured" action="Check again" onAction={() => void retryConfig()}>
       The administration room needs the site's Firebase web configuration before Google sign-in can work. Public pages remain available.
     </Notice>
     {feedback && <p className="admin-feedback" role="alert">{feedback}</p>}
     <GoogleSignInButton auth={auth} queryClient={queryClient} className="admin-button" testId="button-admin-google-sign-in" />
   </div></div></Frame>;
-  if (!replitAuth.user && (!auth || !authReady)) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>{feedback ? <Notice icon={<ShieldAlert size={20} />} title="Sign-in unavailable">{feedback}</Notice> : <Skeleton />}<GoogleSignInButton auth={auth} queryClient={queryClient} disabled={replitAuth.isLoading} className="admin-button" testId="button-admin-google-sign-in" label="Sign in" /></div></div></Frame>;
+  if (!replitAuth.user && !user && (!auth || !authReady)) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>{feedback ? <Notice icon={<ShieldAlert size={20} />} title="Sign-in unavailable">{feedback}</Notice> : <Skeleton />}<GoogleSignInButton auth={auth} queryClient={queryClient} disabled={replitAuth.isLoading} className="admin-button" testId="button-admin-google-sign-in" label="Sign in" /></div></div></Frame>;
   if (identityReady && identityId) {
     if (me.isPending) return <Frame email={identityEmail || undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
     if (me.isError) return <Frame email={identityEmail || undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
@@ -344,9 +343,8 @@ export default function Admin() {
         {me.error?.status === 403 ? 'This signed-in address does not have administrator access. Only the server can grant access to the private workspace.' : 'We could not confirm your administrator access right now. No private data has been shown.'}
       </Notice>
       {feedback && <p className="admin-feedback" role="alert">{feedback}</p>}
-      <GoogleSignInButton auth={auth} queryClient={queryClient} replitUser={Boolean(replitAuth.user)} replitLogout={replitAuth.logout} className="admin-button secondary" testId="button-admin-google-sign-in" label={replitAuth.user ? 'Sign in' : undefined} />
     </div></div></Frame>;
-    if (me.data?.role === 'admin') return <Dashboard userId={identityId} email={me.data.email} auth={auth} replitUser={Boolean(replitAuth.user)} replitLogout={replitAuth.logout} authFeedback={feedback} onSignOut={leave} />;
+    if (me.data?.role === 'admin') return <Dashboard userId={identityId} email={me.data.email} onSignOut={leave} />;
   }
 
   return <Frame>
@@ -363,8 +361,7 @@ export default function Admin() {
           <h2>Welcome back.</h2>
           <p>Sign in with Google to continue. Administrator access is verified by the server after sign-in.</p>
           {feedback && <p className="admin-feedback" role="alert" data-testid="status-auth-error">{feedback}</p>}
-          <GoogleSignInButton auth={auth} queryClient={queryClient} replitUser={Boolean(replitAuth.user)} replitLogout={replitAuth.logout} className="admin-button" testId="button-admin-google-sign-in" label="Sign in" />
-          {replitAuth.user && <p className="admin-auth-note">An existing session is active. Sign out before signing in with Google.</p>}
+          <GoogleSignInButton auth={auth} queryClient={queryClient} className="admin-button" testId="button-admin-google-sign-in" label="Sign in" />
           <p className="admin-auth-note"><LockKeyhole size={13} style={{ display: 'inline', marginRight: 8 }} />Access is verified by the server after you sign in.</p>
         </div>
       </div>

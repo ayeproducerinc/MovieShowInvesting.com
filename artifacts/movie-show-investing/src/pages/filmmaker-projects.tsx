@@ -198,10 +198,6 @@ export default function FilmmakerProjects() {
     created_at: project.created_at,
   }));
   return <>
-    {(ssoUser || user) && <div className="page-wrap" style={{ marginTop: 24, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-      <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} replitUser={Boolean(ssoUser)} replitLogout={replitAuth.logout} disabled={replitAuth.isLoading} className="dossier-button dossier-button-outline" testId="button-filmmaker-google-link" label={ssoUser ? 'Sign in' : undefined} />
-      {ssoUser && <p className="dossier-notice">An existing session is active. Sign out before signing in with Google.</p>}
-    </div>}
     {claimError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{claimError} <Link href="/start/filmmaker">Open this browser’s worksheet</Link> · <button type="button" onClick={() => void linkCurrentVisit()}>Try linking again</button></div>}
     {actionError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{actionError}</div>}
     <ProjectHubView

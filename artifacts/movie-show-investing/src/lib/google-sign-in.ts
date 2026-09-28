@@ -1,23 +1,18 @@
 import { FirebaseError } from 'firebase/app';
 import {
   GoogleAuthProvider,
-  linkWithPopup,
   signInWithPopup,
   type Auth,
 } from 'firebase/auth';
 
 export async function signInWithGoogle(auth: Auth) {
+  if (auth.currentUser) {
+    throw new Error('You are already signed in. Sign out before signing in again.');
+  }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  const existingUser = auth.currentUser;
 
   try {
-    if (existingUser && !existingUser.providerData.some(provider => provider.providerId === GoogleAuthProvider.PROVIDER_ID)) {
-      return await linkWithPopup(existingUser, provider);
-    }
-    // A Google-linked user can explicitly select a different Google account.
-    // Firebase changes the active user only through this deliberate popup;
-    // matching email addresses are never used to merge identities.
     return await signInWithPopup(auth, provider);
   } catch (error) {
     const code = error instanceof FirebaseError ? error.code : '';

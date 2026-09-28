@@ -79,8 +79,6 @@ export function SiteShell({ children }: { children: ReactNode }) {
             <div className="hidden items-center gap-3 md:flex">
               {signedIn ? <>
                 <Link href="/me/projects" data-testid="link-header-my-projects" className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">My projects</Link>
-                <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} replitUser={Boolean(replitAuth.user)} replitLogout={replitAuth.logout} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-semibold whitespace-nowrap underline underline-offset-4" testId="button-header-google-sign-in" />
-                {replitAuth.user && <span className="max-w-36 text-[11px] leading-tight text-[#535c60]">Existing session active. Sign out before Google sign-in.</span>}
                 <button type="button" data-testid="button-header-sign-out" onClick={() => void leave()} disabled={signingOut || replitAuth.isLoading} className="text-[12px] font-semibold whitespace-nowrap underline underline-offset-4">Sign out</button>
               </> : <>
                 <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold whitespace-nowrap text-[#902f4d]" testId="button-header-google-sign-in" label="Sign in" />
@@ -92,8 +90,6 @@ export function SiteShell({ children }: { children: ReactNode }) {
         <div className="page-wrap flex min-h-10 items-center justify-end gap-5 border-t border-[#d7d0c5] py-2 md:hidden" aria-label="Account controls">
           {signedIn ? <>
             <Link href="/me/projects" data-testid="link-mobile-my-projects" onClick={() => setOpen(false)} className="text-[12px] font-bold text-[#902f4d]">My projects</Link>
-            <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} replitUser={Boolean(replitAuth.user)} replitLogout={replitAuth.logout} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-semibold underline underline-offset-4" testId="button-mobile-google-sign-in" />
-            {replitAuth.user && <span className="max-w-28 text-[10px] leading-tight text-[#535c60]">Existing session active. Sign out before Google sign-in.</span>}
             <button type="button" data-testid="button-mobile-sign-out" onClick={() => void leave()} disabled={signingOut || replitAuth.isLoading} className="text-[12px] font-semibold underline underline-offset-4">Sign out</button>
           </> : <>
             <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold text-[#902f4d]" testId="button-mobile-google-sign-in" label="Sign in" />
