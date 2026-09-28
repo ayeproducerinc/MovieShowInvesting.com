@@ -47,6 +47,8 @@ function emailLinkError(error: unknown): string {
       return `The Firebase web configuration needs attention (${code}). The site owner must check that the configured keys belong to the intended Firebase project.`;
     case 'auth/too-many-requests':
       return 'Firebase has temporarily limited sign-in requests. Please wait before trying again.';
+    case 'auth/quota-exceeded':
+      return 'This Firebase project has reached its email sign-in sending limit. Try again after the daily quota resets. The project owner can raise the limit by enabling Firebase billing, which may incur charges.';
     case 'auth/network-request-failed':
       return 'The request to Firebase could not connect. Check your connection and try again.';
     default:

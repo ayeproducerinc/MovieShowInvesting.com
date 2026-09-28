@@ -19,8 +19,9 @@ function emailLinkSendError(error: unknown): string {
     case 'auth/invalid-email':
       return 'Firebase says this email address is not valid. Check the spelling and try again.';
     case 'auth/too-many-requests':
+      return 'Firebase has temporarily limited sign-in attempts. Please wait before requesting another link.';
     case 'auth/quota-exceeded':
-      return 'Firebase has temporarily limited sign-in emails. Please wait before requesting another link.';
+      return 'This Firebase project has reached its email sign-in sending limit. Try again after the daily quota resets. The project owner can raise the limit by enabling Firebase billing, which may incur charges.';
     case 'auth/network-request-failed':
       return 'The request to Firebase could not connect. Check your connection and try again.';
     case 'auth/unauthorized-domain':
