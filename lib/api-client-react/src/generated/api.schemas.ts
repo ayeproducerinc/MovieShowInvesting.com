@@ -156,7 +156,6 @@ export const FilmmakerSubmissionInputStage = {
   distribution: 'distribution',
   production: 'production',
   idea: 'idea',
-  other: 'other',
 } as const;
 
 export type FilmmakerSubmissionInputFormat = typeof FilmmakerSubmissionInputFormat[keyof typeof FilmmakerSubmissionInputFormat];
@@ -201,7 +200,6 @@ export const FilmmakerSubmissionInputPaybackTerms = {
 export interface FilmmakerSubmissionInput {
   no_project_yet: boolean;
   stage?: FilmmakerSubmissionInputStage;
-  stage_other?: string;
   title?: string;
   format?: FilmmakerSubmissionInputFormat;
   genre?: FilmmakerSubmissionInputGenre;
@@ -264,6 +262,19 @@ export interface FilmmakerSubmission {
 /**
  * @nullable
  */
+export type FilmmakerResultStage = typeof FilmmakerResultStage[keyof typeof FilmmakerResultStage] | null;
+
+
+export const FilmmakerResultStage = {
+  distribution: 'distribution',
+  production: 'production',
+  idea: 'idea',
+  other: 'other',
+} as const;
+
+/**
+ * @nullable
+ */
 export type FilmmakerResultPriceGroup = typeof FilmmakerResultPriceGroup[keyof typeof FilmmakerResultPriceGroup] | null;
 
 
@@ -283,7 +294,7 @@ export interface FilmmakerResult {
   /** @nullable */
   project_slug: string | null;
   /** @nullable */
-  stage: string | null;
+  stage: FilmmakerResultStage;
   /** @nullable */
   stage_other: string | null;
   /** @nullable */
@@ -866,9 +877,18 @@ export const DeleteFilmmakerImageKind = {
 } as const;
 
 export type GetExploreParams = {
-stage?: string;
+stage?: GetExploreStage;
 genre?: string;
 sort?: string;
 search?: string;
 };
+
+export type GetExploreStage = typeof GetExploreStage[keyof typeof GetExploreStage];
+
+
+export const GetExploreStage = {
+  distribution: 'distribution',
+  production: 'production',
+  idea: 'idea',
+} as const;
 

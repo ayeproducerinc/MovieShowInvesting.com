@@ -26,14 +26,14 @@ const queryClient = new QueryClient();
 const metadata: Record<string, [string, string]> = {
   '/': ['Movie Show Investing | A new path for independent film', 'A place for filmmakers to share projects and explore future investor interest. No money is collected.'],
   '/faq': ['FAQ | Movie Show Investing', 'Answers about Movie Show Investing, non-binding interest, distribution, and protecting your ideas.'],
-  '/privacy': ['Privacy | Movie Show Investing', 'Prelaunch privacy information about visitor cookies and campaign attribution.'],
-  '/terms': ['Terms | Movie Show Investing', 'Prelaunch terms for the Movie Show Investing informational site.'],
+  '/privacy': ['Privacy | Movie Show Investing', 'How Movie Show Investing uses visitor, project, investor, account, and message information.'],
+  '/terms': ['Terms | Movie Show Investing', 'Terms for the current Movie Show Investing site and its non-binding features.'],
   '/disclaimers': ['Disclaimers | Movie Show Investing', 'Important context about non-binding interest, securities, and investment risk.'],
   '/explore': ['Explore projects | Movie Show Investing', 'Discover approved independent films and shows. Project profiles are not investment offers.'],
   '/invest': ['Express interest | Movie Show Investing', 'Explore independent film projects and save non-binding investor interest. No money is collected.'],
   '/invest/done': ['Interest saved | Movie Show Investing', 'Your non-binding interest has been saved. No money has been collected.'],
   '/messages': ['Messages | Movie Show Investing', 'Your private project conversations.'],
-   '/start/filmmaker': ['Filmmaker worksheet | Movie Show Investing', 'Share your project and explore illustrative terms in a guided prelaunch worksheet.'],
+   '/start/filmmaker': ['Filmmaker worksheet | Movie Show Investing', 'Share your project and explore illustrative terms in a guided worksheet.'],
    '/start/filmmaker/done': ['Thank you | Movie Show Investing', 'Your filmmaker answers have been received.'],
     '/me/projects': ['My projects | Movie Show Investing', 'Manage your filmmaker projects and start another submission.'],
 };

@@ -301,8 +301,7 @@ export const submitFilmmakerBodyCountryRegExp = new RegExp('^[A-Z]{2}$');
 
 export const SubmitFilmmakerBody = zod.object({
   "no_project_yet": zod.boolean(),
-  "stage": zod.enum(['distribution', 'production', 'idea', 'other']).optional(),
-  "stage_other": zod.string().optional(),
+  "stage": zod.enum(['distribution', 'production', 'idea']).optional(),
   "title": zod.string().optional(),
   "format": zod.enum(['movie', 'show']).optional(),
   "genre": zod.enum(['Horror', 'Drama', 'Comedy', 'Thriller', 'Documentary', 'Sci-Fi', 'Other']).optional(),
@@ -354,7 +353,7 @@ export const GetFilmmakerResultResponse = zod.object({
   "no_project_yet": zod.boolean(),
   "project_id": zod.number().int().min(1).nullable(),
   "project_slug": zod.string().nullable(),
-  "stage": zod.string().nullable(),
+  "stage": zod.union([zod.literal('distribution'),zod.literal('production'),zod.literal('idea'),zod.literal('other'),zod.literal(null)]).nullable(),
   "stage_other": zod.string().nullable(),
   "title": zod.string().nullable(),
   "format": zod.string().nullable(),
@@ -668,7 +667,7 @@ export const GetProjectShareMetadataResponse = zod.unknown()
  * @summary Browse approved projects for investors
  */
 export const GetExploreQueryParams = zod.object({
-  "stage": zod.coerce.string().optional(),
+  "stage": zod.enum(['distribution', 'production', 'idea']).optional(),
   "genre": zod.coerce.string().optional(),
   "sort": zod.coerce.string().optional(),
   "search": zod.coerce.string().optional()

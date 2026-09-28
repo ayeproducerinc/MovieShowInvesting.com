@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FilmmakerSubmissionInputStage = typeof FilmmakerSubmissionInputStage[keyof typeof FilmmakerSubmissionInputStage];
+export type GetExploreStage = typeof GetExploreStage[keyof typeof GetExploreStage];
 
 
-export const FilmmakerSubmissionInputStage = {
+export const GetExploreStage = {
   distribution: 'distribution',
   production: 'production',
   idea: 'idea',

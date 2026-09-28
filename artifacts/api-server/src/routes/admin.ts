@@ -222,9 +222,15 @@ async function getAdminTable(section: Section): Promise<AdminTable> {
   if (section === "market") {
     const ladder = [125, 150, 175, 200];
     const rows: unknown[][] = [];
-    for (const slate of ["distribution", "production", "idea", "other"]) {
-      const slateProjects = projects.filter((project) => project.stage === slate);
-      const slateMinimums = minimums.filter((minimum) => minimum.slate === slate);
+    const stageBuckets = [
+      { label: "distribution", value: "distribution" },
+      { label: "production", value: "production" },
+      { label: "idea", value: "idea" },
+      { label: "Legacy stage: other", value: "other" },
+    ] as const;
+    for (const slate of stageBuckets) {
+      const slateProjects = projects.filter((project) => project.stage === slate.value);
+      const slateMinimums = minimums.filter((minimum) => minimum.slate === slate.value);
       const offerCounts = ladder.map((offer) => slateProjects.filter((project) => project.offerPer100 === offer).length);
       const offer250Plus = slateProjects.filter((project) => (project.offerPer100 ?? 0) >= 250).length;
       const otherOffers = slateProjects.filter((project) => project.offerPer100 != null && !ladder.includes(project.offerPer100) && project.offerPer100 < 250).length;
@@ -232,7 +238,7 @@ async function getAdminTable(section: Section): Promise<AdminTable> {
       const minimum250Plus = slateMinimums.filter((answer) => !answer.notInterested && answer.minPer100 != null && answer.minPer100 >= 250).length;
       const otherMinimums = slateMinimums.filter((answer) => !answer.notInterested && answer.minPer100 == null && Boolean(answer.otherText)).length;
       const notInterested = slateMinimums.filter((answer) => answer.notInterested).length;
-      rows.push([slate, ...offerCounts, offer250Plus, otherOffers, slateProjects.filter((project) => project.wantsLower).length,
+      rows.push([slate.label, ...offerCounts, offer250Plus, otherOffers, slateProjects.filter((project) => project.wantsLower).length,
         ...minimumCounts, minimum250Plus, otherMinimums, notInterested]);
     }
     return buildTable(section, [

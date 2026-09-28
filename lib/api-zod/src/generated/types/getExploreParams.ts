@@ -5,9 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { GetExploreStage } from './getExploreStage';
 
 export type GetExploreParams = {
-stage?: string;
+stage?: GetExploreStage;
 genre?: string;
 sort?: string;
 search?: string;

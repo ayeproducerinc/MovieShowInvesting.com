@@ -31,7 +31,7 @@ const SHOWCASE_FIELDS = new Set([
   "showcase_requested", "synopsis", "team_links", "money_use", "distribution_plan", "trailer_url",
 ]);
 const INPUT_FIELDS = new Set([
-  "no_project_yet", "stage", "stage_other", "title", "format", "genre", "genre_other",
+  "no_project_yet", "stage", "title", "format", "genre", "genre_other",
   "logline", "trailer_url", "pilot_url", "budget", "budget_from_example", "deal_answer",
   "offer_per100", "offer_other_text", "wants_lower", "payback_terms", "payback_terms_other",
   "funding_sources", "funding_other", "reached_goal", "funding_experience", "name", "email",
@@ -133,7 +133,6 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     if (requiredProjectValues.some(([, value]) => value === undefined)
       || !hasText(data.title)
       || !hasText(data.logline)
-      || (data.stage === "other" && !hasText(data.stage_other))
       || (data.genre === "Other" && !hasText(data.genre_other))
       || (data.payback_terms === "other" && !hasText(data.payback_terms_other))) {
       res.status(400).json({ error: "Project, offer, and funding details are required for project submissions." });

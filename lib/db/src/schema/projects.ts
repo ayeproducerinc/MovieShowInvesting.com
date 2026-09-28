@@ -39,7 +39,7 @@ export const projectsTable = pgTable("projects", {
   hidden: boolean("hidden").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  check("projects_stage_check", sql`${table.stage} is null or ${table.stage} in ('distribution', 'production', 'idea', 'other')`),
+  check("projects_stage_check", sql`${table.stage} is null or ${table.stage} in ('distribution', 'production', 'idea')`),
   check("projects_offer_floor_check", sql`${table.offerPer100} is null or ${table.offerPer100} >= 125`),
   check("projects_price_group_check", sql`${table.priceGroup} is null or ${table.priceGroup} in ('A', 'B')`),
   check("projects_deal_answer_check", sql`${table.dealAnswer} is null or ${table.dealAnswer} in ('yes', 'maybe', 'no')`),

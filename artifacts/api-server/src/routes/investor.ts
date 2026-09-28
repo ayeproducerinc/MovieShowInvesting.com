@@ -104,6 +104,7 @@ async function getDiscoverableProjects(): Promise<ProjectRow[]> {
       ), 0)::float8 as confirmed_pledge_total
     from projects p
     where p.approved = true and p.showcase_requested = true and p.hidden = false
+      and p.stage in ('idea', 'production', 'distribution')
   `);
   return rows;
 }
@@ -223,6 +224,7 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
       const visible = await client.query<{ id: number }>(
         `select id from projects where id = any($1::int[])
           and approved = true and showcase_requested = true and hidden = false
+          and stage in ('idea', 'production', 'distribution')
           for share`,
         [ids],
       );

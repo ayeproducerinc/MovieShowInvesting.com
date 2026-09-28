@@ -46,6 +46,7 @@ router.get("/explore", async (req, res): Promise<void> => {
       ), 0)::float8 as confirmed_pledge_total
     from projects p
     where p.approved = true and p.showcase_requested = true and p.hidden = false
+      and p.stage in ('idea', 'production', 'distribution')
   `);
 
   const needle = query.data.search?.trim().toLocaleLowerCase() ?? "";

@@ -139,8 +139,7 @@ export async function saveVisitorFlowProgress(input: {
 
 export type FilmmakerSubmissionData = {
   no_project_yet: boolean;
-  stage?: "distribution" | "production" | "idea" | "other";
-  stage_other?: string;
+  stage?: "distribution" | "production" | "idea";
   title?: string;
   format?: "movie" | "show";
   genre?: "Horror" | "Drama" | "Comedy" | "Thriller" | "Documentary" | "Sci-Fi" | "Other";
@@ -248,6 +247,18 @@ export async function createFilmmakerSubmission(input: {
       eq(flowProgressTable.visitorId, input.visitorId),
       eq(flowProgressTable.flow, "filmmaker"),
     ));
+    const savedStage = existingProgress?.answers.stage;
+    if (!existingProgress?.completed && savedStage === "other") {
+      throw new FilmmakerSubmissionError(
+        "This saved draft uses a retired project stage. Choose idea, production, or distribution before submitting.",
+      );
+    }
+    if (!input.data.no_project_yet) {
+      const stage = (input.data as { stage?: unknown }).stage;
+      if (stage !== "idea" && stage !== "production" && stage !== "distribution") {
+        throw new FilmmakerSubmissionError("A project stage of idea, production, or distribution is required.");
+      }
+    }
     if (existingProgress?.completed) {
       const reference = storedSubmissionReference(existingProgress.answers);
       if (!reference) {
@@ -333,7 +344,6 @@ export async function createFilmmakerSubmission(input: {
         genre: input.data.genre,
         genreOther: input.data.genre_other,
         stage: input.data.stage,
-        stageOther: input.data.stage_other,
         logline: input.data.logline,
         trailerUrl: input.data.trailer_url,
         pilotUrl: input.data.pilot_url,

@@ -9,7 +9,7 @@ import { LocationPicker } from '../components/location-picker';
 import { calculateDeal, examples, money, phase, restoreWorksheet, standardOffer, validListedOffer, type Format, type Stage } from './filmmaker-calculator';
 
 type Answers = {
-  stage: Stage | null; stage_other: string; no_project_yet: boolean;
+  stage: Stage | null; no_project_yet: boolean;
   title: string; format: Format; genre: FilmmakerSubmissionInput['genre'] | ''; genre_other: string; logline: string; trailer_url: string; pilot_url: string;
   budget: number; budget_mode: 'example' | 'custom'; deal_answer: 'yes' | 'maybe' | 'no' | null;
   offer_per100: number | null; offer_choice: string; offer_other_text: string; wants_lower: boolean;
@@ -18,7 +18,7 @@ type Answers = {
   name: string; email: string; phone: string; city: string; state: string; country: string; location_manual: boolean; favorite_genres: string[]; chat_opt_in: boolean;
 };
 const initial: Answers = {
-  stage:null, stage_other:'', no_project_yet:false, title:'', format:'movie', genre:'', genre_other:'', logline:'', trailer_url:'', pilot_url:'',
+  stage:null, no_project_yet:false, title:'', format:'movie', genre:'', genre_other:'', logline:'', trailer_url:'', pilot_url:'',
   budget:0, budget_mode:'example', deal_answer:null, offer_per100:null, offer_choice:'', offer_other_text:'', wants_lower:false,
   payback_terms:null, payback_terms_other:'', funding_sources:[], funding_other:'', reached_goal:null, funding_experience:'',
   name:'', email:'', phone:'', city:'', state:'', country:'', location_manual:false, favorite_genres:[], chat_opt_in:false,
@@ -53,7 +53,7 @@ function payload(a:Answers):FilmmakerSubmissionInput {
   const contact = { no_project_yet:a.no_project_yet, name:a.name.trim(), email:a.email.trim(), phone:a.phone.trim() || undefined, city:a.city.trim(), state:a.state.trim() || undefined, country:a.country || undefined, favorite_genres:a.favorite_genres, chat_opt_in:a.chat_opt_in };
   if (a.no_project_yet) return contact;
   return {
-    ...contact, stage:a.stage ?? undefined, stage_other:a.stage === 'other' ? a.stage_other.trim() : undefined,
+    ...contact, stage:a.stage ?? undefined,
     title:a.title.trim(), format:a.format, genre:a.genre || undefined, genre_other:a.genre === 'Other' ? a.genre_other.trim() : undefined,
     logline:a.logline.trim(), trailer_url:a.trailer_url.trim() || undefined, pilot_url:a.stage === 'production' ? a.pilot_url.trim() || undefined : undefined,
     budget:a.budget, budget_from_example:a.budget_mode === 'example', deal_answer:a.deal_answer ?? undefined,
@@ -98,13 +98,18 @@ export default function Filmmaker() {
   useEffect(() => {
     if (!progress.data || initialized.current) return;
     initialized.current = true;
-    const { answers:restored, screen:restoredScreen } = restoreWorksheet(initial, progress.data.answers, progress.data.last_screen);
-    setA(restored);
-    setScreen(restoredScreen);
+    const { stage_other:legacyStageOther, ...savedAnswers } = progress.data.answers;
+    void legacyStageOther;
+    const { answers:restored, screen:restoredScreen } = restoreWorksheet(initial, savedAnswers, progress.data.last_screen);
+    const legacyStage = (restored as unknown as Record<string, unknown>).stage === 'other';
+    const recovered = legacyStage ? { ...restored, stage:null } : restored;
+    const recoveredScreen = legacyStage ? 1 : restoredScreen;
+    setA(recovered);
+    setScreen(recoveredScreen);
     if (progress.data.completed) {
       navigate('/start/filmmaker/done');
     } else {
-      lastSaved.current = JSON.stringify({ screen:restoredScreen, answers:restored });
+      lastSaved.current = legacyStage ? '' : JSON.stringify({ screen:recoveredScreen, answers:recovered });
       setHydrated(true);
     }
   }, [progress.data, navigate]);
@@ -154,7 +159,7 @@ export default function Filmmaker() {
   const afterPayback = receipt && (phase(stage) === 'idea' ? 'you keep it all' : `You keep ${money(receipt.filmmakerAfter)} of every $100`);
 
   function validateStep(step:number):string {
-    if (step === 1 && (!a.stage || (a.stage === 'other' && !a.stage_other.trim()))) return 'Choose a stage and describe it if you selected Other.';
+    if (step === 1 && !a.stage) return 'Choose a project stage to continue.';
     if (step === 2 && !a.no_project_yet) {
       if (!a.title.trim() || !a.genre || !a.logline.trim() || (a.genre === 'Other' && !a.genre_other.trim())) return 'Add a title, genre and logline to continue.';
       if (!validUrl(a.trailer_url) || !validUrl(a.pilot_url)) return 'Use a full http:// or https:// link for your video URLs.';
@@ -201,7 +206,7 @@ export default function Filmmaker() {
     setA(next);
     setValidation('');
     if (editTimer.current !== null) window.clearTimeout(editTimer.current);
-    if (value !== 'other') void persist(2, next).then(() => { setScreen(2); window.scrollTo({ top:0, behavior:'smooth' }); }).catch(() => undefined);
+    void persist(2, next).then(() => { setScreen(2); window.scrollTo({ top:0, behavior:'smooth' }); }).catch(() => undefined);
   }
   function chooseNoProject(checked:boolean) {
     const next = { ...a, no_project_yet:checked };
@@ -248,8 +253,7 @@ export default function Filmmaker() {
           <Choice id="stage-distribution" name="project-stage" selected={a.stage==='distribution'} onClick={()=>selectStage('distribution')} detail="A finished film looking toward release.">Distribution phase</Choice>
           <Choice id="stage-production" name="project-stage" selected={a.stage==='production'} onClick={()=>selectStage('production')} detail="A short or pilot you want to make next.">Short or pilot I want to develop</Choice>
           <Choice id="stage-idea" name="project-stage" selected={a.stage==='idea'} onClick={()=>selectStage('idea')} detail="The story is taking shape.">Script or idea</Choice>
-          <Choice id="stage-other" name="project-stage" selected={a.stage==='other'} onClick={()=>selectStage('other')}>Other</Choice>
-        </div>{a.stage==='other' && <div className="fm-section"><Field id="stage-other" label="Tell us where you are" value={a.stage_other} onChange={v=>change('stage_other',v)} required/><p className="fm-small">For the illustrative numbers ahead, we’ll use the idea-stage examples.</p></div>}</>}
+        </div></>}
         {screen === 2 && <><label className="fm-check fm-section"><input type="checkbox" data-testid="checkbox-no-project" checked={a.no_project_yet} disabled={saving} onChange={e=>chooseNoProject(e.target.checked)}/><span><strong>I don’t have a project yet. I want to participate in the future.</strong><small style={{display:'block',color:'#666',marginTop:5}}>Skip the project and deal questions. We’ll only ask how to reach you.</small></span></label>
           {!a.no_project_yet && <>
             <Field id="project-title" label="Working title" value={a.title} onChange={v=>change('title',v)} required placeholder="Even a working title is fine"/>
@@ -306,13 +310,13 @@ export default function Filmmaker() {
             onChange={location=>{ setA(current=>({...current,...location})); setValidation(''); }} />
            <div className="fm-section"><p className="fm-label">Favorite genres · select any</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{genres.map(g=><Choice id={`favorite-${g}`} name="favorite-genre" multiple key={g} selected={a.favorite_genres.includes(g)} onClick={()=>toggleArray('favorite_genres',g)}>{g}</Choice>)}</div></div>
           <label className="fm-check fm-section"><input type="checkbox" data-testid="checkbox-chat-opt-in" checked={a.chat_opt_in} onChange={e=>change('chat_opt_in',e.target.checked)}/><span>I’m open to a quick 15-minute chat about my experience.</span></label>
-          <p className="fm-small">By submitting, you’re sharing information for this prelaunch conversation. This does not create a project listing or an investment opportunity. See our <Link href="/privacy" className="underline" data-testid="link-flow-privacy">privacy policy</Link>.</p>
+          <p className="fm-small">By submitting, you’re sharing information with Movie Show Investing for its launch MVP. This does not create a project listing or an investment opportunity. See our <Link href="/privacy" className="underline" data-testid="link-flow-privacy">privacy policy</Link>.</p>
         </>}
         {validation && <p className="fm-error" data-testid="error-validation" role="alert">{validation}</p>}
         {saveError && <div className="fm-error" data-testid="error-save" role="alert">{saveError} <button type="button" data-testid="button-retry-save" className="underline" onClick={()=>void persist(screenRef.current,answersRef.current).catch(()=>undefined)}>Retry save</button></div>}
         <div className="fm-steps">
           {screen>1 ? <button type="button" data-testid="button-back" className="fm-back" disabled={saving || submit.isPending} onClick={()=>void back()}><ArrowLeft size={17}/> Back</button> : <span className="fm-small">Your answers save as you go.</span>}
-          {screen===1 && a.stage!=='other' ? <span className="fm-small">Choose a stage to continue</span> :
+          {screen===1 && !a.stage ? <span className="fm-small">Choose a stage to continue</span> :
             <button type="button" data-testid={screen===6?'button-submit-filmmaker':'button-continue'} className="fm-primary" disabled={saving || submit.isPending || screen===4 && (otherOfferError || !a.offer_choice || !validListedOffer(a.offer_per100))} onClick={()=>screen===6 ? void finish() : void advance(a.no_project_yet && screen===2 ? 6 : screen+1)}>
               {submit.isPending ? 'Submitting…' : saving ? 'Saving…' : screen===6 ? 'Send my answers' : 'Continue'} {!submit.isPending && <ArrowRight size={17}/>}
             </button>}

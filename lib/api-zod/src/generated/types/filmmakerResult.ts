@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FilmmakerResultPriceGroup } from './filmmakerResultPriceGroup';
+import type { FilmmakerResultStage } from './filmmakerResultStage';
 
 export interface FilmmakerResult {
   completed: true;
@@ -18,7 +19,7 @@ export interface FilmmakerResult {
   /** @nullable */
   project_slug: string | null;
   /** @nullable */
-  stage: string | null;
+  stage: FilmmakerResultStage;
   /** @nullable */
   stage_other: string | null;
   /** @nullable */

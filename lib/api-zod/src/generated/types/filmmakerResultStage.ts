@@ -6,11 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FilmmakerSubmissionInputStage = typeof FilmmakerSubmissionInputStage[keyof typeof FilmmakerSubmissionInputStage];
+/**
+ * @nullable
+ */
+export type FilmmakerResultStage = typeof FilmmakerResultStage[keyof typeof FilmmakerResultStage] | null;
 
 
-export const FilmmakerSubmissionInputStage = {
+export const FilmmakerResultStage = {
   distribution: 'distribution',
   production: 'production',
   idea: 'idea',
+  other: 'other',
 } as const;

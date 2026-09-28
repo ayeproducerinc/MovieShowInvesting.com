@@ -800,7 +800,7 @@ paths:
         - name: stage
           in: query
           required: false
-          schema: { type: string }
+          schema: { type: string, enum: [distribution, production, idea] }
         - name: genre
           in: query
           required: false
@@ -1318,8 +1318,7 @@ components:
       required: [no_project_yet, name, email, city, favorite_genres, chat_opt_in]
       properties:
         no_project_yet: { type: boolean }
-        stage: { type: string, enum: [distribution, production, idea, other] }
-        stage_other: { type: string }
+        stage: { type: string, enum: [distribution, production, idea] }
         title: { type: string }
         format: { type: string, enum: [movie, show] }
         genre: { type: string, enum: [Horror, Drama, Comedy, Thriller, Documentary, Sci-Fi, Other] }
@@ -1384,7 +1383,7 @@ components:
         no_project_yet: { type: boolean }
         project_id: { type: ["integer", "null"], minimum: 1 }
         project_slug: { type: ["string", "null"] }
-        stage: { type: ["string", "null"] }
+        stage: { type: ["string", "null"], enum: [distribution, production, idea, other, null] }
         stage_other: { type: ["string", "null"] }
         title: { type: ["string", "null"] }
         format: { type: ["string", "null"] }

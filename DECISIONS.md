@@ -23,7 +23,7 @@ These product rules are locked for the MVP. Change them only when the owner expl
 - Offers are rates per $100, not fixed-dollar amounts. Investor payback goal = pledge amount × project offer ÷ 100.
 - The filmmaker may select $125, $150, $175, $200, or another amount of at least $125. An offer below $125 cannot be submitted.
 - “I’d need to offer less than $125” is captured as `wants_lower`; the project is still listed at $125.
-- “Other” project stage uses Idea pricing math. Do not silently relabel the filmmaker’s original stage; investor matching/display treatment for this stage remains an open decision.
+- Project stages are exactly **Idea**, **Production**, and **Distribution**. “Other” is not a project stage or investor stage preference. Preserve unrelated “Other” answers for genres, offers, funding, and payback terms. Do not silently remap any legacy project if a stored “Other” stage appears elsewhere.
 - Price-test Group B applies only to Distribution and uses a $15 fee per $100. Assign each visitor once, 50/50, and retain the assignment.
 - The investor-facing project payback goal is based on the investor offer only. The platform fee is a separate amount owed by the filmmaker.
 
@@ -73,6 +73,5 @@ These product rules are locked for the MVP. Change them only when the owner expl
 - Recipients and allocation of the remaining 33% Distribution share and 40% Production share after payback.
 - Idea Slate example budgets ($50,000 feature and $65,000 series are provisional examples).
 - Pass thresholds for the six demand tests.
-- How an “Other” project stage is labeled and matched to investor preferences.
 - Investor-facing “Returns” motivation and the longer project-page disclaimer in the guides conflict with the banned investor wording. The exact required short risk disclosure above remains the exception; do not silently adopt the conflicting copy or invent replacements.
 - Any later profit-share terms, rate tiers, or payment waterfall beyond the current MVP rules.

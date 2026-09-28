@@ -14,7 +14,6 @@ import type { FilmmakerSubmissionInputStage } from './filmmakerSubmissionInputSt
 export interface FilmmakerSubmissionInput {
   no_project_yet: boolean;
   stage?: FilmmakerSubmissionInputStage;
-  stage_other?: string;
   title?: string;
   format?: FilmmakerSubmissionInputFormat;
   genre?: FilmmakerSubmissionInputGenre;

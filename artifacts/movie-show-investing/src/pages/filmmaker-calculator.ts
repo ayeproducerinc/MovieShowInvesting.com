@@ -1,7 +1,7 @@
-export type Stage = 'distribution' | 'production' | 'idea' | 'other';
+export type Stage = 'distribution' | 'production' | 'idea';
 export type Format = 'movie' | 'show';
 
-export const phase = (stage: Stage) => stage === 'other' ? 'idea' : stage;
+export const phase = (stage: Stage) => stage;
 export const examples = (stage: Stage, format: Format): number[] => {
   if (phase(stage) === 'distribution') return [25000, 50000, 100000];
   if (phase(stage) === 'production') return format === 'movie' ? [200000] : [350000, 450000];

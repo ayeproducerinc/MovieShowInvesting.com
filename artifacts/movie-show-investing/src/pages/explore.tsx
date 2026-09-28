@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { ArrowRight, RotateCcw } from 'lucide-react';
 import { Link } from 'wouter';
 import { useGetExplore } from '@workspace/api-client-react';
+import type { GetExploreStage } from '@workspace/api-client-react';
 import { InvestorProjectCard } from '@/components/investor-project-card';
 import '../investor.css';
 
-const stages = [['','All stages'],['distribution','Distribution'],['production','Production'],['idea','Idea'],['other','Other']] as const;
+const stages = [['','All stages'],['distribution','Distribution'],['production','Production'],['idea','Idea']] as const;
 const genres = ['','Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Other'];
 
 export default function Explore() {
-  const [stage,setStage] = useState('');
+  const [stage,setStage] = useState<GetExploreStage | ''>('');
   const [genre,setGenre] = useState('');
   const [search,setSearch] = useState('');
   const [sort,setSort] = useState('');
@@ -22,7 +23,7 @@ export default function Explore() {
     <div className="page-wrap">
       <div className="inv-toolbar">
         <div className="inv-field"><label htmlFor="explore-search">Search projects</label><input id="explore-search" className="inv-input" data-testid="input-explore-search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Title or story"/></div>
-        <div className="inv-field"><label htmlFor="explore-stage">Stage</label><select id="explore-stage" className="inv-input" data-testid="select-explore-stage" value={stage} onChange={e=>setStage(e.target.value)}>{stages.map(([v,label])=><option value={v} key={v}>{label}</option>)}</select></div>
+        <div className="inv-field"><label htmlFor="explore-stage">Stage</label><select id="explore-stage" className="inv-input" data-testid="select-explore-stage" value={stage} onChange={e=>setStage(e.target.value as GetExploreStage | '')}>{stages.map(([v,label])=><option value={v} key={v}>{label}</option>)}</select></div>
         <div className="inv-field"><label htmlFor="explore-genre">Genre</label><select id="explore-genre" className="inv-input" data-testid="select-explore-genre" value={genre} onChange={e=>setGenre(e.target.value)}>{genres.map(v=><option value={v} key={v}>{v || 'All genres'}</option>)}</select></div>
         <div className="inv-field"><label htmlFor="explore-sort">Order</label><select id="explore-sort" className="inv-input" data-testid="select-explore-sort" value={sort} onChange={e=>setSort(e.target.value)}><option value="">Recently added</option><option value="title">Title</option></select></div>
       </div>
