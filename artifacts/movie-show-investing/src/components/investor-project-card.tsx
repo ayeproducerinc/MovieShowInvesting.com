@@ -1,0 +1,18 @@
+import { ArrowUpRight } from 'lucide-react';
+import { Link } from 'wouter';
+import type { ExploreProject } from '@workspace/api-client-react';
+
+export function InvestorProjectCard({ project, action }: { project: ExploreProject; action?: { label: string; onClick: () => void; disabled?: boolean } }) {
+  return <article className="inv-project" data-testid={`card-project-${project.id}`}>
+    <div className="inv-poster">{project.poster_url && <img src={project.poster_url} alt={`${project.title} poster`} loading="lazy" />}</div>
+    <div className="inv-project-body">
+      <p className="inv-kicker">{project.format || 'Project'} / {project.stage || 'Stage not listed'} / {project.genre || 'Genre not listed'}</p>
+      <h2>{project.title}</h2>
+      <p>{project.logline || 'Read the project dossier for more about this story.'}</p>
+      <div className="inv-project-links">
+        <Link href={`/project/${project.slug}`} data-testid={`link-project-${project.id}`}>View project <ArrowUpRight size={13} className="inline"/></Link>
+        {action && <button type="button" className="inv-button secondary" data-testid={`button-project-${project.id}`} onClick={action.onClick} disabled={action.disabled}>{action.label}</button>}
+      </div>
+    </div>
+  </article>;
+}

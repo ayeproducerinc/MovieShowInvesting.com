@@ -17,6 +17,7 @@ import {
   synchronizeFilmmakerPhone,
 } from '@/components/filmmaker-phone-verification';
 import { FilmmakerQuestionsDesk } from '@/components/filmmaker-questions-desk';
+import { FilmmakerConversationsDesk } from '@/components/filmmaker-conversations-desk';
 import { useFilmmakerEmailLink } from '@/hooks/use-filmmaker-email-link';
 import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 
@@ -213,5 +214,6 @@ export default function FilmmakerProjects() {
       onRetry={() => { void projects.refetch(); void linkCurrentVisit(); }}
     />
     {!projects.isPending && !projects.isError && !claiming && <FilmmakerQuestionsDesk projects={projects.data?.projects ?? []}/>}
+    {!projects.isPending && !projects.isError && !claiming && uid && <FilmmakerConversationsDesk uid={uid} projectIds={(projects.data?.projects ?? []).map(project => project.id)}/>}
   </>;
 }

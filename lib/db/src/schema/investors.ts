@@ -1,4 +1,4 @@
-import { boolean, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { visitorsTable } from "./visitors";
@@ -12,6 +12,8 @@ export const investorsTable = pgTable("investors", {
   state: text("state"),
   zip: text("zip"),
   amountChoice: text("amount_choice"),
+  investmentAmount: integer("investment_amount"),
+  unallocated: boolean("unallocated"),
   accredited: text("accredited"),
   experience: text("experience").array(),
   experienceOther: text("experience_other"),
@@ -19,6 +21,11 @@ export const investorsTable = pgTable("investors", {
   motivationsOther: text("motivations_other"),
   favoriteGenres: text("favorite_genres").array(),
   stages: text("stages").array(),
+  minima: jsonb("minima").$type<{
+    distribution: number | null;
+    production: number | null;
+    idea: number | null;
+  }>(),
   feelSafeText: text("feel_safe_text"),
   callOptIn: boolean("call_opt_in"),
   path: text("path"),
@@ -31,7 +38,10 @@ export const investorsTable = pgTable("investors", {
   visitorId: text("visitor_id").references(() => visitorsTable.visitorId, { onDelete: "set null" }),
   ownRefCode: text("own_ref_code"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("investors_firebase_uid_unique").on(table.firebaseUid),
+  uniqueIndex("investors_visitor_id_unique").on(table.visitorId),
+]);
 
 export const insertInvestorSchema = createInsertSchema(investorsTable).omit({ id: true, createdAt: true });
 export type InsertInvestor = z.infer<typeof insertInvestorSchema>;

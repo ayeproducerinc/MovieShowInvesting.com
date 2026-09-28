@@ -72,18 +72,6 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 **Gate:** Visual Guide scenarios F9–F11 pass, including branded sign-in, verified badges, and the private question-and-answer relay.
 
-## Phase 6 — Hardening and filmmaker launch
-
-**Status:** not started  
-**Deliverables:**
-
-- Mixpanel and Microsoft Clarity events specified in the Prompt Guide.
-- Cloudflare Turnstile and server verification on the filmmaker final submit and Ask form; honeypot fields and request limits.
-- Prepare Privacy, Terms, and Disclaimers pages using owner-approved copy for launch, including AYe Producer, Inc., message-safety review, and the data-deletion contact.
-- Production-domain configuration and Firebase authorized-domain setup.
-
-**Gate:** Filmmaker scenarios F1–F11 pass on the launch domain and the filmmaker side is ready to launch.
-
 ## Phase 7 — Explore and investor flow
 
 **Status:** not started  
@@ -94,8 +82,10 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 - Five investor pages: amount, terms, interests, matches, and about you.
 - Equal-split editable lineup, auto-build and unallocated “Just pledge” paths, lineup bar, spread rating, and all pledge limits.
 - Investor copy follows the required wording and disclosure rules; do not show offers or market figures on the terms page.
+- Private, text-only investor–filmmaker project conversations after verified email-link sign-in, one thread per investor/project. Keep email addresses private and store the conversation in the app; Mailjet may send generic notifications when configured.
+- Authorized admins can inspect every thread, review reports, lock/unlock threads, and audit moderation actions. Keep real-user messaging closed until the owner approves the explicit admin-review privacy wording and these controls work. No attachments, public chat, or real-time presence.
 
-**Gate:** Visual Guide scenarios I1–I6 pass for preferences, matching, pledge limits, split, auto-build, and unallocated pledges.
+**Gate:** Visual Guide scenarios I1–I6 pass for preferences, matching, pledge limits, split, auto-build, and unallocated pledges. Messaging must pass cross-account isolation, persistence, reporting, lock, and email-failure checks before it opens to real users. The domain/Turnstile launch checks remain in Phase 6 after Phase 8.
 
 ## Phase 8 — Pledge confirmation and lineup
 
@@ -108,7 +98,20 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 - Find-my-lineup email flow with a uniform response and the specified rate limits.
 - Investor analytics events and final copy/disclosure audit.
 
-**Gate:** Visual Guide scenarios I7–I12 pass and the investor side is ready to launch.
+**Gate:** Visual Guide scenarios I7–I12 pass where possible before launch; final domain/provider checks remain in Phase 6.
+
+## Phase 6 — Final hardening and launch (after Phase 8)
+
+**Status:** not started; explicitly deferred until after Phase 8.
+**Deliverables:**
+
+- Mixpanel and Microsoft Clarity events specified in the Prompt Guide.
+- Cloudflare Turnstile and server verification on the filmmaker final submit and Ask form; honeypot fields and request limits.
+- Prepare Privacy, Terms, and Disclaimers pages using owner-approved copy for launch, including AYe Producer, Inc., message-safety review, and the data-deletion contact.
+- Production-domain configuration and Firebase authorized-domain setup.
+- Live Mailjet, Firebase phone, protected messaging, attribution, and investor/filmmaker scenario checks.
+
+**Gate:** Filmmaker F1–F11 and investor I1–I12 launch scenarios pass on the launch domain; neither side is called launch-ready before this final gate.
 
 ## FAQ copy
 

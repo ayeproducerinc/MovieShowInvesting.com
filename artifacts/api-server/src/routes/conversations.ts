@@ -1,0 +1,458 @@
+import { createHash } from "node:crypto";
+import { Router, type IRouter, type Request, type Response } from "express";
+import { pool } from "@workspace/db";
+import {
+  CreateConversationParams,
+  CreateConversationResponse,
+  GetConversationParams,
+  GetConversationResponse,
+  GetMessagingConfigResponse,
+  GetMyConversationsResponse,
+  ReportConversationBody,
+  ReportConversationParams,
+  ReportConversationResponse,
+  SendConversationMessageBody,
+  SendConversationMessageParams,
+  SendConversationMessageResponse,
+} from "@workspace/api-zod";
+import { FirebaseConfigurationError, verifyFirebaseIdToken } from "../lib/firebase-admin";
+import { sendTransactionalEmail } from "../lib/mailjet";
+
+const router: IRouter = Router();
+const MESSAGE_DAILY_LIMIT = 10;
+const MESSAGE_DISCLOSURE_ENV = "MESSAGING_APPROVED_NOTICE";
+
+type Identity = { uid: string; email: string };
+type ParticipantRole = "investor" | "filmmaker";
+type ConversationRow = {
+  id: number;
+  project_id: number;
+  project_slug: string;
+  project_title: string;
+  other_party_name: string | null;
+  locked: boolean;
+  reported: boolean;
+  last_message_at: Date | null;
+  created_at: Date;
+};
+
+function messagingConfig(): { available: boolean; disclosure: string } {
+  const approvedNotice = process.env[MESSAGE_DISCLOSURE_ENV]?.trim() ?? "";
+  const available = process.env.MESSAGING_PRIVACY_APPROVED === "true" && approvedNotice.length > 0;
+  return { available, disclosure: available ? approvedNotice : "" };
+}
+
+function safeAppBaseUrl(): string | null {
+  const configured = process.env.PUBLIC_APP_URL?.trim();
+  if (!configured) return null;
+  try {
+    const url = new URL(configured);
+    if (!["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password
+      || url.search || url.hash) return null;
+    return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return null;
+  }
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
+}
+
+async function authenticate(req: Request, res: Response): Promise<Identity | null> {
+  const match = req.get("authorization")?.match(/^Bearer\s+(\S+)$/i);
+  if (!match) {
+    res.status(401).json({ error: "A Firebase ID token is required." });
+    return null;
+  }
+  try {
+    const decoded = await verifyFirebaseIdToken(match[1]);
+    if (decoded.email_verified !== true || typeof decoded.email !== "string" || typeof decoded.uid !== "string" || !decoded.uid) {
+      res.status(403).json({ error: "A verified Firebase email is required." });
+      return null;
+    }
+    const email = decoded.email.trim().toLowerCase();
+    if (!email) {
+      res.status(403).json({ error: "A verified Firebase email is required." });
+      return null;
+    }
+    return { uid: decoded.uid, email };
+  } catch (error) {
+    if (error instanceof FirebaseConfigurationError) {
+      res.status(503).json({ error: error.message });
+      return null;
+    }
+    req.log.warn({ error: error instanceof Error ? error.message : "Authentication failed." }, "Firebase messaging token verification failed");
+    res.status(401).json({ error: "The Firebase ID token is invalid or expired." });
+    return null;
+  }
+}
+
+async function findParticipantRole(uid: string): Promise<ParticipantRole | null> {
+  const result = await pool.query<{ role: ParticipantRole }>(
+    `select 'investor' as role from investors where firebase_uid = $1
+     union
+     select 'filmmaker' as role from filmmakers where firebase_uid = $1
+     limit 1`,
+    [uid],
+  );
+  return result.rows[0]?.role ?? null;
+}
+
+function isMessagingBlocked(row: { locked: boolean; reported: boolean }): boolean {
+  return row.locked || row.reported;
+}
+
+router.get("/messaging/config", (_req, res): void => {
+  res.json(GetMessagingConfigResponse.parse(messagingConfig()));
+});
+
+router.post("/projects/:slug/conversations", async (req, res): Promise<void> => {
+  const identity = await authenticate(req, res);
+  if (!identity) return;
+  const parsedParams = CreateConversationParams.safeParse(req.params);
+  if (!parsedParams.success) {
+    res.status(400).json({ error: "Invalid project slug." });
+    return;
+  }
+  if (!messagingConfig().available) {
+    res.status(503).json({ error: "Messaging is not currently available." });
+    return;
+  }
+
+  const projectResult = await pool.query<{
+    id: number;
+    slug: string;
+    title: string;
+    filmmaker_id: number;
+    filmmaker_uid: string | null;
+    filmmaker_name: string | null;
+  }>(
+    `select p.id, p.slug, p.title, f.id as filmmaker_id,
+       f.firebase_uid as filmmaker_uid, f.name as filmmaker_name
+     from projects p
+     inner join filmmakers f on f.id = p.filmmaker_id
+     where p.slug = $1 and p.title is not null and p.approved = true
+       and p.hidden = false and p.showcase_requested = true
+     limit 1`,
+    [parsedParams.data.slug],
+  );
+  const project = projectResult.rows[0];
+  if (!project || !project.filmmaker_uid || project.filmmaker_uid === identity.uid) {
+    res.status(404).json({ error: "Project not found or unavailable for messaging." });
+    return;
+  }
+
+  const client = await pool.connect();
+  let conversation: ConversationRow | undefined;
+  try {
+    await client.query("begin");
+    const advisoryKeys = [
+      `investor-uid:${createHash("sha256").update(identity.uid).digest("hex")}`,
+      `investor-email:${createHash("sha256").update(identity.email).digest("hex")}`,
+      `conversation-start:${createHash("sha256").update(identity.uid).digest("hex")}:${project.id}`,
+    ].sort();
+    for (const key of advisoryKeys) {
+      await client.query("select pg_advisory_xact_lock(hashtext($1))", [key]);
+    }
+
+    type InvestorRow = { id: number; name: string | null; email: string | null; firebase_uid: string | null };
+    const uidInvestors = await client.query<InvestorRow>(
+      `select id, name, email, firebase_uid from investors
+       where firebase_uid = $1 order by id for update`,
+      [identity.uid],
+    );
+    const emailInvestors = await client.query<InvestorRow>(
+      `select id, name, email, firebase_uid from investors
+       where lower(trim(email)) = $1 order by id for update`,
+      [identity.email],
+    );
+
+    const identityConflict = uidInvestors.rows.length > 1
+      || emailInvestors.rows.length > 1
+      || emailInvestors.rows.some((row) => row.firebase_uid != null && row.firebase_uid !== identity.uid)
+      || Boolean(uidInvestors.rows[0] && emailInvestors.rows[0]
+        && uidInvestors.rows[0].id !== emailInvestors.rows[0].id);
+    if (identityConflict) {
+      await client.query("rollback");
+      res.status(409).json({ error: "This verified account conflicts with an existing investor identity." });
+      return;
+    }
+
+    let investor = uidInvestors.rows[0] ?? emailInvestors.rows[0];
+    if (!investor) {
+      await client.query("rollback");
+      res.status(404).json({ error: "No investor record matches this verified account." });
+      return;
+    }
+    if (investor.firebase_uid == null) {
+      const claimed = await client.query<InvestorRow>(
+        `update investors set firebase_uid = $1
+         where id = $2 and firebase_uid is null
+         returning id, name, email, firebase_uid`,
+        [identity.uid, investor.id],
+      );
+      investor = claimed.rows[0];
+      if (!investor) {
+        await client.query("rollback");
+        res.status(409).json({ error: "This investor record is already linked to another account." });
+        return;
+      }
+    }
+    const uidClaims = await client.query<{ id: number }>(
+      "select id from investors where firebase_uid = $1 order by id for update",
+      [identity.uid],
+    );
+    if (uidClaims.rows.length !== 1 || uidClaims.rows[0].id !== investor.id) {
+      await client.query("rollback");
+      res.status(409).json({ error: "This verified account conflicts with an existing investor identity." });
+      return;
+    }
+
+    const result = await client.query<{
+      id: number;
+      project_id: number;
+      project_slug: string;
+      project_title: string;
+      other_party_name: string | null;
+      locked: boolean;
+      reported: boolean;
+      last_message_at: Date | null;
+      created_at: Date;
+    }>(
+      `insert into conversations (project_id, investor_id, filmmaker_id)
+       values ($1, $2, $3)
+       on conflict (project_id, investor_id) do update set updated_at = conversations.updated_at
+         where conversations.filmmaker_id = excluded.filmmaker_id
+       returning id, project_id, $4::text as project_slug, $5::text as project_title,
+         $6::text as other_party_name, locked, reported,
+         last_message_at, created_at`,
+      [project.id, investor.id, project.filmmaker_id, project.slug, project.title, project.filmmaker_name ?? "Filmmaker"],
+    );
+    conversation = result.rows[0];
+    if (!conversation) {
+      await client.query("rollback");
+      res.status(404).json({ error: "Project not found or unavailable for messaging." });
+      return;
+    }
+    if (isMessagingBlocked(conversation)) {
+      await client.query("rollback");
+      res.status(409).json({ error: "This conversation is locked or under review." });
+      return;
+    }
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+  res.status(201).json(CreateConversationResponse.parse(conversation));
+});
+
+router.get("/me/conversations", async (req, res): Promise<void> => {
+  const identity = await authenticate(req, res);
+  if (!identity) return;
+  if (!messagingConfig().available) {
+    res.status(503).json({ error: "Messaging is not currently available." });
+    return;
+  }
+  if (!await findParticipantRole(identity.uid)) {
+    res.status(403).json({ error: "A verified investor or filmmaker account is required." });
+    return;
+  }
+  const result = await pool.query<ConversationRow>(
+    `select c.id, c.project_id, p.slug as project_slug, p.title as project_title,
+       case when i.firebase_uid = $1 then coalesce(f.name, 'Filmmaker')
+            else coalesce(i.name, 'Investor') end as other_party_name,
+       c.locked, c.reported,
+       c.last_message_at, c.created_at
+     from conversations c
+     inner join projects p on p.id = c.project_id
+     inner join investors i on i.id = c.investor_id
+     inner join filmmakers f on f.id = c.filmmaker_id
+     where i.firebase_uid = $1 or f.firebase_uid = $1
+     order by c.last_message_at desc nulls last, c.created_at desc`,
+    [identity.uid],
+  );
+  res.json(GetMyConversationsResponse.parse({ conversations: result.rows }));
+});
+
+router.get("/conversations/:id", async (req, res): Promise<void> => {
+  const identity = await authenticate(req, res);
+  if (!identity) return;
+  if (!messagingConfig().available) {
+    res.status(503).json({ error: "Messaging is not currently available." });
+    return;
+  }
+  const params = GetConversationParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid conversation ID." });
+    return;
+  }
+  const result = await pool.query<ConversationRow>(
+    `select c.id, c.project_id, p.slug as project_slug, p.title as project_title,
+       case when i.firebase_uid = $2 then coalesce(f.name, 'Filmmaker')
+            else coalesce(i.name, 'Investor') end as other_party_name,
+       c.locked, c.reported,
+       c.last_message_at, c.created_at
+     from conversations c
+     inner join projects p on p.id = c.project_id
+     inner join investors i on i.id = c.investor_id
+     inner join filmmakers f on f.id = c.filmmaker_id
+     where c.id = $1 and (i.firebase_uid = $2 or f.firebase_uid = $2)
+     limit 1`,
+    [params.data.id, identity.uid],
+  );
+  const conversation = result.rows[0];
+  if (!conversation) {
+    res.status(404).json({ error: "Conversation not found for this participant." });
+    return;
+  }
+  const messages = await pool.query(
+    `select id, sender_role, body, created_at
+     from conversation_messages where conversation_id = $1
+     order by created_at, id`,
+    [conversation.id],
+  );
+  res.json(GetConversationResponse.parse({ conversation, messages: messages.rows }));
+});
+
+router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
+  const identity = await authenticate(req, res);
+  if (!identity) return;
+  const params = SendConversationMessageParams.safeParse(req.params);
+  const parsedBody = SendConversationMessageBody.safeParse(req.body);
+  if (!params.success || !parsedBody.success) {
+    res.status(400).json({ error: "Provide a conversation ID and message text." });
+    return;
+  }
+  const body = parsedBody.data.body.trim();
+  if (!body || body.length > 2000) {
+    res.status(400).json({ error: "Message text must contain 1 to 2000 characters." });
+    return;
+  }
+  const client = await pool.connect();
+  let inserted: { id: number; sender_role: ParticipantRole; body: string; created_at: Date } | undefined;
+  let notification: { email: string | null } | undefined;
+  try {
+    await client.query("begin");
+    const conversationResult = await client.query<{
+      id: number;
+      investor_uid: string;
+      filmmaker_uid: string;
+      locked: boolean;
+      reported: boolean;
+      recipient_email: string | null;
+    }>(
+      `select c.id, i.firebase_uid as investor_uid, f.firebase_uid as filmmaker_uid,
+         c.locked, c.reported,
+         case when i.firebase_uid = $2 then f.email else i.email end as recipient_email
+       from conversations c
+       inner join investors i on i.id = c.investor_id
+       inner join filmmakers f on f.id = c.filmmaker_id
+       where c.id = $1 and (i.firebase_uid = $2 or f.firebase_uid = $2)
+       for update of c`,
+      [params.data.id, identity.uid],
+    );
+    const conversation = conversationResult.rows[0];
+    if (!conversation) {
+      await client.query("rollback");
+      res.status(404).json({ error: "Conversation not found for this participant." });
+      return;
+    }
+    if (!messagingConfig().available || isMessagingBlocked(conversation)) {
+      await client.query("rollback");
+      res.status(409).json({ error: "Messaging is disabled or this conversation is locked or under review." });
+      return;
+    }
+    const senderRole: ParticipantRole = conversation.investor_uid === identity.uid ? "investor" : "filmmaker";
+    const rateKey = createHash("sha256").update(identity.uid).digest("hex");
+    await client.query("select pg_advisory_xact_lock(hashtext($1))", [`conversation-message-sender:${rateKey}`]);
+    const count = await client.query<{ count: number }>(
+      `select count(*)::int as count from conversation_messages
+       where sender_uid = $1 and created_at > now() - interval '24 hours'`,
+      [identity.uid],
+    );
+    if (count.rows[0].count >= MESSAGE_DAILY_LIMIT) {
+      await client.query("rollback");
+      res.status(429).json({ error: "You have reached the limit of 10 messages in 24 hours." });
+      return;
+    }
+    const message = await client.query<{ id: number; sender_role: ParticipantRole; body: string; created_at: Date }>(
+      `insert into conversation_messages (conversation_id, sender_uid, sender_role, body)
+       values ($1, $2, $3, $4)
+       returning id, sender_role, body, created_at`,
+      [conversation.id, identity.uid, senderRole, body],
+    );
+    inserted = message.rows[0];
+    notification = { email: conversation.recipient_email };
+    await client.query("update conversations set last_message_at = now(), updated_at = now() where id = $1", [conversation.id]);
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  const appBaseUrl = safeAppBaseUrl();
+  if (notification?.email && appBaseUrl
+    && process.env.MAILJET_API_KEY?.trim()
+    && process.env.MAILJET_SECRET_KEY?.trim()
+    && process.env.MAILJET_SENDER_EMAIL?.trim()) {
+    try {
+      const status = await sendTransactionalEmail({
+        to: notification.email,
+        type: "conversation-message-notification",
+        subject: "You have a new private message",
+        text: `Sign in to Movie Show Investing to view your new private message: ${appBaseUrl}/messages`,
+        html: `<p>You have a new private message.</p><p><a href="${escapeHtml(appBaseUrl)}/messages">Sign in to view it</a>.</p>`,
+      });
+      if (status !== "sent") req.log.warn({ conversationId: params.data.id, status }, "Conversation message notification was not delivered");
+    } catch (error) {
+      req.log.warn({ conversationId: params.data.id, error: error instanceof Error ? error.message : "Email failed" }, "Conversation message notification failed");
+    }
+  }
+  res.status(201).json(SendConversationMessageResponse.parse(inserted));
+});
+
+router.post("/conversations/:id/report", async (req, res): Promise<void> => {
+  const identity = await authenticate(req, res);
+  if (!identity) return;
+  const params = ReportConversationParams.safeParse(req.params);
+  const parsedBody = ReportConversationBody.safeParse(req.body);
+  if (!params.success || !parsedBody.success) {
+    res.status(400).json({ error: "Provide a conversation ID and report reason." });
+    return;
+  }
+  const reason = parsedBody.data.reason.trim();
+  if (!reason || reason.length > 2000) {
+    res.status(400).json({ error: "Report reason must contain 1 to 2000 characters." });
+    return;
+  }
+  const result = await pool.query(
+    `update conversations c
+     set reported = true, report_reason = coalesce(c.report_reason, $3),
+       reporter_role = coalesce(c.reporter_role, case when i.firebase_uid = $2 then 'investor' else 'filmmaker' end),
+       reported_at = coalesce(c.reported_at, now()), updated_at = now()
+     from investors i, filmmakers f
+     where c.id = $1 and i.id = c.investor_id and f.id = c.filmmaker_id
+       and (i.firebase_uid = $2 or f.firebase_uid = $2)
+     returning c.id`,
+    [params.data.id, identity.uid, reason],
+  );
+  if (!result.rowCount) {
+    res.status(404).json({ error: "Conversation not found for this participant." });
+    return;
+  }
+  res.json(ReportConversationResponse.parse({ reported: true }));
+});
+
+export default router;

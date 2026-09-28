@@ -531,6 +531,239 @@ export interface PublicProject {
   phone_verified: boolean;
 }
 
+export interface ExploreProject {
+  /** @minimum 1 */
+  id: number;
+  slug: string;
+  title: string;
+  /** @nullable */
+  logline: string | null;
+  /** @nullable */
+  format: string | null;
+  /** @nullable */
+  genre: string | null;
+  /** @nullable */
+  stage: string | null;
+  /** @nullable */
+  poster_url: string | null;
+  /**
+     * @minimum 125
+     * @nullable
+     */
+  offer_per_100: number | null;
+  /** @minimum 0 */
+  confirmed_pledge_total: number;
+}
+
+export interface ExploreProjects {
+  projects: ExploreProject[];
+}
+
+export interface InvestorMinima {
+  /**
+     * @minimum 125
+     * @nullable
+     */
+  distribution: number | null;
+  /**
+     * @minimum 125
+     * @nullable
+     */
+  production: number | null;
+  /**
+     * @minimum 125
+     * @nullable
+     */
+  idea: number | null;
+}
+
+export interface InvestorMatchInput {
+  /** @minimum 1 */
+  amount: number;
+  favorite_genres: string[];
+  stages: string[];
+  minima: InvestorMinima;
+}
+
+export interface InvestorMatches {
+  projects: ExploreProject[];
+}
+
+export interface InvestorAllocationInput {
+  /** @minimum 1 */
+  project_id: number;
+  /** @minimum 1 */
+  amount: number;
+}
+
+export interface InvestorIntentInput {
+  /** @minLength 1 */
+  name: string;
+  email: string;
+  /** @minimum 1 */
+  amount: number;
+  allocations: InvestorAllocationInput[];
+  unallocated: boolean;
+  accredited: boolean;
+  experience: string[];
+  motivations: string[];
+  favorite_genres: string[];
+  stages: string[];
+  minima: InvestorMinima;
+  call_opt_in: boolean;
+  city?: string;
+  state?: string;
+  zip?: string;
+}
+
+export interface InvestorIntentResult {
+  /** @minimum 1 */
+  investor_id: number;
+  status: 'saved';
+}
+
+export interface InvestorIntentView {
+  /** @minimum 1 */
+  investor_id: number;
+  name: string;
+  email: string;
+  /** @minimum 1 */
+  amount: number;
+  allocations: InvestorAllocationInput[];
+  unallocated: boolean;
+  accredited: boolean;
+  experience: string[];
+  motivations: string[];
+  favorite_genres: string[];
+  stages: string[];
+  minima: InvestorMinima;
+  call_opt_in: boolean;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  state?: string | null;
+  /** @nullable */
+  zip?: string | null;
+}
+
+export interface InvestorIntentCurrent {
+  intent: InvestorIntentView | null;
+}
+
+export interface MessagingConfig {
+  available: boolean;
+  disclosure: string;
+}
+
+export interface Conversation {
+  /** @minimum 1 */
+  id: number;
+  /** @minimum 1 */
+  project_id: number;
+  project_slug: string;
+  project_title: string;
+  other_party_name: string;
+  locked: boolean;
+  reported: boolean;
+  /** @nullable */
+  last_message_at: string | null;
+  created_at: string;
+}
+
+export interface Conversations {
+  conversations: Conversation[];
+}
+
+export type ConversationMessageSenderRole = typeof ConversationMessageSenderRole[keyof typeof ConversationMessageSenderRole];
+
+
+export const ConversationMessageSenderRole = {
+  investor: 'investor',
+  filmmaker: 'filmmaker',
+} as const;
+
+export interface ConversationMessage {
+  /** @minimum 1 */
+  id: number;
+  sender_role: ConversationMessageSenderRole;
+  body: string;
+  created_at: string;
+}
+
+export interface ConversationMessageInput {
+  /** @minLength 1 */
+  body: string;
+}
+
+export interface ConversationReportInput {
+  /** @minLength 1 */
+  reason: string;
+}
+
+export const ConversationReportResultValue = {
+  reported: true,
+} as const;
+export type ConversationReportResult = typeof ConversationReportResultValue;
+
+export interface ConversationView {
+  conversation: Conversation;
+  messages: ConversationMessage[];
+}
+
+export type ConversationAuditAction = typeof ConversationAuditAction[keyof typeof ConversationAuditAction];
+
+
+export const ConversationAuditAction = {
+  lock: 'lock',
+  unlock: 'unlock',
+  review: 'review',
+} as const;
+
+export interface ConversationAudit {
+  action: ConversationAuditAction;
+  /** @nullable */
+  note: string | null;
+  at: string;
+}
+
+export interface ConversationDetail {
+  /** @minimum 1 */
+  id: number;
+  /** @minimum 1 */
+  project_id: number;
+  project_slug: string;
+  project_title: string;
+  other_party_name: string;
+  locked: boolean;
+  reported: boolean;
+  /** @nullable */
+  last_message_at: string | null;
+  created_at: string;
+  /** @nullable */
+  report_reason: string | null;
+  messages: ConversationMessage[];
+  audit: ConversationAudit[];
+}
+
+export type ConversationModerationInputAction = typeof ConversationModerationInputAction[keyof typeof ConversationModerationInputAction];
+
+
+export const ConversationModerationInputAction = {
+  lock: 'lock',
+  unlock: 'unlock',
+  review: 'review',
+} as const;
+
+export interface ConversationModerationInput {
+  action: ConversationModerationInputAction;
+  note: string;
+}
+
+export interface ConversationModerationResult {
+  status: string;
+  locked: boolean;
+}
+
 export type FlowProgressAnswers = { [key: string]: unknown };
 
 export interface FlowProgress {
@@ -631,4 +864,11 @@ export const DeleteFilmmakerImageKind = {
   poster: 'poster',
   share: 'share',
 } as const;
+
+export type GetExploreParams = {
+stage?: string;
+genre?: string;
+sort?: string;
+search?: string;
+};
 

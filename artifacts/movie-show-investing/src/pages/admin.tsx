@@ -6,12 +6,13 @@ import {
 } from 'firebase/auth';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  getGetAdminMeQueryKey, getGetAdminTableQueryKey, getGetFirebaseConfigQueryKey,
+  getGetAdminMeQueryKey, getGetAdminTableQueryKey, getGetFirebaseConfigQueryKey, getGetAdminConversationsQueryKey,
   setAuthTokenGetter, useGetAdminMe, useGetAdminTable, useGetFirebaseConfig,
   useReviewAdminProject, useReviewAdminMessage,
   type AdminSection, type AdminTable,
 } from '@workspace/api-client-react';
 import { ArrowDownToLine, ArrowRight, Clapperboard, LockKeyhole, LogOut, Mail, RotateCw, ShieldAlert } from 'lucide-react';
+import { AdminConversations } from '@/components/admin-conversations';
 
 const SECTIONS: { id: AdminSection; label: string; description: string }[] = [
   { id: 'summary', label: 'Summary', description: 'A consolidated view of activity recorded across the site.' },
@@ -61,6 +62,8 @@ function emailLinkError(error: unknown): string {
 function clearPrivateData(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.cancelQueries({ queryKey: getGetAdminMeQueryKey() });
   queryClient.removeQueries({ queryKey: getGetAdminMeQueryKey() });
+  queryClient.removeQueries({ queryKey: getGetAdminConversationsQueryKey() });
+  queryClient.removeQueries({ predicate: query => typeof query.queryKey[0] === 'string' && /^\/api\/admin\/conversations\/\d+$/.test(query.queryKey[0]) });
   for (const section of SECTIONS) {
     void queryClient.cancelQueries({ queryKey: getGetAdminTableQueryKey(section.id) });
     queryClient.removeQueries({ queryKey: getGetAdminTableQueryKey(section.id) });
@@ -222,6 +225,7 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
 
 function Dashboard({ user, email, onSignOut }: { user: User; email: string; onSignOut: () => void }) {
   const [active, setActive] = useState<AdminSection>('summary');
+  const [conversationMode, setConversationMode] = useState(false);
   const section = SECTIONS.find(item => item.id === active)!;
   // The active table is read here for the export control; SectionData shares its query cache.
   const { data, isFetching } = useGetAdminTable(active, {
@@ -232,9 +236,10 @@ function Dashboard({ user, email, onSignOut }: { user: User; email: string; onSi
       <aside className="admin-sidebar" aria-label="Administration sections">
         <div className="admin-sidebar-label admin-mono">Index / 10 views</div>
         <nav className="admin-nav" aria-label="Data sections">
-          {SECTIONS.map((item, i) => <button key={item.id} type="button" aria-current={active === item.id ? 'page' : undefined} onClick={() => setActive(item.id)} data-testid={`button-section-${item.id}`}>
+          {SECTIONS.map((item, i) => <button key={item.id} type="button" aria-current={!conversationMode && active === item.id ? 'page' : undefined} onClick={() => { setActive(item.id); setConversationMode(false); }} data-testid={`button-section-${item.id}`}>
             <span className="admin-nav-number">{String(i + 1).padStart(2, '0')}</span>{item.label}
           </button>)}
+          <button type="button" aria-current={conversationMode ? 'page' : undefined} onClick={() => setConversationMode(true)} data-testid="button-section-conversations"><span className="admin-nav-number">11</span>Conversations</button>
         </nav>
         <div className="admin-sidebar-foot">Private administration<br />{email}<br /><br />No payments are collected here.</div>
       </aside>
@@ -242,15 +247,15 @@ function Dashboard({ user, email, onSignOut }: { user: User; email: string; onSi
         <div className="admin-main-inner">
           <div className="admin-title-row">
             <div>
-              <div className="admin-overline admin-mono">Administration / {String(SECTIONS.indexOf(section) + 1).padStart(2, '0')}</div>
-              <h1 className="admin-page-title" data-testid="text-section-heading">{section.label}</h1>
-              <p className="admin-lede">{section.description}</p>
+               <div className="admin-overline admin-mono">Administration / {conversationMode ? '11' : String(SECTIONS.indexOf(section) + 1).padStart(2, '0')}</div>
+               <h1 className="admin-page-title" data-testid="text-section-heading">{conversationMode ? 'Conversations' : section.label}</h1>
+               <p className="admin-lede">{conversationMode ? 'Project threads, reports, and auditable moderation actions.' : section.description}</p>
             </div>
-            <button type="button" className="admin-button" disabled={!data || isFetching} onClick={() => data && downloadCsv(data, active)} data-testid={`button-download-${active}`} title={!data ? 'Available when this section loads' : `Download ${section.label} as CSV`}>
+             {!conversationMode && <button type="button" className="admin-button" disabled={!data || isFetching} onClick={() => data && downloadCsv(data, active)} data-testid={`button-download-${active}`} title={!data ? 'Available when this section loads' : `Download ${section.label} as CSV`}>
               <ArrowDownToLine size={16} /> Download CSV
-            </button>
+             </button>}
           </div>
-          <SectionData key={`${active}-${user.uid}`} section={section} userId={user.uid} />
+           {conversationMode ? <AdminConversations uid={user.uid}/> : <SectionData key={`${active}-${user.uid}`} section={section} userId={user.uid} />}
         </div>
       </main>
     </div>

@@ -9,9 +9,11 @@ import { clearFilmmakerAction } from '@/lib/filmmaker-intent';
 
 const navigation = [
   { href: '/', label: 'Home' },
+  { href: '/explore', label: 'Explore projects' },
   { href: '/faq', label: 'Questions' },
   { href: '/start/filmmaker', label: 'For filmmakers' },
   { href: '/invest', label: 'For investors' },
+  { href: '/messages', label: 'Messages' },
 ];
 
 export function SiteShell({ children }: { children: ReactNode }) {
@@ -89,9 +91,11 @@ export function SiteShell({ children }: { children: ReactNode }) {
             <div className="grid grid-cols-2 gap-6 self-end text-[13px]">
               <div className="flex flex-col gap-4">
                 <Link href="/" data-testid="link-footer-home" className="hover:text-[#dfb674]">Home</Link>
+                <Link href="/explore" data-testid="link-footer-explore" className="hover:text-[#dfb674]">Explore projects</Link>
                 <Link href="/faq" data-testid="link-footer-faq" className="hover:text-[#dfb674]">FAQ</Link>
                 <Link href="/start/filmmaker" data-testid="link-footer-filmmaker" className="hover:text-[#dfb674]">For filmmakers</Link>
                 <Link href="/invest" data-testid="link-footer-invest" className="hover:text-[#dfb674]">For investors</Link>
+                <Link href="/messages" data-testid="link-footer-messages" className="hover:text-[#dfb674]">Messages</Link>
               </div>
               <div className="flex flex-col gap-4">
                 <Link href="/privacy" data-testid="link-footer-privacy" className="hover:text-[#dfb674]">Privacy</Link>

@@ -10,6 +10,10 @@ import filmmakerPhoneRouter from "./filmmaker-phone";
 import locationsRouter from "./locations";
 import projectsRouter from "./projects";
 import questionsRouter from "./questions";
+import exploreRouter from "./explore";
+import investorRouter from "./investor";
+import conversationsRouter from "./conversations";
+import adminConversationsRouter from "./admin-conversations";
 
 const router: IRouter = Router();
 
@@ -24,5 +28,9 @@ router.use(filmmakerPhoneRouter);
 router.use(locationsRouter);
 router.use(projectsRouter);
 router.use(questionsRouter);
+router.use(exploreRouter);
+router.use(investorRouter);
+router.use(conversationsRouter);
+router.use(adminConversationsRouter);
 
 export default router;

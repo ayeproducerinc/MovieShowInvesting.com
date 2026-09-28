@@ -665,6 +665,408 @@ export const GetProjectShareMetadataResponse = zod.unknown()
 
 
 /**
+ * @summary Browse approved projects for investors
+ */
+export const GetExploreQueryParams = zod.object({
+  "stage": zod.coerce.string().optional(),
+  "genre": zod.coerce.string().optional(),
+  "sort": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional()
+})
+
+
+export const getExploreResponseProjectsItemOfferPer100Min = 125;
+
+export const getExploreResponseProjectsItemConfirmedPledgeTotalMin = 0;
+
+
+
+export const GetExploreResponse = zod.object({
+  "projects": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "slug": zod.string(),
+  "title": zod.string(),
+  "logline": zod.string().nullable(),
+  "format": zod.string().nullable(),
+  "genre": zod.string().nullable(),
+  "stage": zod.string().nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "offer_per_100": zod.number().int().min(getExploreResponseProjectsItemOfferPer100Min).nullable(),
+  "confirmed_pledge_total": zod.number().min(getExploreResponseProjectsItemConfirmedPledgeTotalMin)
+}))
+})
+
+
+/**
+ * @summary Match projects against investor preferences
+ */
+
+export const matchInvestorBodyMinimaDistributionMin = 125;
+
+export const matchInvestorBodyMinimaProductionMin = 125;
+
+export const matchInvestorBodyMinimaIdeaMin = 125;
+
+
+
+export const MatchInvestorBody = zod.object({
+  "amount": zod.number().int().min(1),
+  "favorite_genres": zod.array(zod.string()),
+  "stages": zod.array(zod.string()),
+  "minima": zod.object({
+  "distribution": zod.number().int().min(matchInvestorBodyMinimaDistributionMin).nullable(),
+  "production": zod.number().int().min(matchInvestorBodyMinimaProductionMin).nullable(),
+  "idea": zod.number().int().min(matchInvestorBodyMinimaIdeaMin).nullable()
+})
+})
+
+
+export const matchInvestorResponseProjectsItemOfferPer100Min = 125;
+
+export const matchInvestorResponseProjectsItemConfirmedPledgeTotalMin = 0;
+
+
+
+export const MatchInvestorResponse = zod.object({
+  "projects": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "slug": zod.string(),
+  "title": zod.string(),
+  "logline": zod.string().nullable(),
+  "format": zod.string().nullable(),
+  "genre": zod.string().nullable(),
+  "stage": zod.string().nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "offer_per_100": zod.number().int().min(matchInvestorResponseProjectsItemOfferPer100Min).nullable(),
+  "confirmed_pledge_total": zod.number().min(matchInvestorResponseProjectsItemConfirmedPledgeTotalMin)
+}))
+})
+
+
+/**
+ * @summary Save visitor-scoped intent or verified account intent and preferences
+ */
+
+
+
+
+export const saveInvestorIntentBodyMinimaDistributionMin = 125;
+
+export const saveInvestorIntentBodyMinimaProductionMin = 125;
+
+export const saveInvestorIntentBodyMinimaIdeaMin = 125;
+
+
+
+export const SaveInvestorIntentBody = zod.object({
+  "name": zod.string().min(1),
+  "email": zod.string().email(),
+  "amount": zod.number().int().min(1),
+  "allocations": zod.array(zod.object({
+  "project_id": zod.number().int().min(1),
+  "amount": zod.number().int().min(1)
+})),
+  "unallocated": zod.boolean(),
+  "accredited": zod.boolean(),
+  "experience": zod.array(zod.string()),
+  "motivations": zod.array(zod.string()),
+  "favorite_genres": zod.array(zod.string()),
+  "stages": zod.array(zod.string()),
+  "minima": zod.object({
+  "distribution": zod.number().int().min(saveInvestorIntentBodyMinimaDistributionMin).nullable(),
+  "production": zod.number().int().min(saveInvestorIntentBodyMinimaProductionMin).nullable(),
+  "idea": zod.number().int().min(saveInvestorIntentBodyMinimaIdeaMin).nullable()
+}),
+  "call_opt_in": zod.boolean(),
+  "city": zod.string().optional(),
+  "state": zod.string().optional(),
+  "zip": zod.string().optional()
+})
+
+
+
+
+export const SaveInvestorIntentResponse = zod.object({
+  "investor_id": zod.number().int().min(1),
+  "status": zod.literal("saved")
+})
+
+
+/**
+ * @summary Read visitor-scoped intent or verified account intent
+ */
+
+
+
+
+export const getCurrentInvestorIntentResponseIntentOneMinimaDistributionMin = 125;
+
+export const getCurrentInvestorIntentResponseIntentOneMinimaProductionMin = 125;
+
+export const getCurrentInvestorIntentResponseIntentOneMinimaIdeaMin = 125;
+
+
+
+export const GetCurrentInvestorIntentResponse = zod.object({
+  "intent": zod.union([zod.object({
+  "investor_id": zod.number().int().min(1),
+  "name": zod.string(),
+  "email": zod.string().email(),
+  "amount": zod.number().int().min(1),
+  "allocations": zod.array(zod.object({
+  "project_id": zod.number().int().min(1),
+  "amount": zod.number().int().min(1)
+})),
+  "unallocated": zod.boolean(),
+  "accredited": zod.boolean(),
+  "experience": zod.array(zod.string()),
+  "motivations": zod.array(zod.string()),
+  "favorite_genres": zod.array(zod.string()),
+  "stages": zod.array(zod.string()),
+  "minima": zod.object({
+  "distribution": zod.number().int().min(getCurrentInvestorIntentResponseIntentOneMinimaDistributionMin).nullable(),
+  "production": zod.number().int().min(getCurrentInvestorIntentResponseIntentOneMinimaProductionMin).nullable(),
+  "idea": zod.number().int().min(getCurrentInvestorIntentResponseIntentOneMinimaIdeaMin).nullable()
+}),
+  "call_opt_in": zod.boolean(),
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "zip": zod.string().nullish()
+}),zod.null()])
+})
+
+
+/**
+ * @summary Read messaging availability and disclosure
+ */
+export const GetMessagingConfigResponse = zod.object({
+  "available": zod.boolean(),
+  "disclosure": zod.string()
+})
+
+
+/**
+ * @summary Start a private conversation about a project
+ */
+
+
+
+export const CreateConversationParams = zod.object({
+  "slug": zod.coerce.string().min(1)
+})
+
+
+
+
+
+export const CreateConversationResponse = zod.object({
+  "id": zod.number().int().min(1),
+  "project_id": zod.number().int().min(1),
+  "project_slug": zod.string(),
+  "project_title": zod.string(),
+  "other_party_name": zod.string(),
+  "locked": zod.boolean(),
+  "reported": zod.boolean(),
+  "last_message_at": zod.coerce.date().nullable(),
+  "created_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary List conversations for the signed-in participant
+ */
+
+
+
+
+export const GetMyConversationsResponse = zod.object({
+  "conversations": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "project_id": zod.number().int().min(1),
+  "project_slug": zod.string(),
+  "project_title": zod.string(),
+  "other_party_name": zod.string(),
+  "locked": zod.boolean(),
+  "reported": zod.boolean(),
+  "last_message_at": zod.coerce.date().nullable(),
+  "created_at": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Read a participant conversation and its messages
+ */
+
+
+
+export const GetConversationParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+
+
+
+
+export const GetConversationResponse = zod.object({
+  "conversation": zod.object({
+  "id": zod.number().int().min(1),
+  "project_id": zod.number().int().min(1),
+  "project_slug": zod.string(),
+  "project_title": zod.string(),
+  "other_party_name": zod.string(),
+  "locked": zod.boolean(),
+  "reported": zod.boolean(),
+  "last_message_at": zod.coerce.date().nullable(),
+  "created_at": zod.coerce.date()
+}),
+  "messages": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "sender_role": zod.enum(['investor', 'filmmaker']),
+  "body": zod.string(),
+  "created_at": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Send a message in a participant conversation
+ */
+
+
+
+export const SendConversationMessageParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const SendConversationMessageBody = zod.object({
+  "body": zod.string().min(1)
+})
+
+
+
+
+export const SendConversationMessageResponse = zod.object({
+  "id": zod.number().int().min(1),
+  "sender_role": zod.enum(['investor', 'filmmaker']),
+  "body": zod.string(),
+  "created_at": zod.coerce.date()
+})
+
+
+/**
+ * @summary Report a participant conversation
+ */
+
+
+
+export const ReportConversationParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const ReportConversationBody = zod.object({
+  "reason": zod.string().min(1)
+})
+
+export const ReportConversationResponse = zod.object({
+  "reported": zod.literal(true)
+})
+
+
+/**
+ * Requires a Firebase Bearer token with administrator access.
+ * @summary List conversations for administrator moderation
+ */
+
+
+
+
+export const GetAdminConversationsResponse = zod.object({
+  "conversations": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "project_id": zod.number().int().min(1),
+  "project_slug": zod.string(),
+  "project_title": zod.string(),
+  "other_party_name": zod.string(),
+  "locked": zod.boolean(),
+  "reported": zod.boolean(),
+  "last_message_at": zod.coerce.date().nullable(),
+  "created_at": zod.coerce.date()
+}))
+})
+
+
+/**
+ * Requires a Firebase Bearer token with administrator access.
+ * @summary Read a conversation and its moderation audit
+ */
+
+
+
+export const GetAdminConversationParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+
+
+
+
+export const GetAdminConversationResponse = zod.object({
+  "id": zod.number().int().min(1),
+  "project_id": zod.number().int().min(1),
+  "project_slug": zod.string(),
+  "project_title": zod.string(),
+  "other_party_name": zod.string(),
+  "locked": zod.boolean(),
+  "reported": zod.boolean(),
+  "last_message_at": zod.coerce.date().nullable(),
+  "created_at": zod.coerce.date(),
+  "report_reason": zod.string().nullable(),
+  "messages": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "sender_role": zod.enum(['investor', 'filmmaker']),
+  "body": zod.string(),
+  "created_at": zod.coerce.date()
+})),
+  "audit": zod.array(zod.object({
+  "action": zod.enum(['lock', 'unlock', 'review']),
+  "note": zod.string().nullable(),
+  "at": zod.coerce.date()
+}))
+})
+
+
+/**
+ * Requires a Firebase Bearer token with administrator access.
+ * @summary Lock, unlock, or mark a conversation for review
+ */
+
+
+
+export const ModerateAdminConversationParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const ModerateAdminConversationBody = zod.object({
+  "action": zod.enum(['lock', 'unlock', 'review']),
+  "note": zod.string()
+})
+
+export const ModerateAdminConversationResponse = zod.object({
+  "status": zod.string(),
+  "locked": zod.boolean()
+})
+
+
+/**
  * @summary Check verified Firebase admin access
  */
 export const GetAdminMeResponse = zod.object({

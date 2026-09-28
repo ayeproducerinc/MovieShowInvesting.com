@@ -9,7 +9,7 @@ These product rules are locked for the MVP. Change them only when the owner expl
 - Filmmakers launch first. Investor signup and pledges launch later, after approved projects are available.
 - The project is unlisted by default. “Private” means accessible to people with its link, not access-controlled. Do not describe an unlisted page as confidential or password-protected.
 - A filmmaker can request to showcase a project, but it appears in Explore only after admin approval and only while it is not hidden.
-- Do not add payments, banking, escrow, Greenlights, leaderboards, lineup editing, public Q&A, direct messages, or tiered rates.
+- Do not add payments, banking, escrow, Greenlights, leaderboards, public Q&A, unrestricted direct messages, or tiered rates. Investor allocations within one non-binding lineup may be edited. Approved messaging exception: one private, text-only investor–filmmaker conversation per project and investor, accessible only to verified participants and authorized admins, with reporting, admin review/lock controls, and an audit trail. Do not open it to real users until owner-approved messaging privacy wording and moderation controls are in place.
 - Share loglines and synopses, not full scripts.
 
 ## Slates and offers
@@ -62,6 +62,7 @@ These product rules are locked for the MVP. Change them only when the owner expl
 - Use the existing project’s React/Vite frontend and Express API with PostgreSQL/Drizzle. Do not add a Flask server or a second API server.
 - Keep the API contract OpenAPI-first and use the generated client/schema packages already in the project.
 - Firebase is for authentication only: email-link sign-in and phone verification. Store all other application data in PostgreSQL.
+- Magic links identify the signed-in messaging participant; Mailjet may notify them about a new message but is not the conversation record. Notification failure must not erase an internal message or expose its contents to email recipients.
 - The admin area uses Firebase email-link sign-in with a server-verified admin allowlist, not a separate admin password. A valid Firebase login alone does not grant admin access. The previously supplied admin password is unused.
 - Use Replit Secrets for credentials and environment-specific configuration; never put secret values in source files or ask the user to paste them into chat.
 - Save flow progress as the user proceeds so funnel drop-off and pricing answers can be analyzed.

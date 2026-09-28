@@ -12,13 +12,15 @@ import Home from '@/pages/home';
 import Admin from '@/pages/admin';
 import FAQ from '@/pages/faq';
 import Legal from '@/pages/legal';
-import OpeningLater from '@/pages/opening-later';
 import Filmmaker from '@/pages/filmmaker';
 import FilmmakerDone from '@/pages/filmmaker-done';
 import FilmmakerProjects from '@/pages/filmmaker-projects';
 import Project from '@/pages/project';
 import QuestionToken from '@/pages/question-token';
 import NotFound from '@/pages/not-found';
+import Explore from '@/pages/explore';
+import Investor, { InvestorDone } from '@/pages/investor';
+import Conversation from '@/pages/conversation';
 
 const queryClient = new QueryClient();
 const metadata: Record<string, [string, string]> = {
@@ -27,7 +29,10 @@ const metadata: Record<string, [string, string]> = {
   '/privacy': ['Privacy | Movie Show Investing', 'Prelaunch privacy information about visitor cookies and campaign attribution.'],
   '/terms': ['Terms | Movie Show Investing', 'Prelaunch terms for the Movie Show Investing informational site.'],
   '/disclaimers': ['Disclaimers | Movie Show Investing', 'Important context about non-binding interest, securities, and investment risk.'],
-  '/invest': ['For investors | Movie Show Investing', 'Investor signup and non-binding pledges will open later, after approved projects are available.'],
+  '/explore': ['Explore projects | Movie Show Investing', 'Discover approved independent films and shows. Project profiles are not investment offers.'],
+  '/invest': ['Express interest | Movie Show Investing', 'Explore independent film projects and save non-binding investor interest. No money is collected.'],
+  '/invest/done': ['Interest saved | Movie Show Investing', 'Your non-binding interest has been saved. No money has been collected.'],
+  '/messages': ['Messages | Movie Show Investing', 'Your private project conversations.'],
    '/start/filmmaker': ['Filmmaker worksheet | Movie Show Investing', 'Share your project and explore illustrative terms in a guided prelaunch worksheet.'],
    '/start/filmmaker/done': ['Thank you | Movie Show Investing', 'Your filmmaker answers have been received.'],
     '/me/projects': ['My projects | Movie Show Investing', 'Manage your filmmaker projects and start another submission.'],
@@ -36,7 +41,7 @@ const metadata: Record<string, [string, string]> = {
 function PageMetadata() {
   const [location] = useLocation();
   useEffect(() => {
-    const [title, description] = metadata[location] ?? ['Page not found | Movie Show Investing', 'Explore Movie Show Investing.'];
+    const [title, description] = metadata[location] ?? (location.startsWith('/messages/') ? ['Conversation | Movie Show Investing', 'Your private project conversation.'] : ['Page not found | Movie Show Investing', 'Explore Movie Show Investing.']);
     document.title = title;
     const update = (selector: string, attribute: 'name' | 'property', key: string, content: string) => {
       let element = document.head.querySelector<HTMLMetaElement>(selector);
@@ -61,21 +66,27 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
-function adminEmailLinkTarget() {
+function emailLinkTarget() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('mode') !== 'signIn' || !params.has('oobCode')) return null;
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const adminPath = `${base}/admin`;
   const projectsPath = `${base}/me/projects`;
-  if (window.location.pathname === adminPath || window.location.pathname === projectsPath) return null;
+  const investPath = `${base}/invest`;
+  const messagesPath = `${base}/messages`;
   let path = adminPath;
   try {
     const continuation = params.get('continueUrl');
     if (continuation) {
       const target = new URL(continuation);
-      if (target.origin === window.location.origin && target.pathname === projectsPath) path = projectsPath;
+      if (target.origin === window.location.origin) {
+        if (target.pathname === projectsPath) path = projectsPath;
+        else if (target.pathname === investPath || target.pathname === `${investPath}/done`) path = target.pathname;
+        else if (target.pathname === messagesPath || /^\/messages\/[1-9]\d*$/.test(target.pathname.slice(base.length))) path = target.pathname;
+      }
     }
   } catch { /* Unknown email-link continuation keeps the existing admin fallback. */ }
+  if (window.location.pathname === path || window.location.pathname === adminPath || window.location.pathname === projectsPath || window.location.pathname === investPath || window.location.pathname === messagesPath || window.location.pathname.startsWith(`${messagesPath}/`)) return null;
   const continuation = params.get('continueUrl');
   const intent = continuation && (() => {
     try {
@@ -100,7 +111,11 @@ function PublicPages() {
         <Route path="/privacy">{() => <Legal kind="privacy" />}</Route>
         <Route path="/terms">{() => <Legal kind="terms" />}</Route>
         <Route path="/disclaimers">{() => <Legal kind="disclaimers" />}</Route>
-        <Route path="/invest">{() => <OpeningLater audience="investor" />}</Route>
+        <Route path="/explore" component={Explore} />
+        <Route path="/invest/done" component={InvestorDone} />
+        <Route path="/invest" component={Investor} />
+        <Route path="/messages/:id" component={Conversation} />
+        <Route path="/messages" component={Conversation} />
           <Route path="/start/filmmaker/done" component={FilmmakerDone} />
           <Route path="/me/projects" component={FilmmakerProjects} />
           <Route path="/project/:slug" component={Project} />
@@ -122,11 +137,11 @@ function PublicPages() {
 }
 
 function App() {
-  const emailLinkTarget = adminEmailLinkTarget();
+  const redirectTarget = emailLinkTarget();
   useEffect(() => {
-    if (emailLinkTarget) window.location.replace(emailLinkTarget);
-  }, [emailLinkTarget]);
-  if (emailLinkTarget) return <div role="status" aria-label="Opening administration sign-in" />;
+    if (redirectTarget) window.location.replace(redirectTarget);
+  }, [redirectTarget]);
+  if (redirectTarget) return <div role="status" aria-label="Opening email-link sign-in" />;
 
   return <QueryClientProvider client={queryClient}>
     <TooltipProvider>

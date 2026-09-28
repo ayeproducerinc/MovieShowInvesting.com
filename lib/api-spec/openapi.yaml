@@ -20,6 +20,12 @@ tags:
     description: Unlisted project pages and showcase requests
   - name: questions
     description: Private filmmaker question relay
+  - name: explore
+    description: Project discovery and investor matching
+  - name: investor
+    description: Investor preferences and intent
+  - name: messaging
+    description: Private investor and filmmaker conversations
   - name: locations
     description: International city and region suggestions
   - name: admin
@@ -785,6 +791,286 @@ paths:
               schema: { type: string }
         "404":
           description: Project not found or hidden
+  /explore:
+    get:
+      operationId: getExplore
+      tags: [explore]
+      summary: Browse approved projects for investors
+      parameters:
+        - name: stage
+          in: query
+          required: false
+          schema: { type: string }
+        - name: genre
+          in: query
+          required: false
+          schema: { type: string }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string }
+        - name: search
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Matching discoverable projects
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExploreProjects"
+  /investor/matches:
+    post:
+      operationId: matchInvestor
+      tags: [investor]
+      summary: Match projects against investor preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestorMatchInput"
+      responses:
+        "200":
+          description: Matching projects
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestorMatches"
+  /investor/intents:
+    post:
+      operationId: saveInvestorIntent
+      tags: [investor]
+      summary: Save visitor-scoped intent or verified account intent and preferences
+      security:
+        - firebaseBearer: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestorIntentInput"
+      responses:
+        "201":
+          description: Investor intent saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestorIntentResult"
+        "401": { description: Supplied bearer token is invalid }
+  /investor/intents/current:
+    get:
+      operationId: getCurrentInvestorIntent
+      tags: [investor]
+      summary: Read visitor-scoped intent or verified account intent
+      security:
+        - firebaseBearer: []
+        - {}
+      responses:
+        "200":
+          description: Current investor intent, if one has been saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestorIntentCurrent"
+        "401": { description: Supplied bearer token is invalid }
+  /messaging/config:
+    get:
+      operationId: getMessagingConfig
+      tags: [messaging]
+      summary: Read messaging availability and disclosure
+      responses:
+        "200":
+          description: Messaging configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagingConfig"
+  /projects/{slug}/conversations:
+    post:
+      operationId: createConversation
+      tags: [messaging]
+      summary: Start a private conversation about a project
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "201":
+          description: Conversation created or resumed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "401": { description: Sign-in required }
+        "404": { description: Project unavailable }
+  /me/conversations:
+    get:
+      operationId: getMyConversations
+      tags: [messaging]
+      summary: List conversations for the signed-in participant
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Participant conversations without email addresses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversations"
+        "401": { description: Sign-in required }
+        "503": { description: Messaging has not been approved for use }
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      tags: [messaging]
+      summary: Read a participant conversation and its messages
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Conversation and messages without participant email addresses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationView"
+        "401": { description: Sign-in required }
+        "404": { description: Conversation not found for this participant }
+        "503": { description: Messaging has not been approved for use }
+  /conversations/{id}/messages:
+    post:
+      operationId: sendConversationMessage
+      tags: [messaging]
+      summary: Send a message in a participant conversation
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationMessageInput"
+      responses:
+        "201":
+          description: Message sent without exposing participant email addresses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationMessage"
+        "401": { description: Sign-in required }
+        "404": { description: Conversation not found for this participant }
+        "409": { description: Conversation is locked }
+  /conversations/{id}/report:
+    post:
+      operationId: reportConversation
+      tags: [messaging]
+      summary: Report a participant conversation
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationReportInput"
+      responses:
+        "200":
+          description: Conversation reported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationReportResult"
+        "401": { description: Sign-in required }
+        "404": { description: Conversation not found for this participant }
+  /admin/conversations:
+    get:
+      operationId: getAdminConversations
+      tags: [admin]
+      summary: List conversations for administrator moderation
+      description: Requires a Firebase Bearer token with administrator access.
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Conversations without participant email addresses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversations"
+        "401": { description: Sign-in required }
+        "403": { description: Not an admin }
+  /admin/conversations/{id}:
+    get:
+      operationId: getAdminConversation
+      tags: [admin]
+      summary: Read a conversation and its moderation audit
+      description: Requires a Firebase Bearer token with administrator access.
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Conversation detail without participant email addresses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetail"
+        "401": { description: Sign-in required }
+        "403": { description: Not an admin }
+        "404": { description: Conversation not found }
+  /admin/conversations/{id}/moderation:
+    post:
+      operationId: moderateAdminConversation
+      tags: [admin]
+      summary: Lock, unlock, or mark a conversation for review
+      description: Requires a Firebase Bearer token with administrator access.
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationModerationInput"
+      responses:
+        "200":
+          description: Moderation action applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationModerationResult"
+        "401": { description: Sign-in required }
+        "403": { description: Not an admin }
+        "404": { description: Conversation not found }
   /admin/me:
     get:
       operationId: getAdminMe
@@ -1279,6 +1565,262 @@ components:
         approved: { type: boolean }
         showcase_requested: { type: boolean }
         phone_verified: { type: boolean }
+    ExploreProject:
+      type: object
+      additionalProperties: false
+      required: [id, slug, title, logline, format, genre, stage, poster_url, offer_per_100, confirmed_pledge_total]
+      properties:
+        id: { type: integer, minimum: 1 }
+        slug: { type: string }
+        title: { type: string }
+        logline: { type: ["string", "null"] }
+        format: { type: ["string", "null"] }
+        genre: { type: ["string", "null"] }
+        stage: { type: ["string", "null"] }
+        poster_url: { type: ["string", "null"], format: uri }
+        offer_per_100: { type: ["integer", "null"], minimum: 125 }
+        confirmed_pledge_total: { type: number, minimum: 0 }
+    ExploreProjects:
+      type: object
+      additionalProperties: false
+      required: [projects]
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExploreProject"
+    InvestorMinima:
+      type: object
+      additionalProperties: false
+      required: [distribution, production, idea]
+      properties:
+        distribution: { type: ["integer", "null"], minimum: 125 }
+        production: { type: ["integer", "null"], minimum: 125 }
+        idea: { type: ["integer", "null"], minimum: 125 }
+    InvestorMatchInput:
+      type: object
+      additionalProperties: false
+      required: [amount, favorite_genres, stages, minima]
+      properties:
+        amount: { type: integer, minimum: 1 }
+        favorite_genres:
+          type: array
+          items: { type: string }
+        stages:
+          type: array
+          items: { type: string }
+        minima:
+          $ref: "#/components/schemas/InvestorMinima"
+    InvestorMatches:
+      type: object
+      additionalProperties: false
+      required: [projects]
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExploreProject"
+    InvestorAllocationInput:
+      type: object
+      additionalProperties: false
+      required: [project_id, amount]
+      properties:
+        project_id: { type: integer, minimum: 1 }
+        amount: { type: integer, minimum: 1 }
+    InvestorIntentInput:
+      type: object
+      additionalProperties: false
+      required: [name, email, amount, allocations, unallocated, accredited, experience, motivations, favorite_genres, stages, minima, call_opt_in]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        amount: { type: integer, minimum: 1 }
+        allocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvestorAllocationInput"
+        unallocated: { type: boolean }
+        accredited: { type: boolean }
+        experience:
+          type: array
+          items: { type: string }
+        motivations:
+          type: array
+          items: { type: string }
+        favorite_genres:
+          type: array
+          items: { type: string }
+        stages:
+          type: array
+          items: { type: string }
+        minima:
+          $ref: "#/components/schemas/InvestorMinima"
+        call_opt_in: { type: boolean }
+        city: { type: string }
+        state: { type: string }
+        zip: { type: string }
+    InvestorIntentResult:
+      type: object
+      additionalProperties: false
+      required: [investor_id, status]
+      properties:
+        investor_id: { type: integer, minimum: 1 }
+        status: { type: string, const: saved }
+    InvestorIntentView:
+      type: object
+      additionalProperties: false
+      required: [investor_id, name, email, amount, allocations, unallocated, accredited, experience, motivations, favorite_genres, stages, minima, call_opt_in]
+      properties:
+        investor_id: { type: integer, minimum: 1 }
+        name: { type: string }
+        email: { type: string, format: email }
+        amount: { type: integer, minimum: 1 }
+        allocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvestorAllocationInput"
+        unallocated: { type: boolean }
+        accredited: { type: boolean }
+        experience:
+          type: array
+          items: { type: string }
+        motivations:
+          type: array
+          items: { type: string }
+        favorite_genres:
+          type: array
+          items: { type: string }
+        stages:
+          type: array
+          items: { type: string }
+        minima:
+          $ref: "#/components/schemas/InvestorMinima"
+        call_opt_in: { type: boolean }
+        city: { type: ["string", "null"] }
+        state: { type: ["string", "null"] }
+        zip: { type: ["string", "null"] }
+    InvestorIntentCurrent:
+      type: object
+      additionalProperties: false
+      required: [intent]
+      properties:
+        intent:
+          oneOf:
+            - $ref: "#/components/schemas/InvestorIntentView"
+            - type: "null"
+    MessagingConfig:
+      type: object
+      additionalProperties: false
+      required: [available, disclosure]
+      properties:
+        available: { type: boolean }
+        disclosure: { type: string }
+    Conversation:
+      type: object
+      additionalProperties: false
+      required: [id, project_id, project_slug, project_title, other_party_name, locked, reported, last_message_at, created_at]
+      properties:
+        id: { type: integer, minimum: 1 }
+        project_id: { type: integer, minimum: 1 }
+        project_slug: { type: string }
+        project_title: { type: string }
+        other_party_name: { type: string }
+        locked: { type: boolean }
+        reported: { type: boolean }
+        last_message_at: { type: ["string", "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+    Conversations:
+      type: object
+      additionalProperties: false
+      required: [conversations]
+      properties:
+        conversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Conversation"
+    ConversationMessage:
+      type: object
+      additionalProperties: false
+      required: [id, sender_role, body, created_at]
+      properties:
+        id: { type: integer, minimum: 1 }
+        sender_role: { type: string, enum: [investor, filmmaker] }
+        body: { type: string }
+        created_at: { type: string, format: date-time }
+    ConversationMessageInput:
+      type: object
+      additionalProperties: false
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1 }
+    ConversationReportInput:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1 }
+    ConversationReportResult:
+      type: object
+      additionalProperties: false
+      required: [reported]
+      properties:
+        reported: { type: boolean, const: true }
+    ConversationView:
+      type: object
+      additionalProperties: false
+      required: [conversation, messages]
+      properties:
+        conversation:
+          $ref: "#/components/schemas/Conversation"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationMessage"
+    ConversationAudit:
+      type: object
+      additionalProperties: false
+      required: [action, note, at]
+      properties:
+        action: { type: string, enum: [lock, unlock, review] }
+        note: { type: ["string", "null"] }
+        at: { type: string, format: date-time }
+    ConversationDetail:
+      type: object
+      additionalProperties: false
+      required: [id, project_id, project_slug, project_title, other_party_name, locked, reported, last_message_at, created_at, report_reason, messages, audit]
+      properties:
+        id: { type: integer, minimum: 1 }
+        project_id: { type: integer, minimum: 1 }
+        project_slug: { type: string }
+        project_title: { type: string }
+        other_party_name: { type: string }
+        locked: { type: boolean }
+        reported: { type: boolean }
+        last_message_at: { type: ["string", "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        report_reason: { type: ["string", "null"] }
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationMessage"
+        audit:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationAudit"
+    ConversationModerationInput:
+      type: object
+      additionalProperties: false
+      required: [action, note]
+      properties:
+        action: { type: string, enum: [lock, unlock, review] }
+        note: { type: string }
+    ConversationModerationResult:
+      type: object
+      additionalProperties: false
+      required: [status, locked]
+      properties:
+        status: { type: string }
+        locked: { type: boolean }
     FlowProgress:
       type: object
       required: [flow, last_screen, answers, completed, updated_at]
