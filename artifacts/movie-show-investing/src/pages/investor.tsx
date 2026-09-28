@@ -6,6 +6,7 @@ import { getGetCurrentInvestorIntentQueryKey, getGetFlowProgressQueryKey, useGet
 import type { ExploreProject, InvestorIntentInput } from '@workspace/api-client-react';
 import { InvestorProjectCard } from '@/components/investor-project-card';
 import { LocationPicker } from '@/components/location-picker';
+import { cap, selectAutoBuildProjects, split } from '@/lib/investor-lineup';
 import { useAuth } from '@workspace/replit-auth-web';
 import { useFirebaseUser } from '@/components/firebase-bootstrap';
 import '../investor.css';
@@ -25,11 +26,6 @@ const stages = [['distribution','Finished film / distribution'],['production','S
 type MinimumStage = typeof stages[number][0];
 const fixedMinimumOptions = [[125,'$125'],[150,'$150'],[175,'$175'],[200,'$200'],[250,'$250+']] as const;
 const dollars = (n:number) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);
-const cap = (amount:number) => amount < 150 ? 4 : 5;
-function split(amount:number, selected:ExploreProject[]) {
-  const each = Math.floor(amount / selected.length);
-  return selected.map((project,index)=>({project_id:project.id,amount:each + (index===0 ? amount - each * selected.length : 0)}));
-}
 function spreadRating(amount:number, lineup:Answers['lineup']) {
   if (!lineup.length || amount <= 0) return null;
   const largestShare = Math.max(...lineup.map(row=>Number(row.amount)||0)) / amount;
@@ -189,7 +185,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
       const candidates=result.projects.filter(p=>realIds.has(p.id));
       setMatches(candidates);
       setMatchState(candidates.length?'matches':'no-matches');
-      const selectedCandidates=candidates.slice(0,cap(value.amount));
+      const selectedCandidates=selectAutoBuildProjects(candidates,value.amount);
       if(autoBuild && !value.unallocated && !value.lineup.length && selectedCandidates.length && Math.floor(value.amount/selectedCandidates.length)>=25) {
         return {...value,lineup:split(value.amount,selectedCandidates)};
       }
@@ -208,9 +204,9 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
     if(step===3 && Object.values(a.minima).some(value=>value!==null && (!Number.isSafeInteger(value) || value<125))) return 'Minimum preferences must be whole-dollar amounts of at least $125.';
     if(step===4 && !a.unallocated) {
       if(!a.lineup.length) return 'Choose projects, or select Just pledge to leave your interest unallocated.';
-      if(a.lineup.length>cap(a.amount)) return `Choose no more than ${cap(a.amount)} projects at this amount.`;
+      if(a.lineup.length>cap(a.amount)) return a.amount<150 ? 'Pledges under $150 can include up to 4 projects.' : 'Pledges of $150 or more can include up to 5 projects.';
       if(a.lineup.some(x=>!available.some(p=>p.id===x.project_id))) return 'A project in your lineup is no longer available. Please update your selection.';
-      if(a.lineup.some(x=>!Number.isSafeInteger(Number(x.amount)) || Number(x.amount)<25)) return 'Each project must receive at least $25.';
+      if(a.lineup.some(x=>!Number.isSafeInteger(Number(x.amount)) || Number(x.amount)<25)) return 'Each project needs at least $25.';
       if(allocated!==a.amount) return `Your allocations must add up to ${dollars(a.amount)}. Currently allocated: ${dollars(allocated)}.`;
     }
     if(step===5 && (!a.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim()) || !a.city.trim() || !/^[A-Z]{2}$/.test(a.country))) return 'Add your name, a valid email, city and country. Choose a city from the suggestions or enter your location manually.';
@@ -264,6 +260,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
             {!a.unallocated && <><div className="inv-lineup">{a.lineup.map(row=>{const project=available.find(p=>p.id===row.project_id);const stageLabel=project ? String(project.stage)==='other' ? 'Other stage (legacy)' : project.stage || 'Stage not listed' : 'Please remove this project';return <div className="inv-lineup-row" key={row.project_id}><div><strong>{project?.title || 'Project no longer available'}</strong>{matchState==='matches' && matches.some(m=>m.id===row.project_id) && <span className="inv-match-badge" data-testid={`badge-match-selected-${row.project_id}`}>Matches your preferences</span>}<small>{stageLabel}</small></div><input className="inv-input" type="number" min="25" step="1" aria-label={`Allocation for ${project?.title || 'project'}`} data-testid={`input-allocation-${row.project_id}`} value={row.amount || ''} onChange={e=>change('lineup',a.lineup.map(x=>x.project_id===row.project_id?{...x,amount:Number(e.target.value)}:x))}/><button type="button" data-testid={`button-remove-${row.project_id}`} onClick={()=>{const kept=a.lineup.filter(x=>x.project_id!==row.project_id);change('lineup',kept.length?split(a.amount,kept.map(x=>available.find(p=>p.id===x.project_id)).filter((x):x is ExploreProject=>Boolean(x))):[]);}}>Remove</button></div>;})}</div>
             {a.lineup.length>0 && <div className="inv-actions" style={{marginTop:0}}><button type="button" className="inv-button secondary" data-testid="button-even-split" onClick={()=>change('lineup',split(a.amount,selected))}>Split evenly</button><span className="inv-small" data-testid="text-allocation-total">Allocated {dollars(allocated)} of {dollars(a.amount)}</span></div>}
              <div className="inv-section"><h2>More to consider</h2><p>Only approved, available projects appear here. Browse a dossier before adding one.</p>
+               {a.lineup.length>=cap(a.amount) && available.some(p=>!a.lineup.some(row=>row.project_id===p.id)) && <p className="inv-match-state" role="status" data-testid="text-lineup-limit">{a.amount<150 ? 'Pledges under $150 can include up to 4 projects.' : 'Pledges of $150 or more can include up to 5 projects.'} Remove a project to choose another.</p>}
                {matchState==='no-matches' && <p className="inv-match-state" role="status" data-testid="text-no-project-matches">No project was returned as a match for both your chosen genres and stages and a qualifying offer at its stage minimum. Stages with no minimum set do not produce a match. You can still browse and choose any available project manually, or choose Just pledge.</p>}
                {matchState==='unavailable' && <div className="inv-match-state" role="status"><p>Matches could not be restored. These are available projects for manual selection; none are labeled as matches.</p><button type="button" className="inv-button secondary" data-testid="button-retry-matching" onClick={()=>void findCandidates(a,false).catch(()=>setError('We could not find matches right now. Please try again.'))}>Retry matching</button></div>}
                {matchState==='loading' && <p className="inv-match-state" role="status">Checking your preferences against available projects…</p>}
