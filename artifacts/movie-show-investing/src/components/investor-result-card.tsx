@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Check, Copy, Share2, RotateCcw } from 'lucide-react';
 import { getGetExploreQueryKey, getGetProjectShareMetadataUrl, useGetExplore } from '@workspace/api-client-react';
 import type { InvestorInterestHistoryItem } from '@workspace/api-client-react';
+import { trackInvestorEvent } from '@/lib/analytics';
 import '../investor-result.css';
 
 const dollars = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
@@ -29,6 +30,7 @@ export function InvestorResultCard({ entry }: { entry: InvestorInterestHistoryIt
     if (!selected || publicProjects.isFetching || publicProjects.isError) return;
     try {
       await navigator.clipboard.writeText(url);
+      trackInvestorEvent('inv_share_click', { method: 'copy', project_slug: selected.slug });
       setShowCopyFallback(false);
       setFeedback('Public project link copied.');
     } catch {
@@ -42,6 +44,7 @@ export function InvestorResultCard({ entry }: { entry: InvestorInterestHistoryIt
     if (!navigator.share) { await copy(); return; }
     try {
       await navigator.share({ title: selected.title, url });
+      trackInvestorEvent('inv_share_click', { method: 'share', project_slug: selected.slug });
       setFeedback('Public project page shared.');
     } catch (error) {
       if ((error as DOMException).name !== 'AbortError') {

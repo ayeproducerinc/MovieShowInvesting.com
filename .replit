@@ -28,3 +28,6 @@ channel = "stable-25_05"
 BUNNY_STREAM_COLLECTION_ID = "345d7a2b-be09-40c1-8713-e7ca5e9e99a0"
 MESSAGING_APPROVED_NOTICE = "Project messages are visible to the signed-in investor and the filmmaker for that project. Authorized Movie Show Investing administrators can also read messages and reports, review safety concerns, and lock conversations. Messages are stored on the platform. Email notifications, if enabled, contain no message text. Do not share confidential scripts or sensitive personal or financial information."
 MESSAGING_PRIVACY_APPROVED = "true"
+
+[userenv.development]
+VITE_MIXPANEL_TOKEN = "34e21f730ff50bf2038cdc711aa3f94c"

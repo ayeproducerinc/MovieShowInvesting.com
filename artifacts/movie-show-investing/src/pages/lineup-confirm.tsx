@@ -6,6 +6,7 @@ import { useAuth } from '@workspace/replit-auth-web';
 import { getGetCurrentInvestorIntentQueryKey, getGetExploreQueryKey, getGetPublicProjectQueryKey, useConfirmInvestorIntent, useGetCurrentInvestorIntent } from '@workspace/api-client-react';
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
+import { trackInvestorEvent } from '@/lib/analytics';
 import '../investor.css';
 import '../lineup.css';
 
@@ -66,6 +67,7 @@ export default function LineupConfirm() {
         amount: latest.amount,
         allocations: latest.allocations.map(row => ({ project_id: row.project_id, amount: row.amount })),
       } });
+      trackInvestorEvent('inv_confirmed');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getGetCurrentInvestorIntentQueryKey() }),
         queryClient.invalidateQueries({ queryKey: getGetExploreQueryKey() }),
@@ -78,6 +80,7 @@ export default function LineupConfirm() {
       // before telling the investor whether the action succeeded.
       const reconciled = await current.refetch();
       if (reconciled.data?.intent?.status === 'confirmed' && reconciled.data.intent.entry_id === intent.entry_id) {
+        trackInvestorEvent('inv_confirmed');
         await queryClient.invalidateQueries({ queryKey: getGetCurrentInvestorIntentQueryKey() });
         navigate('/lineup');
         return;

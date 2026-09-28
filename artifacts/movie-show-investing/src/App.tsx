@@ -8,6 +8,7 @@ import { SiteShell } from '@/components/site-shell';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/toaster';
 import { useVisitAttribution } from '@/hooks/use-public-site';
+import { trackInvestorEvent } from '@/lib/analytics';
 import Home from '@/pages/home';
 import Admin from '@/pages/admin';
 import FAQ from '@/pages/faq';
@@ -45,6 +46,9 @@ const metadata: Record<string, [string, string]> = {
 function PageMetadata() {
   const [location] = useLocation();
   useEffect(() => {
+    if (['/invest', '/invest/done', '/lineup', '/lineup/confirm'].includes(location)) {
+      trackInvestorEvent('inv_page_view', { page: location });
+    }
     const [title, description] = metadata[location] ?? (location.startsWith('/messages/') ? ['Conversation | Movie Show Investing', 'Your private project conversation.'] : ['Page not found | Movie Show Investing', 'Explore Movie Show Investing.']);
     document.title = title;
     const update = (selector: string, attribute: 'name' | 'property', key: string, content: string) => {

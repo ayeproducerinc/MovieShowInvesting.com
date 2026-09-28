@@ -6,6 +6,7 @@ import { getGetCurrentInvestorIntentQueryKey, getGetFlowProgressQueryKey, useGet
 import type { ExploreProject, InvestorIntentInput } from '@workspace/api-client-react';
 import { InvestorProjectCard } from '@/components/investor-project-card';
 import { InvestorResultCard } from '@/components/investor-result-card';
+import { trackInvestorEvent } from '@/lib/analytics';
 import { LocationPicker } from '@/components/location-picker';
 import { cap, selectAutoBuildProjects, split } from '@/lib/investor-lineup';
 import { useAuth } from '@workspace/replit-auth-web';
@@ -290,6 +291,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
       const {terms_read: _terms, lineup: _lineup, location_manual: _manual, ...input}=a;
       void _terms; void _lineup; void _manual;
       await submit.mutateAsync({data:{...input,new_entry:newEntry || current.data?.intent?.entry_id != null && current.data.intent.status==='saved',name:a.name.trim(),email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,allocations:a.unallocated?[]:a.lineup,unallocated:a.unallocated}});
+      trackInvestorEvent('inv_complete', { path: newEntry ? 'new_entry' : revise ? 'revise' : 'initial', total: a.amount, accredited: a.accredited });
       await queryClient.invalidateQueries({queryKey:getGetCurrentInvestorIntentQueryKey()});
       navigate('/invest/done');
     } catch {setError('Your interest could not be saved. Nothing has been submitted; please try again.');}
@@ -299,6 +301,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
     const ids=[...a.lineup.map(x=>x.project_id),project.id];
     const projects=ids.map(id=>available.find(p=>p.id===id)).filter((x):x is ExploreProject=>Boolean(x));
     change('lineup',split(a.amount,projects));
+    trackInvestorEvent('lineup_add', { project_id: project.id });
   }
   if(progress.isError && progress.error?.status===409) return <section className="inv"><GuestDraftConflictState/></section>;
   if(authLoading || visitor.isPending || progress.isLoading || current.isLoading || explore.isLoading || !ready && !progress.isError && !visitor.isError) return <section className="inv"><div className="page-wrap inv-state" aria-label="Loading investor worksheet"><p className="inv-kicker">Opening your worksheet</p><div className="inv-skeleton" style={{height:85}}/><div className="inv-skeleton" style={{height:150}}/></div></section>;
