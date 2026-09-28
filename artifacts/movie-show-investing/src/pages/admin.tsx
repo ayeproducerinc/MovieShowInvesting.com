@@ -135,7 +135,7 @@ function ReviewActions({ section, row, columns, onResult }: {
   const messageHidden = MessageHidden({ row, columns });
   if (!eligible || id === null) return <span className="admin-action-na">—</span>;
 
-  async function review(action: 'approve' | 'hide' | 'unhide') {
+  async function review(action: 'approve' | 'decline' | 'hide' | 'unhide') {
     if (id === null || lock.current) return;
     lock.current = true;
     setWorking(true);
@@ -144,13 +144,13 @@ function ReviewActions({ section, row, columns, onResult }: {
       if (isProject) {
         await project.mutateAsync({
           projectId: id,
-          data: action === 'approve' ? { approved: true, hidden: false } : { hidden: action === 'hide' },
+          data: action === 'approve' ? { approved: true, hidden: false } : action === 'decline' ? { approved: false } : { hidden: action === 'hide' },
         });
       } else {
         await message.mutateAsync({ messageId: id, data: { hidden: action === 'hide' } });
       }
       onResult(isProject
-        ? action === 'approve' ? `Project ${id} approved.` : `Project ${id} ${action === 'hide' ? 'hidden' : 'unhidden'}.`
+        ? action === 'approve' ? `Project ${id} approved.` : action === 'decline' ? `Project ${id} declined after review.` : `Project ${id} ${action === 'hide' ? 'hidden' : 'unhidden'}.`
         : `Message ${id} ${action === 'hide' ? 'hidden' : 'unhidden'}.`);
       // These views reflect moderation state; refresh all three, including the current table.
       await Promise.all((['summary', 'queues', 'messages'] as AdminSection[]).map(sectionId =>
@@ -166,6 +166,7 @@ function ReviewActions({ section, row, columns, onResult }: {
 
   return <div className="admin-row-actions">
     {isProject && !approved && !projectHidden && <button type="button" disabled={working} onClick={() => void review('approve')} data-testid={`button-approve-project-${id}`}>Approve</button>}
+    {isProject && !approved && !projectHidden && (row[statusIndex] ?? '').toLowerCase() !== 'declined' && <button type="button" disabled={working} onClick={() => void review('decline')} data-testid={`button-decline-project-${id}`}>Decline</button>}
     <button type="button" disabled={working} onClick={() => void review((isProject ? projectHidden : messageHidden) ? 'unhide' : 'hide')} data-testid={`button-${(isProject ? projectHidden : messageHidden) ? 'unhide' : 'hide'}-${isProject ? 'project' : 'message'}-${id}`}>
       {(isProject ? projectHidden : messageHidden) ? 'Unhide' : 'Hide'}
     </button>
@@ -184,7 +185,7 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
       <h2 data-testid="text-table-title">{section.id === 'queues' ? 'Showcase requests and other queues' : data?.title || section.label}</h2>
       <span className="admin-mono admin-count" data-testid="text-row-total">{data ? `${data.total.toLocaleString()} ${data.total === 1 ? 'record' : 'records'}` : 'Unavailable'}</span>
     </div>
-    {section.id === 'queues' && <p data-testid="text-showcase-queue-guidance">Showcase requests awaiting review appear as “Showcase request” with status “Awaiting review.” Approved requests are eligible for discovery only while the project is not hidden.</p>}
+    {section.id === 'queues' && <p data-testid="text-showcase-queue-guidance">Paid pitch reviews appear as “Showcase request” with status “Awaiting review.” Earlier requests remain available without retroactive fees. Approval adds a pitch to public discovery; declining keeps its free page unlisted.</p>}
     {result?.message && <p className={`admin-review-feedback ${result.failed ? 'error' : ''}`} role={result.failed ? 'alert' : 'status'} data-testid="status-review-result">{result.message}</p>}
     {isError ? <Notice icon={<ShieldAlert size={20} />} title="This view could not be loaded" action="Try again" onAction={() => void refetch()}>
       {error?.status === 403 ? 'Access to this data was denied. Your account may no longer have administrator access.' : 'The connection to this section failed. Your other sections are still available.'}

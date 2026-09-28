@@ -25,6 +25,7 @@ import Project from '@/pages/project';
 import QuestionToken from '@/pages/question-token';
 import NotFound from '@/pages/not-found';
 import Explore from '@/pages/explore';
+import Pricing from '@/pages/pricing';
 import Investor, { InvestorDone } from '@/pages/investor';
 import Lineup from '@/pages/lineup';
 import LineupConfirm from '@/pages/lineup-confirm';
@@ -38,6 +39,7 @@ const metadata: Record<string, [string, string]> = {
   '/terms': ['Terms | Movie Show Investing', 'Terms for the current Movie Show Investing site and its non-binding features.'],
   '/disclaimers': ['Disclaimers | Movie Show Investing', 'Important context about non-binding interest, securities, and investment risk.'],
   '/explore': ['Explore projects | Movie Show Investing', 'Discover approved independent films and shows. Project profiles are not investment offers.'],
+  '/pricing': ['Pitch review pricing | Movie Show Investing', 'Create a free unlisted pitch or pay $49 once to submit it for editorial review in our test checkout.'],
   '/invest': ['Express interest | Movie Show Investing', 'Explore independent film projects and save non-binding investor interest. No money is collected.'],
   '/invest/done': ['Interest saved | Movie Show Investing', 'Your non-binding interest has been saved. No money has been collected.'],
   '/lineup': ['My saved lineup | Movie Show Investing', 'A private view of your saved, non-binding project interest. No money has been collected.'],
@@ -109,6 +111,7 @@ function PublicPages() {
         <Route path="/terms">{() => <Legal kind="terms" />}</Route>
         <Route path="/disclaimers">{() => <Legal kind="disclaimers" />}</Route>
         <Route path="/explore" component={Explore} />
+        <Route path="/pricing" component={Pricing} />
         <Route path="/invest/done" component={InvestorDone} />
         <Route path="/invest" component={Investor} />
         <Route path="/lineup" component={Lineup} />

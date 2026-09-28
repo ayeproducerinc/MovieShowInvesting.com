@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { eq } from "drizzle-orm";
 import {
   db,
   emailLogTable,
@@ -25,6 +26,7 @@ import {
   ReviewAdminProjectResponse,
 } from "@workspace/api-zod";
 import { authorizeAdminIdentity } from "../lib/admin-auth";
+import { reconcileReviewCheckouts } from "../lib/pitch-review-payments";
 
 const router: IRouter = Router();
 type Section = "summary" | "pledges" | "location" | "funnels" | "market" | "price-test" | "queues" | "messages" | "channels" | "email-log";
@@ -231,7 +233,7 @@ async function getAdminTable(section: Section): Promise<AdminTable> {
   if (section === "queues") {
     const rows: unknown[][] = [];
     for (const project of projects.filter((item) => item.showcaseRequested)) {
-      const status = project.hidden ? "Hidden" : project.approved ? "Approved" : "Pending";
+      const status = project.hidden ? "Hidden" : project.approved ? "Approved" : project.reviewDecision === "declined" ? "Declined" : "Pending";
       rows.push(["Approval", "", project.title ?? "", project.slug ?? "", project.createdAt, status, project.id]);
     }
     const callRecords: { priority: number; row: unknown[] }[] = [];
@@ -347,6 +349,15 @@ router.get("/admin/tables/:section", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid admin table section." });
     return;
   }
+  if (parsedParams.data.section === "queues") {
+    try {
+      await reconcileReviewCheckouts();
+    } catch (error) {
+      req.log.error({ error }, "Could not reconcile pending review payments");
+      res.status(503).json({ error: "Payment verification is unavailable. Please try again before reviewing pitches." });
+      return;
+    }
+  }
   const table = await getAdminTable(parsedParams.data.section);
   res.json(GetAdminTableResponse.parse(table));
 });
@@ -364,6 +375,13 @@ router.patch("/admin/projects/:projectId", async (req, res): Promise<void> => {
   if (!parsedBody.success || (parsedBody.data.approved === undefined && parsedBody.data.hidden === undefined)) {
     res.status(400).json({ error: "At least one of approved or hidden must be provided." });
     return;
+  }
+  if (parsedBody.data.approved === true) {
+    const [candidate] = await db.select().from(projectsTable).where(eq(projectsTable.id, parsedParams.data.projectId));
+    if (!candidate?.showcaseRequested) {
+      res.status(409).json({ error: "This pitch has not been submitted for review." });
+      return;
+    }
   }
 
   const project = await updateProjectReview(parsedParams.data.projectId, parsedBody.data);

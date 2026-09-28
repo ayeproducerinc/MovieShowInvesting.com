@@ -21,3 +21,4 @@
 - [Analytics capture boundary](analytics-capture-boundary.md) — only opt-in masked replay on public pages was approved; private investor and filmmaker routes remain excluded.
 - [Turnstile hostname boundary](turnstile-host-boundary.md) — verify challenge hosts against configured app domains, not proxy-derived request headers.
 - [Showcase re-review boundary](showcase-rereview-boundary.md) — edits to approved public project content can pause listing; never show stale approval after saving.
+- [Stripe sandbox account boundary](stripe-sandbox-account-boundary.md) — checkout and verification must use the same account; the owner chose the app-connected sandbox for pitch-review tests.

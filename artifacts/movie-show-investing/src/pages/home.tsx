@@ -7,7 +7,7 @@ import './home.css';
 const filmmakerSteps = [
   ['Create your project.', 'Tell us what you’re making and what it may cost.'],
   ['Propose the terms.', 'Explore an illustrative payback target and explain what you have in mind.'],
-  ['Build interest.', 'Request showcase review, then share your project and gather non-binding pledges when it’s approved for discovery.'],
+  ['Build interest.', 'Create a free, unlisted pitch and share its link. Choose the $49 test checkout to submit it for editorial review; only approved pitches enter public discovery.'],
 ];
 
 const investorSteps = [
@@ -49,6 +49,7 @@ export default function Home() {
               <ArrowButton href="/start/filmmaker" testId="link-home-filmmaker">Pitch your project</ArrowButton>
               <ArrowButton href="/explore" testId="link-home-explore" outline>Explore projects</ArrowButton>
             </div>
+            <Link href="/pricing" className="mt-5 inline-block text-sm font-semibold underline underline-offset-4">View filmmaker pricing</Link>
             <p className="home-hero__notice">Pledges are non-binding. No money is collected, and no investment is offered on this site today.</p>
             {stats.isLoading && <div role="status" aria-label="Loading filmmaker count" className="home-hero__count-skeleton" />}
             {stats.isError && <div className="home-hero__count-error" role="status">Community count is temporarily unavailable. <button type="button" data-testid="button-retry-stats" onClick={() => stats.refetch()}>Try again</button></div>}

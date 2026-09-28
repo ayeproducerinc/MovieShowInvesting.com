@@ -63,6 +63,7 @@ import type {
   Flow,
   FlowProgress,
   GetExploreParams,
+  GetPitchReviewCheckoutStatus200,
   HealthStatus,
   InvestorIntentClaimResult,
   InvestorIntentConfirmationInput,
@@ -90,6 +91,7 @@ import type {
   SaveProgressInput,
   SearchLocationsParams,
   SiteStats,
+  StartPitchReviewCheckout200,
   UploadFilmmakerImageParams,
   Visit,
   VisitInput
@@ -2608,6 +2610,157 @@ export const useUpdateFilmmakerShowcase = <TError = ErrorType<void>,
       > => {
       return useMutation(getUpdateFilmmakerShowcaseMutationOptions(options));
     }
+
+export const getStartPitchReviewCheckoutUrl = () => {
+
+
+
+
+  return `/api/filmmakers/review-checkout`
+}
+
+/**
+ * @summary Start a sandbox checkout for the current completed pitch
+ */
+export const startPitchReviewCheckout = async ( options?: Parameters<typeof customFetch>[1]): Promise<StartPitchReviewCheckout200> => {
+
+  return customFetch<StartPitchReviewCheckout200>(getStartPitchReviewCheckoutUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getStartPitchReviewCheckoutMutationKey = () => ['startPitchReviewCheckout'] as const;
+
+export const getStartPitchReviewCheckoutMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startPitchReviewCheckout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startPitchReviewCheckout>>, TError,void, TContext> => {
+
+const mutationKey = getStartPitchReviewCheckoutMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startPitchReviewCheckout>>, void> = () => {
+
+
+          return  startPitchReviewCheckout(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartPitchReviewCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof startPitchReviewCheckout>>>
+
+    export type StartPitchReviewCheckoutMutationError = ErrorType<void>
+
+
+    /**
+ * @summary Start a sandbox checkout for the current completed pitch
+ */
+export const useStartPitchReviewCheckout = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startPitchReviewCheckout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startPitchReviewCheckout>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getStartPitchReviewCheckoutMutationOptions(options));
+    }
+
+export const getGetPitchReviewCheckoutStatusUrl = () => {
+
+
+
+
+  return `/api/filmmakers/review-checkout/status`
+}
+
+/**
+ * @summary Reconcile sandbox payment for the current pitch and read review status
+ */
+export const getPitchReviewCheckoutStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetPitchReviewCheckoutStatus200> => {
+
+  return customFetch<GetPitchReviewCheckoutStatus200>(getGetPitchReviewCheckoutStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPitchReviewCheckoutStatusQueryKey = () => {
+    return [
+    `/api/filmmakers/review-checkout/status`
+    ] as const;
+    }
+
+
+export const getGetPitchReviewCheckoutStatusQueryOptions = <TData = Awaited<ReturnType<typeof getPitchReviewCheckoutStatus>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPitchReviewCheckoutStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPitchReviewCheckoutStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPitchReviewCheckoutStatus>>> = ({ signal }) => getPitchReviewCheckoutStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPitchReviewCheckoutStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPitchReviewCheckoutStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getPitchReviewCheckoutStatus>>>
+export type GetPitchReviewCheckoutStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary Reconcile sandbox payment for the current pitch and read review status
+ */
+
+export function useGetPitchReviewCheckoutStatus<TData = Awaited<ReturnType<typeof getPitchReviewCheckoutStatus>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPitchReviewCheckoutStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPitchReviewCheckoutStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetFilmmakerMediaConfigUrl = () => {
 

@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { startReviewCheckoutReconciliation } from "./lib/pitch-review-payments";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,5 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  if (process.env.NODE_ENV !== "production") startReviewCheckoutReconciliation();
 });

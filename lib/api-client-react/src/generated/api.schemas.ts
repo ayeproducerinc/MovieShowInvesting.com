@@ -1054,6 +1054,19 @@ export type SearchLocationsParams = {
 query: string;
 };
 
+export type StartPitchReviewCheckout200 = {
+  /** @nullable */
+  url: string | null;
+  already_submitted: boolean;
+};
+
+export type GetPitchReviewCheckoutStatus200 = {
+  paid: boolean;
+  pending: boolean;
+  approved: boolean;
+  declined: boolean;
+};
+
 export type UploadFilmmakerImageParams = {
 kind: UploadFilmmakerImageKind;
 };

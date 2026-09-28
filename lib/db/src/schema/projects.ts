@@ -35,6 +35,8 @@ export const projectsTable = pgTable("projects", {
   moneyUse: text("money_use"),
   distributionPlan: text("distribution_plan"),
   showcaseRequested: boolean("showcase_requested"),
+  reviewPaidAt: timestamp("review_paid_at", { withTimezone: true }),
+  reviewDecision: text("review_decision"),
   approved: boolean("approved").notNull().default(false),
   hidden: boolean("hidden").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

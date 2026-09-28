@@ -390,6 +390,11 @@ router.patch("/filmmakers/showcase", async (req, res): Promise<void> => {
   }
   if (access.identity
     && !requireMatchingFilmmakerContext(req, res, "X-MSI-Project-Id", current.project.id, "project")) return;
+  if (parsed.data.showcase_requested === true
+    && !current.project.reviewPaidAt && !current.project.showcaseRequested && !current.project.approved) {
+    res.status(402).json({ error: "Pay the $49 review fee before submitting this pitch for review." });
+    return;
+  }
   const project = await updateOwnedFilmmakerShowcase({
     visitorId: cookieId,
     changes: parsed.data,

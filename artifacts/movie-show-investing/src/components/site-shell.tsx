@@ -117,6 +117,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
                 <Link href="/explore" data-testid="link-footer-explore" className="hover:text-[#dfb674]">Explore projects</Link>
                 <Link href="/faq" data-testid="link-footer-faq" className="hover:text-[#dfb674]">FAQ</Link>
                 <Link href="/start/filmmaker" data-testid="link-footer-filmmaker" className="hover:text-[#dfb674]">For filmmakers</Link>
+                <Link href="/pricing" className="hover:text-[#dfb674]">Pricing</Link>
                 <Link href="/invest" data-testid="link-footer-invest" className="hover:text-[#dfb674]">For investors</Link>
                 <Link href="/messages" data-testid="link-footer-messages" className="hover:text-[#dfb674]">Messages</Link>
               </div>

@@ -794,7 +794,10 @@ export async function updateProjectReview(
   changes: { approved?: boolean; hidden?: boolean },
 ): Promise<{ id: number; approved: boolean; hidden: boolean } | undefined> {
   const [project] = await db.update(schema.projectsTable)
-    .set(changes)
+    .set({
+      ...changes,
+      ...(changes.approved !== undefined ? { reviewDecision: changes.approved ? "approved" : "declined" } : {}),
+    })
     .where(eq(schema.projectsTable.id, projectId))
     .returning({
       id: schema.projectsTable.id,
@@ -890,7 +893,10 @@ export async function updateOwnedFilmmakerShowcase(input: {
       const normalizedChange = key === "team_links" ? (changeValue ?? []) : (changeValue ?? null);
       return JSON.stringify(normalizedCurrent) !== JSON.stringify(normalizedChange);
     });
-    if (project.approved && hasContentEdit) changes.approved = false;
+    if (project.approved && hasContentEdit) {
+      changes.approved = false;
+      changes.reviewDecision = null;
+    }
     const [updated] = await tx.update(projectsTable).set(changes).where(and(
       eq(projectsTable.id, project.id),
       eq(projectsTable.filmmakerId, owner.filmmakerId),

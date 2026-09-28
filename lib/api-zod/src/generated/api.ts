@@ -647,6 +647,40 @@ export const UpdateFilmmakerShowcaseResponse = zod.object({
 
 
 /**
+ * @summary Start a sandbox checkout for the current completed pitch
+ */
+
+
+
+export const StartPitchReviewCheckoutHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1).optional()
+})
+
+export const StartPitchReviewCheckoutResponse = zod.object({
+  "url": zod.string().nullable(),
+  "already_submitted": zod.boolean()
+})
+
+
+/**
+ * @summary Reconcile sandbox payment for the current pitch and read review status
+ */
+
+
+
+export const GetPitchReviewCheckoutStatusHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1).optional()
+})
+
+export const GetPitchReviewCheckoutStatusResponse = zod.object({
+  "paid": zod.boolean(),
+  "pending": zod.boolean(),
+  "approved": zod.boolean(),
+  "declined": zod.boolean()
+})
+
+
+/**
  * @summary Read non-secret filmmaker media upload availability and limits
  */
 export const GetFilmmakerMediaConfigResponse = zod.object({

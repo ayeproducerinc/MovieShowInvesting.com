@@ -56,7 +56,7 @@ export function ProjectShare({ slug, title, genre, approved = false, showcaseReq
       <a className="dossier-button dossier-button-outline" data-testid="link-view-project" href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/project/${encodeURIComponent(slug)}`} target="_blank" rel="noopener noreferrer">View page <ArrowUpRight size={16}/></a>
     </div>
     <a href="#section-showcase" className="dossier-button dossier-button-outline" data-testid="link-request-showcase-review" style={{ marginTop: 18 }}>
-      {showcaseRequested ? 'Edit showcase details' : 'Request showcase review'} <ArrowUpRight size={16}/>
+      {showcaseRequested ? 'Edit showcase details' : 'Save details or submit for paid review'} <ArrowUpRight size={16}/>
     </a>
     <p className="dossier-status" role="status" data-testid="status-share">{feedback}</p>
     {feedback.startsWith('Could not copy') && <div className="dossier-field"><label htmlFor="share-url">Project link</label><input id="share-url" data-testid="input-share-url" value={url} readOnly onFocus={event => event.currentTarget.select()} /></div>}
