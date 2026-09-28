@@ -7,6 +7,7 @@ import {
   flowProgressTable,
   filmmakerAccountVisitorsTable,
   filmmakersTable,
+  investorsTable,
   projectsTable,
   visitorsTable,
   type FlowProgressRecord,
@@ -528,6 +529,21 @@ export async function getFilmmakerAccountVisitorOwner(visitorId: string): Promis
   if (link?.firebaseUid) return { provider: "firebase", uid: link.firebaseUid };
   if (link?.replitUid) return { provider: "replit", uid: link.replitUid };
   return null;
+}
+
+export async function getInvestorAccountVisitorOwner(visitorId: string): Promise<{
+  firebaseUid: string | null;
+  replitUid: string | null;
+} | null> {
+  const [investor] = await db.select({
+    firebaseUid: investorsTable.firebaseUid,
+    replitUid: investorsTable.replitUid,
+  })
+    .from(investorsTable)
+    .where(eq(investorsTable.visitorId, visitorId))
+    .limit(1);
+  if (!investor) return null;
+  return investor;
 }
 
 export async function listFilmmakerAccountProjects(firebaseUid: string, provider: "firebase" | "replit" = "firebase"): Promise<{

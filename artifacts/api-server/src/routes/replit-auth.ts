@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   ensureVisitor,
   getFilmmakerAccountVisitorOwner,
+  getInvestorAccountVisitorOwner,
 } from "@workspace/db";
 import {
   GetCurrentAuthUserResponse,
@@ -162,8 +163,13 @@ router.post("/logout", async (req: Request, res: Response) => {
   if (req.isAuthenticated() && req.user) {
     const visitorId = req.cookies?.[VISITOR_COOKIE];
     if (typeof visitorId === "string" && UUID.test(visitorId)) {
-      const owner = await getFilmmakerAccountVisitorOwner(visitorId);
-      if (owner?.provider === "replit" && owner.uid === req.user.id) {
+      const [filmmakerOwner, investorOwner] = await Promise.all([
+        getFilmmakerAccountVisitorOwner(visitorId),
+        getInvestorAccountVisitorOwner(visitorId),
+      ]);
+      const filmmakerOwnsVisitor = filmmakerOwner?.provider === "replit" && filmmakerOwner.uid === req.user.id;
+      const investorOwnsVisitor = investorOwner?.replitUid === req.user.id;
+      if (filmmakerOwnsVisitor || investorOwnsVisitor) {
         freshVisitorId = randomUUID();
         await ensureVisitor(freshVisitorId);
       }

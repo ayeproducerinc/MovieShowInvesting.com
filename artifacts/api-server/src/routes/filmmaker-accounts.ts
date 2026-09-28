@@ -7,6 +7,7 @@ import {
   ensureVisitor,
   getFilmmakerAccountProjectVisitor,
   getFilmmakerAccountVisitorOwner,
+  getInvestorAccountVisitorOwner,
   listFilmmakerAccountProjects,
   resumeFilmmakerAccountDraft,
   startOrResumeFilmmakerAccountDraft,
@@ -155,8 +156,17 @@ router.post("/filmmakers/projects/leave", async (req, res): Promise<void> => {
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
   const currentVisitorId = readVisitorCookie(req);
-  const owner = currentVisitorId ? await getFilmmakerAccountVisitorOwner(currentVisitorId) : null;
-  const shouldRotate = owner?.provider === identity.provider && owner.uid === identity.uid;
+  const [filmmakerOwner, investorOwner] = currentVisitorId
+    ? await Promise.all([
+      getFilmmakerAccountVisitorOwner(currentVisitorId),
+      getInvestorAccountVisitorOwner(currentVisitorId),
+    ])
+    : [null, null];
+  const filmmakerOwnsVisitor = filmmakerOwner?.provider === identity.provider && filmmakerOwner.uid === identity.uid;
+  const investorOwnsVisitor = identity.provider === "firebase"
+    ? investorOwner?.firebaseUid === identity.uid
+    : investorOwner?.replitUid === identity.uid;
+  const shouldRotate = filmmakerOwnsVisitor || investorOwnsVisitor;
   if (shouldRotate) {
     const visitorId = randomUUID();
     await ensureVisitor(visitorId);

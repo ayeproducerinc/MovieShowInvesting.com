@@ -7,7 +7,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetAdminMeQueryKey, getGetAdminTableQueryKey, getGetFirebaseConfigQueryKey, getGetAdminConversationsQueryKey,
-  setAuthTokenGetter, useGetAdminMe, useGetAdminTable, useGetFirebaseConfig,
+  leaveFilmmakerAccount, setAuthTokenGetter, useGetAdminMe, useGetAdminTable, useGetFirebaseConfig,
   useReviewAdminProject, useReviewAdminMessage,
   type AdminSection, type AdminTable,
 } from '@workspace/api-client-react';
@@ -16,6 +16,8 @@ import { AdminConversations } from '@/components/admin-conversations';
 import { useAuth } from '@workspace/replit-auth-web';
 import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-web';
 import { switchToFirebase, switchToSso } from '@/lib/auth-switch';
+import { GoogleSignInButton } from '@/components/google-sign-in-button';
+import { getInitializedAuth } from '@/components/firebase-bootstrap';
 
 const SECTIONS: { id: AdminSection; label: string; description: string }[] = [
   { id: 'summary', label: 'Summary', description: 'A consolidated view of activity recorded across the site.' },
@@ -226,7 +228,8 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
   </>;
 }
 
-function Dashboard({ userId, email, onSignOut, onSwitchIdentity }: { userId: string; email: string; onSignOut: () => void; onSwitchIdentity: () => void }) {
+function Dashboard({ userId, email, onSignOut, onSwitchIdentity, replitUser, replitLogout, authFeedback }: { userId: string; email: string; onSignOut: () => void; onSwitchIdentity: () => void; replitUser: boolean; replitLogout: (returnTo?: string) => void; authFeedback: string }) {
+  const queryClient = useQueryClient();
   const [active, setActive] = useState<AdminSection>('summary');
   const [conversationMode, setConversationMode] = useState(false);
   const section = SECTIONS.find(item => item.id === active)!;
@@ -244,7 +247,7 @@ function Dashboard({ userId, email, onSignOut, onSwitchIdentity }: { userId: str
           </button>)}
           <button type="button" aria-current={conversationMode ? 'page' : undefined} onClick={() => setConversationMode(true)} data-testid="button-section-conversations"><span className="admin-nav-number">11</span>Conversations</button>
         </nav>
-        <div className="admin-sidebar-foot">Private administration<br />{email}<br /><br /><button type="button" className="admin-link admin-mono" onClick={onSwitchIdentity}>Switch sign-in method</button><br /><br />No payments are collected here.</div>
+         <div className="admin-sidebar-foot">Private administration<br />{email}<br /><br /><GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} replitUser={replitUser} replitLogout={replitLogout} className="admin-link admin-mono" testId="button-admin-google-link" /><br /><br /><button type="button" className="admin-link admin-mono" onClick={onSwitchIdentity}>Use another sign-in method</button>{authFeedback && <p role="alert" className="admin-feedback">{authFeedback}</p>}<br />No payments are collected here.</div>
       </aside>
       <main className="admin-main">
         <div className="admin-main-inner">
@@ -400,6 +403,12 @@ export default function Admin() {
     }
     if (auth) {
       try {
+        await leaveFilmmakerAccount();
+      } catch {
+        setFeedback('Your browser session could not be safely rotated, so sign-out was stopped. You are still signed in; please try again.');
+        return;
+      }
+      try {
         await signOut(auth);
         setAuthTokenGetter(null);
         clearPrivateData(queryClient);
@@ -409,28 +418,36 @@ export default function Admin() {
     }
   }
 
+  async function beginSso() {
+    setFeedback('');
+    const result = await switchToSso(auth, queryClient, replitAuth.login);
+    if (!result.ok) setFeedback(result.message);
+  }
+
   if (replitAuth.isLoading) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
   if (!replitAuth.user && configPending) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
   if (!replitAuth.user && (configError || (config && (!config.apiKey || !config.authDomain || !config.projectId || !config.appId)))) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
     <Notice icon={<ShieldAlert size={20} />} title="Sign-in is not configured" action="Check again" onAction={() => void retryConfig()}>
-      The administration room needs the site's Firebase web configuration before email-link sign-in can work. Public pages remain available.
+      The administration room needs the site's Firebase web configuration before Google or email-link sign-in can work. Public pages remain available.
     </Notice>
-    <button type="button" className="admin-button" style={{ marginTop: 18 }} onClick={() => void switchToSso(auth, queryClient, replitAuth.login)}>Continue with single sign-on <ArrowRight size={16}/></button>
+    {feedback && <p className="admin-feedback" role="alert">{feedback}</p>}
+    <GoogleSignInButton auth={auth} queryClient={queryClient} className="admin-button" testId="button-admin-google-sign-in" />
+    <button type="button" className="admin-button secondary" style={{ marginTop: 18 }} onClick={() => void beginSso()}>Continue with single sign-on <ArrowRight size={16}/></button>
   </div></div></Frame>;
-  if (!replitAuth.user && (!auth || !authReady)) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>{feedback ? <Notice icon={<ShieldAlert size={20} />} title="Sign-in unavailable">{feedback}</Notice> : <Skeleton />}<button type="button" className="admin-button" style={{ marginTop: 18 }} disabled={replitAuth.isLoading} onClick={() => void switchToSso(auth, queryClient, replitAuth.login)}>Continue with single sign-on <ArrowRight size={16}/></button></div></div></Frame>;
+  if (!replitAuth.user && (!auth || !authReady)) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>{feedback ? <Notice icon={<ShieldAlert size={20} />} title="Sign-in unavailable">{feedback}</Notice> : <Skeleton />}<GoogleSignInButton auth={auth} queryClient={queryClient} disabled={replitAuth.isLoading} className="admin-button" testId="button-admin-google-sign-in" /><button type="button" className="admin-button secondary" style={{ marginTop: 18 }} disabled={replitAuth.isLoading} onClick={() => void beginSso()}>Continue with single sign-on <ArrowRight size={16}/></button></div></div></Frame>;
   if (identityReady && identityId) {
     if (me.isPending) return <Frame email={identityEmail || undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
     if (me.isError) return <Frame email={identityEmail || undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
       <Notice icon={<ShieldAlert size={20} />} title={me.error?.status === 403 ? 'Access not granted' : 'Access could not be verified'} action={me.error?.status === 403 ? 'Sign out' : 'Try again'} onAction={me.error?.status === 403 ? leave : () => void me.refetch()}>
         {me.error?.status === 403 ? 'This signed-in address does not have administrator access. Only the server can grant access to the private workspace.' : 'We could not confirm your administrator access right now. No private data has been shown.'}
       </Notice>
-      <button type="button" className="admin-button secondary" style={{ marginTop: 18 }} onClick={() => replitAuth.user
-        ? switchToFirebase(queryClient, replitAuth.logout)
-        : void switchToSso(auth, queryClient, replitAuth.login)}>{replitAuth.user ? 'Use an email-link account instead' : 'Continue with single sign-on'}</button>
+      {feedback && <p className="admin-feedback" role="alert">{feedback}</p>}
+      <GoogleSignInButton auth={auth} queryClient={queryClient} replitUser={Boolean(replitAuth.user)} replitLogout={replitAuth.logout} className="admin-button secondary" testId="button-admin-google-sign-in" label={replitAuth.user ? 'Switch to Google sign-in' : undefined} />
+      {!replitAuth.user && <button type="button" className="admin-link" style={{ marginTop: 18 }} onClick={() => void beginSso()}>Continue with single sign-on</button>}
     </div></div></Frame>;
-    if (me.data?.role === 'admin') return <Dashboard userId={identityId} email={me.data.email} onSignOut={leave} onSwitchIdentity={() => replitAuth.user
+    if (me.data?.role === 'admin') return <Dashboard userId={identityId} email={me.data.email} replitUser={Boolean(replitAuth.user)} replitLogout={replitAuth.logout} authFeedback={feedback} onSignOut={leave} onSwitchIdentity={() => replitAuth.user
       ? switchToFirebase(queryClient, replitAuth.logout)
-      : void switchToSso(auth, queryClient, replitAuth.login)} />;
+      : void beginSso()} />;
   }
 
   return <Frame>
@@ -447,10 +464,13 @@ export default function Admin() {
            <h2>{linkPresent ? savedEmail && !completionAttempted ? 'Signing you in.' : 'Finish signing in.' : sentTo ? 'Check your inbox.' : 'Welcome back.'}</h2>
           <p>{linkPresent
              ? savedEmail ? 'We are verifying your email link. If it does not complete, request a new link below.' : 'This link cannot access the saved email from where you requested it. Enter the address that received the link to continue.'
-             : sentTo ? `A sign-in link was sent to ${sentTo}. Keep this tab open. Your email app may open the link in another tab; this page will update when your browser shares the sign-in session.` : 'Enter your email address. We will send a one-time sign-in link; no password is needed.'}</p>
+            : sentTo ? `A sign-in link was sent to ${sentTo}. Keep this tab open. Your email app may open the link in another tab; this page will update when your browser shares the sign-in session.` : 'Sign in with Google to continue. Existing email-link accounts can use the recovery option below to sign in and then link Google.'}</p>
           {feedback && <p className="admin-feedback" role="alert" data-testid="status-auth-error">{feedback}</p>}
           {sentTo && !linkPresent && !feedback && <p className="admin-feedback success" role="status" data-testid="status-email-sent"><Mail size={15} style={{ display: 'inline', marginRight: 9 }} />Email sent. Check your inbox and spam folder.</p>}
           {busy && linkPresent && <div className="admin-skeleton" role="status" aria-label="Completing sign-in" style={{ height: 50, width: '100%' }} />}
+          <GoogleSignInButton auth={auth} queryClient={queryClient} replitUser={Boolean(replitAuth.user)} replitLogout={replitAuth.logout} disabled={busy} className="admin-button" testId="button-admin-google-sign-in" />
+          <details style={{ marginTop: 20 }} open={linkPresent}>
+            <summary className="admin-mono" style={{ cursor: 'pointer' }}>{linkPresent ? 'Complete or recover email-link sign-in' : 'Use email-link recovery instead'}</summary>
           {(!linkPresent || !savedEmail || completionAttempted) && <form onSubmit={async event => {
             if (linkPresent && !completionAttempted) {
               event.preventDefault();
@@ -465,8 +485,9 @@ export default function Admin() {
             <div className="admin-field"><label className="admin-mono" htmlFor="admin-email">Email address</label><input id="admin-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@yourstudio.com" data-testid="input-admin-email" /></div>
             <button className="admin-button" type="submit" disabled={busy} data-testid="button-send-email-link">{busy ? 'Working…' : linkPresent && !completionAttempted ? 'Complete sign-in' : sentTo ? 'Send another link' : 'Send sign-in link'}<ArrowRight size={16} /></button>
           </form>}
-          <button type="button" className="admin-button secondary" style={{ marginTop: 14 }} disabled={replitAuth.isLoading} onClick={() => void switchToSso(auth, queryClient, replitAuth.login)}>Continue with single sign-on <ArrowRight size={16}/></button>
-          {replitAuth.user && <button type="button" className="admin-link" style={{ marginTop: 12 }} onClick={() => switchToFirebase(queryClient, replitAuth.logout)}>Use an email-link account instead</button>}
+          </details>
+          <button type="button" className="admin-button secondary" style={{ marginTop: 14 }} disabled={replitAuth.isLoading} onClick={() => void beginSso()}>Continue with single sign-on <ArrowRight size={16}/></button>
+          {replitAuth.user && <button type="button" className="admin-link" style={{ marginTop: 12 }} onClick={() => switchToFirebase(queryClient, replitAuth.logout)}>Sign out of single sign-on</button>}
           {linkPresent && !savedEmail && <p className="admin-auth-note">For your security, use the exact address that received this link.</p>}
           {!linkPresent && <p className="admin-auth-note"><LockKeyhole size={13} style={{ display: 'inline', marginRight: 8 }} />Access is verified by the server after you sign in. Having a link alone does not grant administrator access.</p>}
           {completionAttempted && linkPresent && <button className="admin-link" type="button" onClick={() => { setLinkHandled(true); setFeedback(''); }} data-testid="button-dismiss-expired-link"><RotateCw size={13} style={{ display: 'inline', marginRight: 6 }} />Start a fresh sign-in</button>}

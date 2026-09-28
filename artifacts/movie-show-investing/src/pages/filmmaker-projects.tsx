@@ -23,6 +23,7 @@ import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } f
 import { useAuth } from '@workspace/replit-auth-web';
 import { switchToSso, switchToFirebase } from '@/lib/auth-switch';
 import { getInitializedAuth } from '@/components/firebase-bootstrap';
+import { GoogleSignInButton } from '@/components/google-sign-in-button';
 
 function accountError(error: unknown): string {
   if (error && typeof error === 'object' && 'status' in error) {
@@ -173,11 +174,17 @@ export default function FilmmakerProjects() {
     else await auth.requestLink(email);
   }
 
+  async function beginSso() {
+    setActionError('');
+    const result = await switchToSso(getInitializedAuth(), queryClient, replitAuth.login);
+    if (!result.ok) setActionError(result.message);
+  }
+
     if (replitAuth.isLoading || (!ssoUser && (auth.configPending || (!auth.configError && !auth.ready)))) {
     return <section className="dossier"><div className="page-wrap dossier-hero" role="status"><p className="dossier-kicker">Your filmmaker desk</p><h1 className="dossier-title">Finding your<br/><em>projects.</em></h1></div></section>;
   }
   if (!ssoUser && auth.configError && !auth.user) {
-    return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Email sign-in unavailable</p><h1 className="dossier-title">We can’t open<br/><em>your desk yet.</em></h1><p className="dossier-lead" role="alert">Sign-in isn’t configured right now. Your existing submission has not changed. Please try again later.</p><button type="button" className="dossier-button" onClick={() => void auth.retryConfig()}>Check again <RotateCcw size={17}/></button><button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 16 }} disabled={replitAuth.isLoading} onClick={() => void switchToSso(getInitializedAuth(), queryClient, replitAuth.login)}>Continue with single sign-on <ArrowRight size={17}/></button></div></section>;
+    return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Account sign-in unavailable</p><h1 className="dossier-title">We can’t open<br/><em>your desk yet.</em></h1><p className="dossier-lead" role="alert">Firebase sign-in isn’t configured right now. Your existing submission has not changed. Please try again later.</p>{actionError && <p className="dossier-status" role="alert">{actionError}</p>}<GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} className="dossier-button" testId="button-filmmaker-google-sign-in" /><button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 16 }} onClick={() => void auth.retryConfig()}>Check again <RotateCcw size={17}/></button><button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 16 }} disabled={replitAuth.isLoading} onClick={() => void beginSso()}>Continue with single sign-on <ArrowRight size={17}/></button></div></section>;
   }
   if (!identityId || (!ssoUser && (auth.linkPresent || auth.busy))) {
     return <section className="dossier"><div className="page-wrap dossier-hero" style={{ maxWidth: 850 }}>
@@ -187,12 +194,25 @@ export default function FilmmakerProjects() {
         ? 'Confirm the email address that received this link to finish signing in.'
         : 'Sign in to start another film, return to a saved draft, or manage your projects on another device.'}</p>
       <p className="dossier-notice" style={{ marginTop: 26 }}>Already submitted without signing in? Open this page in the browser where you submitted it and sign in with the same email once to add it to your account. Your saved project and public link will stay intact.</p>
-      <form onSubmit={event => void submitEmail(event)} style={{ maxWidth: 480, marginTop: 28 }}>
-        <label htmlFor="filmmaker-sign-in-email" className="dossier-kicker">Your email address</label>
-        <input id="filmmaker-sign-in-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" data-testid="input-filmmaker-email" style={{ display: 'block', width: '100%', minHeight: 52, border: '1px solid #a6a4a0', padding: '12px 15px', margin: '10px 0 16px', color: '#202936', background: '#fff' }} />
-        <button type="submit" className="dossier-button" disabled={auth.busy}>{auth.linkPresent ? 'Finish sign-in' : 'Email me a sign-in link'} <ArrowRight size={17}/></button>
-      </form>
-      {!auth.linkPresent && <button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 15 }} disabled={replitAuth.isLoading} onClick={() => void switchToSso(getInitializedAuth(), queryClient, replitAuth.login)}>Continue with single sign-on <ArrowRight size={17}/></button>}
+      <div style={{ marginTop: 28 }}>
+        <GoogleSignInButton
+          auth={getInitializedAuth()}
+          queryClient={queryClient}
+          replitUser={Boolean(ssoUser)}
+          replitLogout={replitAuth.logout}
+          disabled={replitAuth.isLoading}
+          className="dossier-button"
+          testId="button-filmmaker-google-sign-in"
+        />
+      </div>
+      <details style={{ maxWidth: 480, marginTop: 24 }} open={auth.linkPresent}>
+        <summary className="dossier-kicker" style={{ cursor: 'pointer' }}>{auth.linkPresent ? 'Complete or recover email-link sign-in' : 'Use email-link recovery instead'}</summary>
+        <form onSubmit={event => void submitEmail(event)} style={{ marginTop: 18 }}>
+          <label htmlFor="filmmaker-sign-in-email" className="dossier-kicker">Your email address</label>
+          <input id="filmmaker-sign-in-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" data-testid="input-filmmaker-email" style={{ display: 'block', width: '100%', minHeight: 52, border: '1px solid #a6a4a0', padding: '12px 15px', margin: '10px 0 16px', color: '#202936', background: '#fff' }} />
+          <button type="submit" className="dossier-button" disabled={auth.busy}>{auth.linkPresent ? 'Finish sign-in' : 'Email me a sign-in link'} <ArrowRight size={17}/></button>
+        </form>
+      </details>
       {auth.busy && <p className="dossier-status" role="status">Working on your sign-in…</p>}
       {auth.sentTo && <p className="dossier-status" role="status">Check {auth.sentTo} for your sign-in link. You can keep this page open.</p>}
       {auth.feedback && <p className="dossier-status" role="alert">{auth.feedback}</p>}
@@ -210,11 +230,10 @@ export default function FilmmakerProjects() {
     created_at: project.created_at,
   }));
   return <>
-    {ssoUser && <div className="page-wrap" style={{ marginTop: 24 }}>
-      <button type="button" className="dossier-button dossier-button-outline" onClick={() => switchToFirebase(queryClient, replitAuth.logout)}>Use an email-link account instead</button>
-    </div>}
-    {user && !ssoUser && <div className="page-wrap" style={{ marginTop: 24 }}>
-      <button type="button" className="dossier-button dossier-button-outline" disabled={replitAuth.isLoading} onClick={() => void switchToSso(getInitializedAuth(), queryClient, replitAuth.login)}>Continue with single sign-on</button>
+    {(ssoUser || user) && <div className="page-wrap" style={{ marginTop: 24, display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+      <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} replitUser={Boolean(ssoUser)} replitLogout={replitAuth.logout} disabled={replitAuth.isLoading} className="dossier-button dossier-button-outline" testId="button-filmmaker-google-link" label={ssoUser ? 'Switch to Google sign-in' : undefined} />
+      {!ssoUser && <button type="button" className="dossier-button dossier-button-outline" disabled={replitAuth.isLoading} onClick={() => void beginSso()}>Continue with single sign-on</button>}
+      {ssoUser && <button type="button" className="dossier-button dossier-button-outline" onClick={() => switchToFirebase(queryClient, replitAuth.logout)}>Use an email-link account instead</button>}
     </div>}
     {claimError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{claimError} <Link href="/start/filmmaker">Open this browser’s worksheet</Link> · <button type="button" onClick={() => void linkCurrentVisit()}>Try linking again</button></div>}
     {actionError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{actionError}</div>}
