@@ -339,12 +339,13 @@ export default function Admin() {
   if (identityReady && identityId) {
     if (me.isPending) return <Frame email={identityEmail || undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
     if (me.isError) return <Frame email={identityEmail || undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
-      <Notice icon={<ShieldAlert size={20} />} title={me.error?.status === 403 ? 'Access not granted' : 'Access could not be verified'} action={me.error?.status === 403 ? 'Sign out' : 'Try again'} onAction={me.error?.status === 403 ? leave : () => void me.refetch()}>
-        {me.error?.status === 403 ? 'This signed-in address does not have administrator access. Only the server can grant access to the private workspace.' : 'We could not confirm your administrator access right now. No private data has been shown.'}
+      <Notice icon={<ShieldAlert size={20} />} title={me.error?.status === 403 ? 'Access not granted' : 'Access could not be verified'} action={me.error?.status === 403 ? undefined : 'Try again'} onAction={me.error?.status === 403 ? undefined : () => void me.refetch()}>
+        {me.error?.status === 403 ? 'This signed-in address does not have administrator access. Only the server can grant access to the private workspace. Use Sign out in the header to try another account.' : 'We could not confirm your administrator access right now. No private data has been shown.'}
       </Notice>
       {feedback && <p className="admin-feedback" role="alert">{feedback}</p>}
     </div></div></Frame>;
     if (me.data?.role === 'admin') return <Dashboard userId={identityId} email={me.data.email} onSignOut={leave} />;
+    return <Frame email={identityEmail || undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Notice icon={<ShieldAlert size={20} />} title="Access not granted">This account does not have administrator access. Use Sign out in the header to try another account.</Notice>{feedback && <p className="admin-feedback" role="alert">{feedback}</p>}</div></div></Frame>;
   }
 
   return <Frame>

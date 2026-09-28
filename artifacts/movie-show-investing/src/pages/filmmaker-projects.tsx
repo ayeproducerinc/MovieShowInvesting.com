@@ -21,8 +21,6 @@ import { FilmmakerConversationsDesk } from '@/components/filmmaker-conversations
 import { useFilmmakerAuth } from '@/hooks/use-filmmaker-auth';
 import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 import { useAuth } from '@workspace/replit-auth-web';
-import { getInitializedAuth } from '@/components/firebase-bootstrap';
-import { GoogleSignInButton } from '@/components/google-sign-in-button';
 
 function accountError(error: unknown): string {
   if (error && typeof error === 'object' && 'status' in error) {
@@ -140,24 +138,14 @@ export default function FilmmakerProjects() {
     return <section className="dossier"><div className="page-wrap dossier-hero" role="status"><p className="dossier-kicker">Your filmmaker desk</p><h1 className="dossier-title">Finding your<br/><em>projects.</em></h1></div></section>;
   }
   if (!ssoUser && auth.configError && !auth.user) {
-    return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Account sign-in unavailable</p><h1 className="dossier-title">We can’t open<br/><em>your desk yet.</em></h1><p className="dossier-lead" role="alert">{auth.authError || 'Google sign-in isn’t configured right now. Your existing submission has not changed. Please try again later.'}</p>{actionError && <p className="dossier-status" role="alert">{actionError}</p>}<GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} className="dossier-button" testId="button-filmmaker-google-sign-in" label="Sign in" /><button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 16 }} onClick={() => void auth.retryConfig()}>Check again <RotateCcw size={17}/></button></div></section>;
+    return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Account sign-in unavailable</p><h1 className="dossier-title">We can’t open<br/><em>your desk yet.</em></h1><p className="dossier-lead" role="alert">{auth.authError || 'Google sign-in isn’t configured right now. Your existing submission has not changed. Please try again later.'}</p>{actionError && <p className="dossier-status" role="alert">{actionError}</p>}<button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 16 }} onClick={() => void auth.retryConfig()}>Check again <RotateCcw size={17}/></button></div></section>;
   }
   if (!identityId) {
     return <section className="dossier"><div className="page-wrap dossier-hero" style={{ maxWidth: 850 }}>
       <p className="dossier-kicker">Private filmmaker access</p>
       <h1 className="dossier-title">One place for<br/><em>every project.</em></h1>
-      <p className="dossier-lead">Sign in with Google to start another film, return to a saved draft, or manage your projects on another device.</p>
+      <p className="dossier-lead">Use Sign in in the site header to start another film, return to a saved draft, or manage your projects on another device.</p>
       <p className="dossier-notice" style={{ marginTop: 26 }}>Already submitted without signing in? Open this page in the browser where you submitted it and sign in with Google to securely claim submissions saved in that browser. Your saved project and public link will stay intact; accounts are never merged based only on matching email addresses.</p>
-      <div style={{ marginTop: 28 }}>
-        <GoogleSignInButton
-          auth={getInitializedAuth()}
-          queryClient={queryClient}
-          disabled={replitAuth.isLoading}
-          className="dossier-button"
-          testId="button-filmmaker-google-sign-in"
-          label="Sign in"
-        />
-      </div>
       <p className="dossier-status" style={{ marginTop: 28 }}><Link href="/">Back to the site</Link></p>
     </div></section>;
   }
