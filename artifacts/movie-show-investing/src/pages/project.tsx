@@ -31,16 +31,22 @@ function SecuritiesNotice() {
 export default function Project() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug || '';
-  const project = useGetPublicProject(slug, { query: { enabled: !!slug, queryKey: getGetPublicProjectQueryKey(slug), retry: (count, error) => error.status !== 404 && count < 2 } });
-  const data = project.data;
   const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
   const firebaseReady = useFirebaseSessionReady();
   const authReady = !replitAuth.isLoading && firebaseReady;
-  const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
+  const identityId = replitAuth.user ? `replit:${replitAuth.user.id}` : firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
+  const project = useGetPublicProject(slug, { query: {
+    enabled: !!slug && authReady,
+    queryKey: [...getGetPublicProjectQueryKey(slug), identityId],
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    retry: (count, error) => error.status !== 404 && count < 2,
+  } });
+  const data = project.data;
   const current = useGetCurrentInvestorIntent({ query: {
     queryKey: [...getGetCurrentInvestorIntentQueryKey(), identityId],
-    enabled: authReady && !!data?.approved && !!data?.showcase_requested,
+    enabled: authReady && !!data?.approved && !!data?.showcase_requested && !data.is_owner,
     refetchOnMount: 'always',
   } });
   const [dismissed, setDismissed] = useState(false);
@@ -75,7 +81,7 @@ export default function Project() {
     if (ogDescription) ogDescription.content = description;
     // The server-rendered share endpoint owns crawler-readable metadata.
   }, [data]);
-  if (project.isLoading) return <section className="dossier"><div className="page-wrap"><SecuritiesNotice/><div className="dossier-hero" aria-label="Loading project"><p className="dossier-kicker">Opening the project dossier</p><div className="dossier-skeleton" style={{ width: 'min(95%, 750px)', height: 95 }}/><div className="dossier-skeleton" style={{ width: 'min(65%, 520px)' }}/></div></div></section>;
+  if (!authReady || project.isPending) return <section className="dossier"><div className="page-wrap"><SecuritiesNotice/><div className="dossier-hero" aria-label="Loading project"><p className="dossier-kicker">Opening the project dossier</p><div className="dossier-skeleton" style={{ width: 'min(95%, 750px)', height: 95 }}/><div className="dossier-skeleton" style={{ width: 'min(65%, 520px)' }}/></div></div></section>;
   if (project.isError && project.error?.status !== 404) return <section className="dossier"><div className="page-wrap"><SecuritiesNotice/><div className="dossier-hero"><p className="dossier-kicker">Connection interrupted</p><h1 className="dossier-title">The page is<br/><em>out of reach.</em></h1><p className="dossier-lead" role="alert">We couldn’t load this project right now. Please try again.</p><button type="button" className="dossier-button" data-testid="button-retry-project" style={{ marginTop: 32 }} onClick={() => void project.refetch()}><RotateCcw size={16}/> Try again</button></div></div></section>;
   if (!data) return <section className="dossier"><div className="page-wrap"><SecuritiesNotice/><div className="dossier-hero"><p className="dossier-kicker">Project unavailable</p><h1 className="dossier-title">Not every story<br/><em>has a page.</em></h1><p className="dossier-lead">This project link is unavailable. It may have changed or been removed.</p><Link href="/" data-testid="link-project-home" className="dossier-button" style={{ marginTop: 32 }}>Return to the site <ArrowUpRight size={17}/></Link></div></div></section>;
   const poster = safeUrl(data.poster_url);
@@ -90,9 +96,11 @@ export default function Project() {
   return <section className="dossier"><div className="page-wrap">
     <SecuritiesNotice/>
     <div className="dossier-head"><Link href="/" className="dossier-kicker" data-testid="link-project-brand">Movie Show Investing / Projects</Link><span className="dossier-kicker">{data.approved && data.showcase_requested ? 'Showcase approved' : 'Unlisted / shared by link'}</span></div>
-    <div className="dossier-hero"><p className="dossier-kicker">{labels || 'Independent project'} / Prelaunch</p><h1 className="dossier-title" data-testid="text-project-title">{data.title}<em>.</em></h1>{data.logline && <p className="dossier-lead" data-testid="text-project-logline">{data.logline}</p>}
+    <div className="dossier-hero"><p className="dossier-kicker">{labels || 'Independent project'} / Prelaunch</p><h1 className="dossier-title" data-testid="text-project-title">{data.title}<em>.</em></h1>{data.is_owner && <p className="dossier-status" data-testid="badge-owned-project">Your project · This is how visitors see its public page.</p>}{data.logline && <p className="dossier-lead" data-testid="text-project-logline">{data.logline}</p>}
+      {data.is_owner && <div style={{marginTop:24}}><Link href="/me/projects" className="dossier-button" data-testid="link-project-manage">Manage project <ArrowUpRight size={16}/></Link></div>}
       {eligible && <div style={{marginTop: 28}} data-testid="project-interest-action">
-        {!authReady || current.isPending || current.isFetching ? <p role="status">Checking your saved interest…</p> :
+        {data.is_owner ? <p className="dossier-status">You can manage this project, but you can’t pledge interest in your own project.</p> :
+          current.isPending || current.isFetching ? <p role="status">Checking your saved interest…</p> :
           current.isError ? <p role="alert">We couldn’t check your saved interest. <button type="button" onClick={() => void current.refetch()}>Try again</button></p> :
           intent?.status === 'saved' ? <div className="dossier-notice"><p>You have saved non-binding interest that is not yet confirmed. No new interest has been recorded for this project.</p><div style={{display:'flex',flexWrap:'wrap',gap:12,marginTop:20}}><Link href="/lineup" className="dossier-button" data-testid="link-project-continue-interest">Continue saved interest <ArrowUpRight size={16}/></Link><Link href={`${target}&revise=1`} className="dossier-button" data-testid="link-project-revise-interest">Revise pending interest for this project <ArrowUpRight size={16}/></Link></div></div> :
           intent?.status === 'confirmed' && previousHere && !dismissed ? <div className="dossier-notice" data-testid="prompt-project-more-interest"><p>You already confirmed interest in this project. A new amount will be a separate non-binding entry, reviewed and signed again; your earlier interest stays unchanged.</p><div style={{display:'flex',flexWrap:'wrap',gap:12,marginTop:20}}><Link href={`${target}&new=1`} className="dossier-button" data-testid="link-project-add-more">Add more interest to this project <ArrowUpRight size={16}/></Link><Link href="/lineup" className="dossier-button">View my lineup <ArrowUpRight size={16}/></Link><button type="button" className="dossier-button" onClick={() => setDismissed(true)} data-testid="button-dismiss-project-interest">Dismiss</button></div></div> :

@@ -28,4 +28,6 @@ export interface ExploreProject {
   offer_per_100: number | null;
   /** @minimum 0 */
   confirmed_pledge_total: number;
+  /** True when the request has verified provider-qualified account ownership or the original project visitor cookie */
+  is_owner: boolean;
 }

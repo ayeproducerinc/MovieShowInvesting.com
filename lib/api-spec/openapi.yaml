@@ -861,6 +861,10 @@ paths:
       operationId: getPublicProject
       tags: [projects]
       summary: Read safe public details for a project accessible by unlisted link
+      description: is_owner is true only for the provider-qualified verified account or the original browser visitor cookie associated with the project.
+      security:
+        - firebaseBearer: []
+        - {}
       parameters:
         - in: path
           name: slug
@@ -898,6 +902,10 @@ paths:
       operationId: getExplore
       tags: [explore]
       summary: Browse approved projects for investors
+      description: is_owner is true only for the provider-qualified verified account or the original browser visitor cookie associated with the project.
+      security:
+        - firebaseBearer: []
+        - {}
       parameters:
         - name: stage
           in: query
@@ -927,6 +935,10 @@ paths:
       operationId: matchInvestor
       tags: [investor]
       summary: Match projects against investor preferences
+      description: Matching projects include is_owner, based only on a provider-qualified verified account or the original browser visitor cookie.
+      security:
+        - firebaseBearer: []
+        - {}
       requestBody:
         required: true
         content:
@@ -945,6 +957,7 @@ paths:
       operationId: saveInvestorIntent
       tags: [investor]
       summary: Save visitor-scoped intent or verified account intent and preferences
+      description: Rejects allocations to projects owned by the provider-qualified verified account or associated with the original visitor cookie. Ownership is never inferred from email alone.
       security:
         - firebaseBearer: []
         - {}
@@ -1015,7 +1028,7 @@ paths:
       operationId: confirmInvestorIntent
       tags: [investor]
       summary: Sign and confirm the account's saved non-binding interest
-      description: Confirmation is idempotent for the same saved interest. No money is collected. Project allocations become public-count eligible only on successful confirmation.
+      description: Confirmation is idempotent for the same saved interest. No money is collected. Project allocations become public-count eligible only on successful confirmation. Pending interest cannot be confirmed for a project owned by the provider-qualified verified account or associated with the original visitor cookie; email alone does not establish ownership.
       security:
         - firebaseBearer: []
       requestBody:
@@ -1761,7 +1774,7 @@ components:
     PublicProject:
       type: object
       additionalProperties: false
-      required: [id, slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, confirmed_pledge_total, approved, showcase_requested, phone_verified]
+      required: [id, slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, confirmed_pledge_total, approved, showcase_requested, phone_verified, is_owner]
       properties:
         id: { type: integer, minimum: 1 }
         slug: { type: string }
@@ -1783,10 +1796,11 @@ components:
         approved: { type: boolean }
         showcase_requested: { type: boolean }
         phone_verified: { type: boolean }
+        is_owner: { type: boolean, description: True when the request has verified provider-qualified account ownership or the original project visitor cookie }
     ExploreProject:
       type: object
       additionalProperties: false
-      required: [id, slug, title, logline, format, genre, stage, poster_url, offer_per_100, confirmed_pledge_total]
+      required: [id, slug, title, logline, format, genre, stage, poster_url, offer_per_100, confirmed_pledge_total, is_owner]
       properties:
         id: { type: integer, minimum: 1 }
         slug: { type: string }
@@ -1798,6 +1812,7 @@ components:
         poster_url: { type: ["string", "null"], format: uri }
         offer_per_100: { type: ["integer", "null"], minimum: 125 }
         confirmed_pledge_total: { type: number, minimum: 0 }
+        is_owner: { type: boolean, description: True when the request has verified provider-qualified account ownership or the original project visitor cookie }
     ExploreProjects:
       type: object
       additionalProperties: false

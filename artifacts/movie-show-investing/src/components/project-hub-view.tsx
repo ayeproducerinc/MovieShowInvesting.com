@@ -52,15 +52,24 @@ export function ProjectHubView({
   onRetry,
 }: ProjectHubViewProps) {
   const projectsHeading = useRef<HTMLHeadingElement>(null);
+  const focusAfterManage = useRef(false);
   const [showProjects, setShowProjects] = useState(initiallyOpen);
   useEffect(() => {
-    if (showProjects && !loading && !error) projectsHeading.current?.focus();
+    if (focusAfterManage.current && showProjects && !loading && !error) {
+      projectsHeading.current?.focus();
+      focusAfterManage.current = false;
+    }
   }, [showProjects, loading, error]);
   function manage() {
+    focusAfterManage.current = true;
     setShowProjects(true);
+    if (showProjects && !loading && !error) {
+      projectsHeading.current?.focus();
+      focusAfterManage.current = false;
+    }
   }
   return (
-    <section className="project-hub" aria-label="Your film projects" aria-busy={loading || busy}>
+    <section className={`project-hub${draftAvailable ? ' project-hub--has-draft' : ''}`} aria-label="Your film projects" aria-busy={loading || busy}>
       <div className="project-hub__wrap">
         <header className="project-hub__masthead">
           <span className="project-hub__mark">Movie Show Investing / Filmmaker desk</span>
@@ -85,6 +94,16 @@ export function ProjectHubView({
           <button type="button" className="project-hub__action project-hub__action--outline" data-testid="button-project-hub-manage" onClick={manage} disabled={loading || busy || !!error}>Manage projects <ArrowRight size={17} aria-hidden="true" /></button>
           <button type="button" className="project-hub__action" data-testid="button-project-hub-start" onClick={onStart} disabled={loading || busy}>Start another project <ArrowRight size={17} aria-hidden="true" /></button>
         </div>
+        {!loading && !error && draftAvailable && (
+          <div className="project-hub__draft" data-testid="card-project-hub-draft">
+            <div>
+              <p className="project-hub__eyebrow">Unfinished worksheet / Draft</p>
+              <h2>Still in the making.</h2>
+              <p>You have a worksheet in progress. Return to your saved answers when you’re ready.</p>
+            </div>
+            <button type="button" className="project-hub__resume" data-testid="button-project-hub-resume" onClick={onResume} disabled={busy}>Resume draft <ArrowRight size={17} aria-hidden="true" /></button>
+          </div>
+        )}
         {phoneVerificationSlot}
 
         {(showProjects || loading || !!error) && <div className="project-hub__body">
@@ -143,20 +162,9 @@ export function ProjectHubView({
                     <p className="project-hub__eyebrow">Nothing filed yet</p>
                     <h3>A blank page is a beginning.</h3>
                     <p>Your first film project will appear here once it is saved. Start with the story you want to tell.</p>
-                    <button type="button" className="project-hub__action" data-testid="button-project-hub-start-empty" onClick={onStart} disabled={busy}>Start a project <ArrowRight size={17} aria-hidden="true" /></button>
                   </div>
                 )}
 
-                {draftAvailable && (
-                  <div className="project-hub__draft" data-testid="card-project-hub-draft">
-                    <div>
-                      <p className="project-hub__eyebrow">Unfinished worksheet / Draft</p>
-                      <h3>Still in the making.</h3>
-                      <p>You have a worksheet in progress. Return to your saved answers when you’re ready.</p>
-                    </div>
-                    <button type="button" className="project-hub__action" data-testid="button-project-hub-resume" onClick={onResume} disabled={busy}>Resume draft <ArrowRight size={17} aria-hidden="true" /></button>
-                  </div>
-                )}
               </>
             )}
           </div>

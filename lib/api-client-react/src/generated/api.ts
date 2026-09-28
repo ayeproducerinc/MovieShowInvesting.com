@@ -2963,6 +2963,7 @@ export const getGetPublicProjectUrl = (slug: string,) => {
 }
 
 /**
+ * is_owner is true only for the provider-qualified verified account or the original browser visitor cookie associated with the project.
  * @summary Read safe public details for a project accessible by unlisted link
  */
 export const getPublicProject = async (slug: string, options?: Parameters<typeof customFetch>[1]): Promise<PublicProject> => {
@@ -3124,6 +3125,7 @@ export const getGetExploreUrl = (params?: GetExploreParams,) => {
 }
 
 /**
+ * is_owner is true only for the provider-qualified verified account or the original browser visitor cookie associated with the project.
  * @summary Browse approved projects for investors
  */
 export const getExplore = async (params?: GetExploreParams, options?: Parameters<typeof customFetch>[1]): Promise<ExploreProjects> => {
@@ -3201,6 +3203,7 @@ export const getMatchInvestorUrl = () => {
 }
 
 /**
+ * Matching projects include is_owner, based only on a provider-qualified verified account or the original browser visitor cookie.
  * @summary Match projects against investor preferences
  */
 export const matchInvestor = async (investorMatchInput: InvestorMatchInput, options?: Parameters<typeof customFetch>[1]): Promise<InvestorMatches> => {
@@ -3289,6 +3292,7 @@ export const getSaveInvestorIntentUrl = () => {
 }
 
 /**
+ * Rejects allocations to projects owned by the provider-qualified verified account or associated with the original visitor cookie. Ownership is never inferred from email alone.
  * @summary Save visitor-scoped intent or verified account intent and preferences
  */
 export const saveInvestorIntent = async (investorIntentInput: InvestorIntentInput, options?: Parameters<typeof customFetch>[1]): Promise<InvestorIntentResult> => {
@@ -3529,7 +3533,7 @@ export const getConfirmInvestorIntentUrl = () => {
 }
 
 /**
- * Confirmation is idempotent for the same saved interest. No money is collected. Project allocations become public-count eligible only on successful confirmation.
+ * Confirmation is idempotent for the same saved interest. No money is collected. Project allocations become public-count eligible only on successful confirmation. Pending interest cannot be confirmed for a project owned by the provider-qualified verified account or associated with the original visitor cookie; email alone does not establish ownership.
  * @summary Sign and confirm the account's saved non-binding interest
  */
 export const confirmInvestorIntent = async (investorIntentConfirmationInput: InvestorIntentConfirmationInput, options?: Parameters<typeof customFetch>[1]): Promise<InvestorIntentConfirmationResult> => {

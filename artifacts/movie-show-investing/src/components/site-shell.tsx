@@ -12,11 +12,10 @@ import { ReplayConsent } from '@/components/replay-consent';
 import { hasReplayProviderConfigured } from '@/lib/analytics';
 
 const navigation = [
-  { href: '/', label: 'Home' },
   { href: '/explore', label: 'Explore projects' },
-  { href: '/faq', label: 'Questions' },
-  { href: '/start/filmmaker', label: 'For filmmakers' },
-  { href: '/invest', label: 'For investors' },
+  { href: '/start/filmmaker', label: 'Pitch' },
+  { href: '/invest', label: 'Pledge' },
+  { href: '/faq', label: 'FAQs' },
   { href: '/messages', label: 'Messages' },
 ];
 
@@ -64,7 +63,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-[100dvh] flex flex-col">
       <header className="relative z-20 border-b hairline bg-[#f4f0e7]">
-        <div className="page-wrap flex h-[72px] items-center justify-between gap-6 md:h-[86px]">
+        <div className="page-wrap flex h-[72px] items-center justify-between gap-4 lg:h-[86px]">
           <Link href="/" data-testid="link-brand" onClick={() => setOpen(false)} className="group inline-flex items-center gap-3 shrink-0" aria-label="Movie Show Investing home">
             <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-[#26303d] transition-transform duration-300 group-hover:rotate-45">
               <span className="h-3.5 w-3.5 rounded-full border-[3px] border-[#902f4d]" />
@@ -72,13 +71,13 @@ export function SiteShell({ children }: { children: ReactNode }) {
             </span>
             <span className="text-[15px] font-bold leading-[1.05] tracking-[-.055em] md:text-[17px]">MOVIE SHOW<br/>INVESTING<span className="text-[#9c4256]">.</span></span>
           </Link>
-          <nav className="hidden items-center gap-5 lg:gap-9 md:flex" aria-label="Main navigation">
-            {navigation.slice(1).map((item) => (
+          <nav className="hidden items-center gap-4 xl:gap-7 lg:flex" aria-label="Main navigation">
+            {navigation.map((item) => (
               <Link key={item.href} href={item.href} data-testid={`link-nav-${item.href.replaceAll('/', '-')}`} className={`text-[13px] font-semibold transition-colors hover:text-[#9c4256] ${location === item.href ? 'text-[#9c4256]' : 'text-[#26303d]'}`}>{item.label}</Link>
             ))}
           </nav>
           <div className="flex items-center gap-4">
-            <div className="hidden items-center gap-3 md:flex">
+            <div className="hidden items-center gap-3 lg:flex">
               {signedIn ? <>
                 <Link href="/lineup" data-testid="link-header-lineup" className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">My lineup</Link>
                 <Link href="/me/projects" data-testid="link-header-my-projects" className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">My projects</Link>
@@ -87,10 +86,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
                 <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold whitespace-nowrap text-[#902f4d]" testId="button-header-google-sign-in" label="Sign in" />
               </>}
             </div>
-            <button type="button" data-testid="button-toggle-menu" className="inline-flex h-10 w-10 items-center justify-center border border-[#26303d] md:hidden" aria-expanded={open} aria-label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen(!open)}>{open ? <X size={19} /> : <Menu size={19} />}</button>
+            <button type="button" data-testid="button-toggle-menu" className="inline-flex h-10 w-10 items-center justify-center border border-[#26303d] lg:hidden" aria-expanded={open} aria-controls="mobile-site-navigation" aria-label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen(!open)}>{open ? <X size={19} /> : <Menu size={19} />}</button>
           </div>
         </div>
-        <div className="page-wrap flex min-h-10 items-center justify-end gap-5 border-t border-[#d7d0c5] py-2 md:hidden" aria-label="Account controls">
+        <div className="page-wrap flex min-h-10 items-center justify-end gap-5 border-t border-[#d7d0c5] py-2 lg:hidden" aria-label="Account controls">
           {signedIn ? <>
             <Link href="/lineup" data-testid="link-mobile-lineup" onClick={() => setOpen(false)} className="text-[12px] font-bold text-[#902f4d]">My lineup</Link>
             <Link href="/me/projects" data-testid="link-mobile-my-projects" onClick={() => setOpen(false)} className="text-[12px] font-bold text-[#902f4d]">My projects</Link>
@@ -99,7 +98,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
             <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold text-[#902f4d]" testId="button-mobile-google-sign-in" label="Sign in" />
           </>}
         </div>
-        {open && <nav className="absolute top-full left-0 right-0 border-b border-[#bcb4a7] bg-[#f4f0e7] px-5 pb-5 shadow-lg md:hidden" aria-label="Mobile navigation">
+        {open && <nav id="mobile-site-navigation" className="absolute top-full left-0 right-0 border-b border-[#bcb4a7] bg-[#f4f0e7] px-5 pb-5 shadow-lg lg:hidden" aria-label="Mobile navigation">
           {navigation.map((item) => <Link key={item.href} href={item.href} data-testid={`link-mobile-${item.href.replaceAll('/', '-')}`} onClick={() => setOpen(false)} className="flex items-center justify-between border-t border-[#cec7bb] py-4 text-lg font-semibold">{item.label}<ArrowUpRight size={18}/></Link>)}
         </nav>}
         {signOutError && <p className="page-wrap pb-2 text-sm text-[#902f4d]" role="alert">{signOutError}</p>}

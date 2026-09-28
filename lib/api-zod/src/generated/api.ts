@@ -724,6 +724,7 @@ export const DeleteFilmmakerImageResponse = zod.void()
 
 
 /**
+ * is_owner is true only for the provider-qualified verified account or the original browser visitor cookie associated with the project.
  * @summary Read safe public details for a project accessible by unlisted link
  */
 export const getPublicProjectPathSlugMax = 120;
@@ -759,7 +760,8 @@ export const GetPublicProjectResponse = zod.object({
   "confirmed_pledge_total": zod.number().min(getPublicProjectResponseConfirmedPledgeTotalMin),
   "approved": zod.boolean(),
   "showcase_requested": zod.boolean(),
-  "phone_verified": zod.boolean()
+  "phone_verified": zod.boolean(),
+  "is_owner": zod.boolean().describe('True when the request has verified provider-qualified account ownership or the original project visitor cookie')
 })
 
 
@@ -780,6 +782,7 @@ export const GetProjectShareMetadataResponse = zod.unknown()
 
 
 /**
+ * is_owner is true only for the provider-qualified verified account or the original browser visitor cookie associated with the project.
  * @summary Browse approved projects for investors
  */
 export const GetExploreQueryParams = zod.object({
@@ -807,12 +810,14 @@ export const GetExploreResponse = zod.object({
   "stage": zod.string().nullable(),
   "poster_url": zod.string().url().nullable(),
   "offer_per_100": zod.number().int().min(getExploreResponseProjectsItemOfferPer100Min).nullable(),
-  "confirmed_pledge_total": zod.number().min(getExploreResponseProjectsItemConfirmedPledgeTotalMin)
+  "confirmed_pledge_total": zod.number().min(getExploreResponseProjectsItemConfirmedPledgeTotalMin),
+  "is_owner": zod.boolean().describe('True when the request has verified provider-qualified account ownership or the original project visitor cookie')
 }))
 })
 
 
 /**
+ * Matching projects include is_owner, based only on a provider-qualified verified account or the original browser visitor cookie.
  * @summary Match projects against investor preferences
  */
 
@@ -853,12 +858,14 @@ export const MatchInvestorResponse = zod.object({
   "stage": zod.string().nullable(),
   "poster_url": zod.string().url().nullable(),
   "offer_per_100": zod.number().int().min(matchInvestorResponseProjectsItemOfferPer100Min).nullable(),
-  "confirmed_pledge_total": zod.number().min(matchInvestorResponseProjectsItemConfirmedPledgeTotalMin)
+  "confirmed_pledge_total": zod.number().min(matchInvestorResponseProjectsItemConfirmedPledgeTotalMin),
+  "is_owner": zod.boolean().describe('True when the request has verified provider-qualified account ownership or the original project visitor cookie')
 }))
 })
 
 
 /**
+ * Rejects allocations to projects owned by the provider-qualified verified account or associated with the original visitor cookie. Ownership is never inferred from email alone.
  * @summary Save visitor-scoped intent or verified account intent and preferences
  */
 
@@ -1009,7 +1016,7 @@ export const ClaimInvestorIntentResponse = zod.object({
 
 
 /**
- * Confirmation is idempotent for the same saved interest. No money is collected. Project allocations become public-count eligible only on successful confirmation.
+ * Confirmation is idempotent for the same saved interest. No money is collected. Project allocations become public-count eligible only on successful confirmation. Pending interest cannot be confirmed for a project owned by the provider-qualified verified account or associated with the original visitor cookie; email alone does not establish ownership.
  * @summary Sign and confirm the account's saved non-binding interest
  */
 export const confirmInvestorIntentBodySignatureNameMin = 2;

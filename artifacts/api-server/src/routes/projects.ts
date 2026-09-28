@@ -6,12 +6,15 @@ import {
   GetPublicProjectParams,
   GetPublicProjectResponse,
 } from "@workspace/api-zod";
+import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 
 const router: IRouter = Router();
 const thumbnailCache = new Map<string, { expiresAt: number; url: string | null }>();
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_LIMIT = 100;
 const DEFAULT_SHARE_IMAGE = "/film-frame.jpg";
+const VISITOR_COOKIE = "msi_visitor_id";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function safeWebUrl(value: string | null | undefined): string | null {
   if (!value || value.length > 2048) return null;
@@ -120,6 +123,9 @@ function getPublicOrigin(req: Request): string | null {
 }
 
 router.get("/projects/:slug", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const identity = await resolveProtectedIdentity(req, res, false);
+  if (res.headersSent) return;
   const params = GetPublicProjectParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: "Invalid project slug." });
@@ -130,6 +136,13 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Project not found." });
     return;
   }
+  const cookieCandidate = req.cookies?.[VISITOR_COOKIE];
+  const visitorId = typeof cookieCandidate === "string" && UUID.test(cookieCandidate) ? cookieCandidate : null;
+  const isOwner = Boolean(
+    (identity?.provider === "firebase" && project.firebaseUid === identity.uid)
+    || (identity?.provider === "replit" && project.replitUid === identity.uid)
+    || (visitorId && project.visitorId === visitorId),
+  );
   const response = {
     id: project.id,
     slug: project.slug,
@@ -151,6 +164,7 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
     approved: project.approved,
     showcase_requested: project.showcaseRequested,
     phone_verified: project.phoneVerified,
+    is_owner: isOwner,
   };
   res.json(GetPublicProjectResponse.parse(response));
 });

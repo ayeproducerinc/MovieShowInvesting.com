@@ -8,12 +8,14 @@ export function InvestorProjectCard({ project, action, matched = false }: { proj
     <div className="inv-poster">{project.poster_url && <img src={project.poster_url} alt={`${project.title} poster`} loading="lazy" />}</div>
     <div className="inv-project-body">
       <p className="inv-kicker">{project.format || 'Project'} / {stageLabel} / {project.genre || 'Genre not listed'}</p>
+      {project.is_owner && <span className="inv-match-badge" data-testid={`badge-owned-project-${project.id}`}>Your project</span>}
       {matched && <span className="inv-match-badge" data-testid={`badge-match-${project.id}`}>Matches your preferences</span>}
       <h2>{project.title}</h2>
       <p>{project.logline || 'Read the project dossier for more about this story.'}</p>
       <div className="inv-project-links">
         <Link href={`/project/${project.slug}`} data-testid={`link-project-${project.id}`}>View project <ArrowUpRight size={13} className="inline"/></Link>
-        {action && <button type="button" className="inv-button secondary" data-testid={`button-project-${project.id}`} onClick={action.onClick} disabled={action.disabled}>{action.label}</button>}
+        {project.is_owner && <Link href="/me/projects" data-testid={`link-manage-project-${project.id}`}>Manage project <ArrowUpRight size={13} className="inline"/></Link>}
+        {action && !project.is_owner && <button type="button" className="inv-button secondary" data-testid={`button-project-${project.id}`} onClick={action.onClick} disabled={action.disabled}>{action.label}</button>}
       </div>
     </div>
   </article>;

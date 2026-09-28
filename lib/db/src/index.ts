@@ -1056,6 +1056,8 @@ export async function getPublicProjectBySlug(slug: string) {
     hidden: projectsTable.hidden,
     phoneVerified: filmmakersTable.phoneVerified,
     firebaseUid: filmmakersTable.firebaseUid,
+    replitUid: filmmakersTable.replitUid,
+    visitorId: filmmakersTable.visitorId,
   }).from(projectsTable)
     .leftJoin(filmmakersTable, eq(projectsTable.filmmakerId, filmmakersTable.id))
     .where(and(eq(projectsTable.slug, slug), eq(projectsTable.hidden, false)));
@@ -1103,6 +1105,9 @@ export async function getPublicProjectBySlug(slug: string) {
     approved: project.approved,
     showcaseRequested: Boolean(project.showcaseRequested),
     phoneVerified,
+    firebaseUid: project.firebaseUid,
+    replitUid: project.replitUid,
+    visitorId: project.visitorId,
   };
 }
 

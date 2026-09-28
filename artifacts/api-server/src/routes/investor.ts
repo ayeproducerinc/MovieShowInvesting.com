@@ -34,6 +34,7 @@ type ProjectRow = {
   poster_url: string | null;
   offer_per_100: number | null;
   confirmed_pledge_total: number;
+  is_owner: boolean;
 };
 type InvestorRow = {
   id: number;
@@ -75,18 +76,26 @@ function safeImageUrl(value: string | null): string | null {
   }
 }
 
-async function getDiscoverableProjects(): Promise<ProjectRow[]> {
+async function getDiscoverableProjects(
+  identity: Awaited<ReturnType<typeof resolveProtectedIdentity>>,
+  visitorId: string | null,
+): Promise<ProjectRow[]> {
   const { rows } = await pool.query<ProjectRow>(`
     select p.id, p.slug, p.title, p.logline, p.format, p.genre, p.stage,
       p.poster_url, p.offer_per100 as offer_per_100,
       coalesce((
+        ($1::text = 'firebase' and f.firebase_uid = $2)
+        or ($1::text = 'replit' and f.replit_uid = $2)
+        or ($3::text is not null and f.visitor_id = $3)
+      ), false) as is_owner,
+      coalesce((
         select sum(pl.amount)::float8 from pledges pl
         where pl.project_id = p.id and pl.confirmed = true
       ), 0)::float8 as confirmed_pledge_total
-    from projects p
+    from projects p left join filmmakers f on f.id = p.filmmaker_id
     where p.approved = true and p.showcase_requested = true and p.hidden = false
       and p.stage in ('idea', 'production', 'distribution')
-  `);
+  `, [identity?.provider ?? null, identity?.uid ?? null, visitorId]);
   return rows;
 }
 
@@ -102,18 +111,25 @@ function projectCard(project: ProjectRow) {
     poster_url: safeImageUrl(project.poster_url),
     offer_per_100: project.offer_per_100,
     confirmed_pledge_total: Number(project.confirmed_pledge_total),
+    is_owner: project.is_owner,
   };
 }
 
 router.post("/investor/matches", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const identity = await resolveProtectedIdentity(req, res, false);
+  if (res.headersSent) return;
   const parsed = MatchInvestorBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid investor matching input." });
     return;
   }
   const { favorite_genres: genres, stages, minima } = parsed.data;
-  const candidates = await getDiscoverableProjects();
+  const cookieCandidate = req.cookies?.[VISITOR_COOKIE];
+  const visitorId = typeof cookieCandidate === "string" && UUID.test(cookieCandidate) ? cookieCandidate : null;
+  const candidates = await getDiscoverableProjects(identity, visitorId);
   const matches = candidates.filter((project) => {
+    if (project.is_owner) return false;
     if (!project.stage || !["distribution", "production", "idea"].includes(project.stage)) return false;
     if (!project.genre || !genres.includes(project.genre) || !stages.includes(project.stage)) return false;
     const minimum = minima[project.stage as Slate];
@@ -244,6 +260,23 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
       if (visible.rows.length !== ids.length) {
         await client.query("rollback");
         res.status(400).json({ error: "Every allocated project must be approved, visible, and available for showcase." });
+        return;
+      }
+      const ownProjects = await client.query<{ id: number }>(`
+        select p.id
+        from projects p
+        join filmmakers f on f.id = p.filmmaker_id
+        where p.id = any($1::int[])
+          and (
+            ($2::text = 'firebase' and f.firebase_uid = $3)
+            or ($2::text = 'replit' and f.replit_uid = $3)
+            or ($4::text is not null and f.visitor_id = $4)
+          )
+        for share of f
+      `, [ids, identity?.provider ?? null, identity?.uid ?? null, visitorId]);
+      if (ownProjects.rows.length) {
+        await client.query("rollback");
+        res.status(400).json({ error: "You cannot allocate interest to your own project." });
         return;
       }
     }
@@ -710,6 +743,30 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
         investor_id: investor.id, status: "confirmed", confirmed_at: (active?.confirmed_at ?? investor.confirmed_at)!.toISOString(),
       }));
       return;
+    }
+    const confirmationVisitorCandidate = req.cookies?.[VISITOR_COOKIE];
+    const confirmationVisitorId = typeof confirmationVisitorCandidate === "string" && UUID.test(confirmationVisitorCandidate)
+      ? confirmationVisitorCandidate
+      : null;
+    const projectIds = pledges.map((pledge) => pledge.project_id).filter((id): id is number => id !== null);
+    if (projectIds.length) {
+      const ownProjects = await client.query<{ id: number }>(`
+        select p.id
+        from projects p
+        join filmmakers f on f.id = p.filmmaker_id
+        where p.id = any($1::int[])
+          and (
+            ($2::text = 'firebase' and f.firebase_uid = $3)
+            or ($2::text = 'replit' and f.replit_uid = $3)
+            or ($4::text is not null and f.visitor_id = $4)
+          )
+        for share of f
+      `, [projectIds, identity.provider, identity.uid, confirmationVisitorId]);
+      if (ownProjects.rows.length) {
+        await client.query("rollback");
+        res.status(409).json({ error: "Interest in your own project cannot be confirmed." });
+        return;
+      }
     }
     if (!Number.isSafeInteger(amount) || amount < 100
       || ((active?.unallocated ?? investor.unallocated) ? pledges.length !== 0 : pledges.length === 0 || pledges.some(p => p.project_id === null)

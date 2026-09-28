@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import { GetExploreQueryParams, GetExploreResponse } from "@workspace/api-zod";
+import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 
 const router: IRouter = Router();
 
@@ -15,8 +16,12 @@ type ExploreRow = {
   poster_url: string | null;
   offer_per_100: number | null;
   confirmed_pledge_total: number;
+  is_owner: boolean;
   created_at: Date;
 };
+
+const VISITOR_COOKIE = "msi_visitor_id";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function safeImageUrl(value: string | null): string | null {
   if (!value || value.length > 2048) return null;
@@ -31,23 +36,33 @@ function safeImageUrl(value: string | null): string | null {
 }
 
 router.get("/explore", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const identity = await resolveProtectedIdentity(req, res, false);
+  if (res.headersSent) return;
   const query = GetExploreQueryParams.safeParse(req.query);
   if (!query.success) {
     res.status(400).json({ error: "Invalid explore filters." });
     return;
   }
 
+  const cookieCandidate = req.cookies?.[VISITOR_COOKIE];
+  const visitorId = typeof cookieCandidate === "string" && UUID.test(cookieCandidate) ? cookieCandidate : null;
   const { rows: projects } = await pool.query<ExploreRow>(`
     select p.id, p.slug, p.title, p.logline, p.format, p.genre, p.stage,
       p.poster_url, p.offer_per100 as offer_per_100, p.created_at,
       coalesce((
+        ($1::text = 'firebase' and f.firebase_uid = $2)
+        or ($1::text = 'replit' and f.replit_uid = $2)
+        or ($3::text is not null and f.visitor_id = $3)
+      ), false) as is_owner,
+      coalesce((
         select sum(pl.amount)::float8 from pledges pl
         where pl.project_id = p.id and pl.confirmed = true
       ), 0)::float8 as confirmed_pledge_total
-    from projects p
+    from projects p left join filmmakers f on f.id = p.filmmaker_id
     where p.approved = true and p.showcase_requested = true and p.hidden = false
       and p.stage in ('idea', 'production', 'distribution')
-  `);
+  `, [identity?.provider ?? null, identity?.uid ?? null, visitorId]);
 
   const needle = query.data.search?.trim().toLocaleLowerCase() ?? "";
   const filtered = projects.filter((project) => {
@@ -89,6 +104,7 @@ router.get("/explore", async (req, res): Promise<void> => {
       poster_url: safeImageUrl(project.poster_url),
       offer_per_100: project.offer_per_100,
       confirmed_pledge_total: Number(project.confirmed_pledge_total),
+      is_owner: project.is_owner,
     })),
   };
   res.json(GetExploreResponse.parse(response));
