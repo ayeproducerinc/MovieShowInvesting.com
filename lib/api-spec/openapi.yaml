@@ -911,6 +911,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InvestorIntentResult"
+        "400":
+          description: Invalid intent amounts, allocations, or project selections
         "401": { description: Supplied bearer token is invalid }
   /investor/intents/current:
     get:
@@ -1098,8 +1100,8 @@ paths:
     post:
       operationId: moderateAdminConversation
       tags: [admin]
-      summary: Lock, unlock, or mark a conversation for review
-      description: Requires a Firebase Bearer token with administrator access.
+      summary: Moderate, review, or explicitly resolve a conversation report
+      description: Requires a Firebase Bearer token with administrator access. Every action is audited. Only resolve clears a report; it requires a non-empty moderator note, preserves the separate lock state, and retains report details. Review and unlock never resolve a report.
       security:
         - firebaseBearer: []
       parameters:
@@ -1115,7 +1117,7 @@ paths:
               $ref: "#/components/schemas/ConversationModerationInput"
       responses:
         "200":
-          description: Moderation action applied
+          description: Moderation action applied; resolve clears only reported and returns the unchanged lock state
           content:
             application/json:
               schema:
@@ -1123,6 +1125,8 @@ paths:
         "401": { description: Sign-in required }
         "403": { description: Not an admin }
         "404": { description: Conversation not found }
+        "400": { description: Invalid action or missing moderator note for report resolution }
+        "409": { description: The conversation does not have an active report to resolve }
   /admin/me:
     get:
       operationId: getAdminMe
@@ -1703,7 +1707,14 @@ components:
       required: [project_id, amount]
       properties:
         project_id: { type: integer, minimum: 1 }
-        amount: { type: integer, minimum: 1 }
+        amount: { type: integer, minimum: 25, maximum: 2147483647, description: Whole-dollar allocation of at least $25, bounded by PostgreSQL integer storage }
+    InvestorAllocationView:
+      type: object
+      additionalProperties: false
+      required: [project_id, amount]
+      properties:
+        project_id: { type: integer, minimum: 1 }
+        amount: { type: integer, minimum: 1, maximum: 2147483647 }
     InvestorIntentInput:
       type: object
       additionalProperties: false
@@ -1711,12 +1722,14 @@ components:
       properties:
         name: { type: string, minLength: 1 }
         email: { type: string, format: email }
-        amount: { type: integer, minimum: 1 }
+        amount: { type: integer, minimum: 100, maximum: 2147483647, description: Whole-dollar total intent of at least $100, bounded by PostgreSQL integer storage }
         allocations:
           type: array
+          maxItems: 5
+          description: Distinct projects only; at most 4 projects for totals below $150 and 5 otherwise. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.
           items:
             $ref: "#/components/schemas/InvestorAllocationInput"
-        unallocated: { type: boolean }
+        unallocated: { type: boolean, description: True for Just pledge; requires zero project allocations }
         accredited: { type: boolean }
         experience:
           type: array
@@ -1751,11 +1764,11 @@ components:
         investor_id: { type: integer, minimum: 1 }
         name: { type: string }
         email: { type: string, format: email }
-        amount: { type: integer, minimum: 1 }
+        amount: { type: integer, minimum: 1, maximum: 2147483647 }
         allocations:
           type: array
           items:
-            $ref: "#/components/schemas/InvestorAllocationInput"
+            $ref: "#/components/schemas/InvestorAllocationView"
         unallocated: { type: boolean }
         accredited: { type: boolean }
         experience:
@@ -1858,7 +1871,7 @@ components:
       additionalProperties: false
       required: [action, note, at]
       properties:
-        action: { type: string, enum: [lock, unlock, review] }
+        action: { type: string, enum: [lock, unlock, review, resolve] }
         note: { type: ["string", "null"] }
         at: { type: string, format: date-time }
     ConversationDetail:
@@ -1889,8 +1902,8 @@ components:
       additionalProperties: false
       required: [action, note]
       properties:
-        action: { type: string, enum: [lock, unlock, review] }
-        note: { type: string }
+        action: { type: string, enum: [lock, unlock, review, resolve] }
+        note: { type: string, description: Required moderator note. A non-empty note is required for resolve. }
     ConversationModerationResult:
       type: object
       additionalProperties: false

@@ -15,6 +15,7 @@ router.use(cookieParser());
 
 const VISITOR_COOKIE = "msi_visitor_id";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_POSTGRES_INTEGER = 2_147_483_647;
 const SLATES = ["distribution", "production", "idea"] as const;
 type Slate = typeof SLATES[number];
 type Minimums = Record<Slate, number | null>;
@@ -113,6 +114,23 @@ router.post("/investor/matches", async (req, res): Promise<void> => {
 });
 
 router.post("/investor/intents", async (req, res): Promise<void> => {
+  const rawBody: unknown = req.body;
+  if (rawBody && typeof rawBody === "object") {
+    const body = rawBody as { amount?: unknown; allocations?: unknown };
+    if (typeof body.amount === "number" && Number.isInteger(body.amount) && body.amount > MAX_POSTGRES_INTEGER) {
+      res.status(400).json({ error: "The total intent cannot exceed $2,147,483,647, the maximum amount supported by storage." });
+      return;
+    }
+    if (Array.isArray(body.allocations) && body.allocations.some((allocation: unknown) =>
+      allocation && typeof allocation === "object"
+      && typeof (allocation as { amount?: unknown }).amount === "number"
+      && Number.isInteger((allocation as { amount: number }).amount)
+      && (allocation as { amount: number }).amount > MAX_POSTGRES_INTEGER
+    )) {
+      res.status(400).json({ error: "A project allocation cannot exceed $2,147,483,647, the maximum amount supported by storage." });
+      return;
+    }
+  }
   const parsed = SaveInvestorIntentBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid investor intent input." });
@@ -149,12 +167,14 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
 
   const allocations = data.allocations;
   const allocationSum = allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
-  if (data.amount < 100) {
-    res.status(400).json({ error: "The total intent must be at least $100." });
+  if (!Number.isSafeInteger(data.amount) || data.amount < 100 || data.amount > MAX_POSTGRES_INTEGER) {
+    res.status(400).json({ error: "The total intent must be a whole-dollar amount from $100 to $2,147,483,647." });
     return;
   }
-  if (allocations.some((allocation) => allocation.amount < 25)) {
-    res.status(400).json({ error: "Each project allocation must be at least $25." });
+  if (allocations.some((allocation) =>
+    !Number.isSafeInteger(allocation.amount) || allocation.amount < 25 || allocation.amount > MAX_POSTGRES_INTEGER
+  )) {
+    res.status(400).json({ error: "Each project allocation must be a whole-dollar amount from $25 to $2,147,483,647." });
     return;
   }
   if (allocations.length > (data.amount < 150 ? 4 : 5)) {
@@ -165,9 +185,16 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
     res.status(400).json({ error: "A project may appear only once in the allocations." });
     return;
   }
-  if (allocationSum > data.amount || (!data.unallocated && allocationSum !== data.amount)
-    || (data.unallocated && allocationSum === data.amount)) {
-    res.status(400).json({ error: "Project allocations and the unallocated balance must exactly equal the total intent." });
+  if (!Number.isSafeInteger(allocationSum) || allocationSum > MAX_POSTGRES_INTEGER) {
+    res.status(400).json({ error: "The sum of project allocations cannot exceed $2,147,483,647, the maximum amount supported by storage." });
+    return;
+  }
+  if (data.unallocated && allocations.length !== 0) {
+    res.status(400).json({ error: "Just pledge intents must have zero project allocations." });
+    return;
+  }
+  if (!data.unallocated && allocationSum !== data.amount) {
+    res.status(400).json({ error: "Allocated project amounts must exactly equal the total intent." });
     return;
   }
 

@@ -63,7 +63,7 @@ export const conversationModerationAuditTable = pgTable("conversation_moderation
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("conversation_moderation_audit_conversation_created_idx").on(table.conversationId, table.createdAt),
-  check("conversation_moderation_audit_action_check", sql`${table.action} in ('lock', 'unlock', 'review')`),
+  check("conversation_moderation_audit_action_check", sql`${table.action} in ('lock', 'unlock', 'review', 'resolve')`),
 ]);
 
 export const insertConversationModerationAuditSchema = createInsertSchema(conversationModerationAuditTable).omit({

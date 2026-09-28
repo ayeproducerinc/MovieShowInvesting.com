@@ -12,9 +12,18 @@ export interface InvestorIntentInput {
   /** @minLength 1 */
   name: string;
   email: string;
-  /** @minimum 1 */
+  /**
+     * Whole-dollar total intent of at least $100
+     * @minimum 100
+     * @maximum 2147483647
+     */
   amount: number;
+  /**
+     * Distinct projects only; at most 4 projects for totals below $150 and 5 otherwise. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.
+     * @maxItems 5
+     */
   allocations: InvestorAllocationInput[];
+  /** True for Just pledge; requires zero project allocations */
   unallocated: boolean;
   accredited: boolean;
   experience: string[];

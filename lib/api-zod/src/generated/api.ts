@@ -797,8 +797,14 @@ export const MatchInvestorResponse = zod.object({
  * @summary Save visitor-scoped intent or verified account intent and preferences
  */
 
+export const saveInvestorIntentBodyAmountMin = 100;
+export const saveInvestorIntentBodyAmountMax = 2147483647;
 
 
+export const saveInvestorIntentBodyAllocationsItemAmountMin = 25;
+export const saveInvestorIntentBodyAllocationsItemAmountMax = 2147483647;
+
+export const saveInvestorIntentBodyAllocationsMax = 5;
 
 export const saveInvestorIntentBodyMinimaDistributionMin = 125;
 
@@ -811,12 +817,12 @@ export const saveInvestorIntentBodyMinimaIdeaMin = 125;
 export const SaveInvestorIntentBody = zod.object({
   "name": zod.string().min(1),
   "email": zod.string().email(),
-  "amount": zod.number().int().min(1),
+  "amount": zod.number().int().min(saveInvestorIntentBodyAmountMin).max(saveInvestorIntentBodyAmountMax).describe('Whole-dollar total intent of at least $100'),
   "allocations": zod.array(zod.object({
   "project_id": zod.number().int().min(1),
-  "amount": zod.number().int().min(1)
-})),
-  "unallocated": zod.boolean(),
+  "amount": zod.number().int().min(saveInvestorIntentBodyAllocationsItemAmountMin).max(saveInvestorIntentBodyAllocationsItemAmountMax).describe('Whole-dollar allocation of at least $25')
+})).max(saveInvestorIntentBodyAllocationsMax).describe('Distinct projects only; at most 4 projects for totals below $150 and 5 otherwise. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.'),
+  "unallocated": zod.boolean().describe('True for Just pledge; requires zero project allocations'),
   "accredited": zod.boolean(),
   "experience": zod.array(zod.string()),
   "motivations": zod.array(zod.string()),
@@ -846,8 +852,10 @@ export const SaveInvestorIntentResponse = zod.object({
  * @summary Read visitor-scoped intent or verified account intent
  */
 
+export const getCurrentInvestorIntentResponseIntentOneAmountMax = 2147483647;
 
 
+export const getCurrentInvestorIntentResponseIntentOneAllocationsItemAmountMax = 2147483647;
 
 export const getCurrentInvestorIntentResponseIntentOneMinimaDistributionMin = 125;
 
@@ -862,10 +870,10 @@ export const GetCurrentInvestorIntentResponse = zod.object({
   "investor_id": zod.number().int().min(1),
   "name": zod.string(),
   "email": zod.string().email(),
-  "amount": zod.number().int().min(1),
+  "amount": zod.number().int().min(1).max(getCurrentInvestorIntentResponseIntentOneAmountMax),
   "allocations": zod.array(zod.object({
   "project_id": zod.number().int().min(1),
-  "amount": zod.number().int().min(1)
+  "amount": zod.number().int().min(1).max(getCurrentInvestorIntentResponseIntentOneAllocationsItemAmountMax)
 })),
   "unallocated": zod.boolean(),
   "accredited": zod.boolean(),
@@ -1087,7 +1095,7 @@ export const GetAdminConversationResponse = zod.object({
   "created_at": zod.coerce.date()
 })),
   "audit": zod.array(zod.object({
-  "action": zod.enum(['lock', 'unlock', 'review']),
+  "action": zod.enum(['lock', 'unlock', 'review', 'resolve']),
   "note": zod.string().nullable(),
   "at": zod.coerce.date()
 }))
@@ -1095,8 +1103,8 @@ export const GetAdminConversationResponse = zod.object({
 
 
 /**
- * Requires a Firebase Bearer token with administrator access.
- * @summary Lock, unlock, or mark a conversation for review
+ * Requires a Firebase Bearer token with administrator access. Every action is audited. Only resolve clears a report; it requires a non-empty moderator note, preserves the separate lock state, and retains report details. Review and unlock never resolve a report.
+ * @summary Moderate, review, or explicitly resolve a conversation report
  */
 
 
@@ -1106,8 +1114,8 @@ export const ModerateAdminConversationParams = zod.object({
 })
 
 export const ModerateAdminConversationBody = zod.object({
-  "action": zod.enum(['lock', 'unlock', 'review']),
-  "note": zod.string()
+  "action": zod.enum(['lock', 'unlock', 'review', 'resolve']),
+  "note": zod.string().describe('Required moderator note. A non-empty note is required for resolve.')
 })
 
 export const ModerateAdminConversationResponse = zod.object({

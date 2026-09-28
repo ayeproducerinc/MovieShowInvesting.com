@@ -627,7 +627,21 @@ export interface InvestorMatches {
 export interface InvestorAllocationInput {
   /** @minimum 1 */
   project_id: number;
+  /**
+     * Whole-dollar allocation of at least $25
+     * @minimum 25
+     * @maximum 2147483647
+     */
+  amount: number;
+}
+
+export interface InvestorAllocationView {
   /** @minimum 1 */
+  project_id: number;
+  /**
+     * @minimum 1
+     * @maximum 2147483647
+     */
   amount: number;
 }
 
@@ -635,9 +649,18 @@ export interface InvestorIntentInput {
   /** @minLength 1 */
   name: string;
   email: string;
-  /** @minimum 1 */
+  /**
+     * Whole-dollar total intent of at least $100
+     * @minimum 100
+     * @maximum 2147483647
+     */
   amount: number;
+  /**
+     * Distinct projects only; at most 4 projects for totals below $150 and 5 otherwise. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.
+     * @maxItems 5
+     */
   allocations: InvestorAllocationInput[];
+  /** True for Just pledge; requires zero project allocations */
   unallocated: boolean;
   accredited: boolean;
   experience: string[];
@@ -662,9 +685,12 @@ export interface InvestorIntentView {
   investor_id: number;
   name: string;
   email: string;
-  /** @minimum 1 */
+  /**
+     * @minimum 1
+     * @maximum 2147483647
+     */
   amount: number;
-  allocations: InvestorAllocationInput[];
+  allocations: InvestorAllocationView[];
   unallocated: boolean;
   accredited: boolean;
   experience: string[];
@@ -752,6 +778,7 @@ export const ConversationAuditAction = {
   lock: 'lock',
   unlock: 'unlock',
   review: 'review',
+  resolve: 'resolve',
 } as const;
 
 export interface ConversationAudit {
@@ -787,10 +814,12 @@ export const ConversationModerationInputAction = {
   lock: 'lock',
   unlock: 'unlock',
   review: 'review',
+  resolve: 'resolve',
 } as const;
 
 export interface ConversationModerationInput {
   action: ConversationModerationInputAction;
+  /** Required moderator note. A non-empty note is required for resolve. */
   note: string;
 }
 

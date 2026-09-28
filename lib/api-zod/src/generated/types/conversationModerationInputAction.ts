@@ -13,4 +13,5 @@ export const ConversationModerationInputAction = {
   lock: 'lock',
   unlock: 'unlock',
   review: 'review',
+  resolve: 'resolve',
 } as const;

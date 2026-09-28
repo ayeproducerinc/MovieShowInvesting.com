@@ -13,4 +13,5 @@ export const ConversationAuditAction = {
   lock: 'lock',
   unlock: 'unlock',
   review: 'review',
+  resolve: 'resolve',
 } as const;

@@ -2,6 +2,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import cookieParser from "cookie-parser";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
+  pool,
   assignVisitorPriceGroup,
   ensureVisitor,
   findVisitorFlowProgress,
@@ -18,6 +19,7 @@ import {
 } from "@workspace/api-zod";
 import {
   authorizeFilmmakerVisitor,
+  resolveProtectedIdentity,
   requireMatchingFilmmakerContext,
 } from "../lib/filmmaker-auth";
 
@@ -28,6 +30,12 @@ const VISITOR_COOKIE = "msi_visitor_id";
 const ONE_YEAR = 365 * 24 * 60 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+type InvestorVisitorRow = {
+  visitor_id: string | null;
+  firebase_uid: string | null;
+  replit_uid: string | null;
+};
+
 function setVisitorCookie(req: Request, res: Response, visitorId: string): void {
   res.cookie(VISITOR_COOKIE, visitorId, {
     maxAge: ONE_YEAR,
@@ -36,6 +44,69 @@ function setVisitorCookie(req: Request, res: Response, visitorId: string): void 
     secure: req.secure,
     path: "/",
   });
+}
+
+async function resolveInvestorProgressVisitor(
+  req: Request,
+  res: Response,
+  cookieId: string | null,
+): Promise<{ allowed: true; visitorId: string | null } | { allowed: false }> {
+  const identity = await resolveProtectedIdentity(req, res, false);
+  if (req.get("authorization") !== undefined && !identity) return { allowed: false };
+
+  let cookieOwner: InvestorVisitorRow | undefined;
+  if (cookieId) {
+    const { rows } = await pool.query<InvestorVisitorRow>(
+      "select visitor_id, firebase_uid, replit_uid from investors where visitor_id = $1 order by id limit 2",
+      [cookieId],
+    );
+    if (rows.length > 1) {
+      res.status(409).json({ error: "This visitor has conflicting investor records and cannot be safely accessed." });
+      return { allowed: false };
+    }
+    cookieOwner = rows[0];
+    if (cookieOwner?.firebase_uid || cookieOwner?.replit_uid) {
+      if (!identity) {
+        res.status(401).json({ error: "A verified account linked to this investor visitor is required." });
+        return { allowed: false };
+      }
+      const sameOwner = identity.provider === "firebase"
+        ? cookieOwner.firebase_uid === identity.uid
+        : cookieOwner.replit_uid === identity.uid;
+      if (!sameOwner) {
+        res.status(403).json({ error: "This visitor is linked to a different investor account." });
+        return { allowed: false };
+      }
+      return { allowed: true, visitorId: cookieId };
+    }
+  }
+
+  if (identity) {
+    const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
+    const { rows } = await pool.query<InvestorVisitorRow>(
+      `select visitor_id, firebase_uid, replit_uid from investors where ${uidColumn} = $1 order by id limit 2`,
+      [identity.uid],
+    );
+    if (rows.length > 1) {
+      res.status(409).json({ error: "This account has conflicting investor records and cannot be safely accessed." });
+      return { allowed: false };
+    }
+    const accountVisitorId = rows[0]?.visitor_id;
+    if (accountVisitorId) {
+      if (cookieId && cookieId !== accountVisitorId && !cookieOwner?.firebase_uid && !cookieOwner?.replit_uid) {
+        const guestProgress = await findVisitorFlowProgress(cookieId, "investor");
+        if (guestProgress) {
+          res.status(409).json({
+            error: "An unfinished guest investor worksheet exists in this browser. It is unchanged; sign out to resume it here.",
+          });
+          return { allowed: false };
+        }
+      }
+      return { allowed: true, visitorId: accountVisitorId };
+    }
+  }
+
+  return { allowed: true, visitorId: cookieId };
 }
 
 router.get("/price-group", async (req, res): Promise<void> => {
@@ -67,17 +138,24 @@ router.get("/progress/:flow", async (req, res): Promise<void> => {
     return;
   }
 
-  const cookieId = req.cookies?.[VISITOR_COOKIE];
-  if (typeof cookieId !== "string" || !UUID.test(cookieId)) {
+  const cookieCandidate = req.cookies?.[VISITOR_COOKIE];
+  const cookieId = typeof cookieCandidate === "string" && UUID.test(cookieCandidate) ? cookieCandidate : null;
+  let visitorId = cookieId;
+  if (parsedParams.data.flow === "investor") {
+    const access = await resolveInvestorProgressVisitor(req, res, cookieId);
+    if (!access.allowed) return;
+    visitorId = access.visitorId;
+  }
+  if (!visitorId) {
     res.status(404).json({ error: "No progress saved." });
     return;
   }
   if (parsedParams.data.flow === "filmmaker") {
-    const access = await authorizeFilmmakerVisitor(req, res, cookieId);
+    const access = await authorizeFilmmakerVisitor(req, res, visitorId);
     if (!access.allowed) return;
   }
 
-  const record = await findVisitorFlowProgress(cookieId, parsedParams.data.flow);
+  const record = await findVisitorFlowProgress(visitorId, parsedParams.data.flow);
   if (!record) {
     res.status(404).json({ error: "No progress saved." });
     return;
@@ -104,8 +182,15 @@ router.post("/progress", async (req, res): Promise<void> => {
     return;
   }
 
-  const cookieId = req.cookies?.[VISITOR_COOKIE];
-  if (typeof cookieId !== "string" || !UUID.test(cookieId)) {
+  const cookieCandidate = req.cookies?.[VISITOR_COOKIE];
+  const cookieId = typeof cookieCandidate === "string" && UUID.test(cookieCandidate) ? cookieCandidate : null;
+  let visitorId = cookieId;
+  if (parsed.data.flow === "investor") {
+    const access = await resolveInvestorProgressVisitor(req, res, cookieId);
+    if (!access.allowed) return;
+    visitorId = access.visitorId;
+  }
+  if (!visitorId) {
     res.status(400).json({ error: "A visitor cookie is required before saving progress." });
     return;
   }
@@ -116,10 +201,10 @@ router.post("/progress", async (req, res): Promise<void> => {
   }
 
   if (parsed.data.flow === "filmmaker") {
-    const access = await authorizeFilmmakerVisitor(req, res, cookieId);
+    const access = await authorizeFilmmakerVisitor(req, res, visitorId);
     if (!access.allowed) return;
     if (access.identity) {
-      const draft = await findVisitorFlowProgress(cookieId, "filmmaker");
+      const draft = await findVisitorFlowProgress(visitorId, "filmmaker");
       if (!draft) {
         res.status(409).json({ error: "No current filmmaker draft was found for this visitor." });
         return;
@@ -128,13 +213,13 @@ router.post("/progress", async (req, res): Promise<void> => {
     }
   }
 
-  if (!await visitorExists(cookieId)) {
+  if (!await visitorExists(visitorId)) {
     res.status(400).json({ error: "Visitor must be recorded before saving progress." });
     return;
   }
 
   const record = await saveVisitorFlowProgress({
-    visitorId: cookieId,
+    visitorId,
     flow: parsed.data.flow,
     lastScreen: parsed.data.last_screen,
     answers: parsed.data.answers,

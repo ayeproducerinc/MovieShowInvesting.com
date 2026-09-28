@@ -16,11 +16,12 @@ import {
   SendConversationMessageResponse,
 } from "@workspace/api-zod";
 import { resolveProtectedIdentity, type FilmmakerIdentity } from "../lib/filmmaker-auth";
-import { sendTransactionalEmail } from "../lib/mailjet";
+import { recordTransactionalEmailStatus, sendTransactionalEmail } from "../lib/mailjet";
 
 const router: IRouter = Router();
 const MESSAGE_DAILY_LIMIT = 10;
 const MESSAGE_DISCLOSURE_ENV = "MESSAGING_APPROVED_NOTICE";
+const APPROVED_MESSAGING_NOTICE = "Project messages are visible to the signed-in investor and the filmmaker for that project. Authorized Movie Show Investing administrators can also read messages and reports, review safety concerns, and lock conversations. Messages are stored on the platform. Email notifications, if enabled, contain no message text. Do not share confidential scripts or sensitive personal or financial information.";
 
 type Identity = Pick<FilmmakerIdentity, "uid" | "provider" | "email">;
 type ParticipantRole = "investor" | "filmmaker";
@@ -37,9 +38,10 @@ type ConversationRow = {
 };
 
 function messagingConfig(): { available: boolean; disclosure: string } {
-  const approvedNotice = process.env[MESSAGE_DISCLOSURE_ENV]?.trim() ?? "";
-  const available = process.env.MESSAGING_PRIVACY_APPROVED === "true" && approvedNotice.length > 0;
-  return { available, disclosure: available ? approvedNotice : "" };
+  const approvedNotice = process.env[MESSAGE_DISCLOSURE_ENV] ?? "";
+  const available = process.env.MESSAGING_PRIVACY_APPROVED === "true"
+    && approvedNotice === APPROVED_MESSAGING_NOTICE;
+  return { available, disclosure: available ? APPROVED_MESSAGING_NOTICE : "" };
 }
 
 function safeAppBaseUrl(): string | null {
@@ -71,11 +73,10 @@ async function findParticipantRole(identity: Identity): Promise<ParticipantRole 
   const result = await pool.query<{ role: ParticipantRole }>(
     `select 'investor' as role from investors where ${investorUidColumn} = $1
      union
-     select 'filmmaker' as role from filmmakers where ${filmmakerUidColumn} = $1
-     limit 1`,
+     select 'filmmaker' as role from filmmakers where ${filmmakerUidColumn} = $1`,
     [identity.uid],
   );
-  return result.rows[0]?.role ?? null;
+  return result.rows.length === 1 ? result.rows[0].role : null;
 }
 
 function isMessagingBlocked(row: { locked: boolean; reported: boolean }): boolean {
@@ -148,9 +149,14 @@ router.post("/projects/:slug/conversations", async (req, res): Promise<void> => 
        where lower(trim(email)) = $1 order by id for update`,
       [identity.email],
     );
+    const uidFilmmakers = await client.query<{ id: number }>(
+      `select id from filmmakers where ${identity.provider === "firebase" ? "firebase_uid" : "replit_uid"} = $1`,
+      [identity.uid],
+    );
 
     const identityConflict = uidInvestors.rows.length > 1
       || emailInvestors.rows.length > 1
+      || uidFilmmakers.rows.length > 0
       || emailInvestors.rows.some((row) =>
         identity.provider === "firebase"
           ? (row.firebase_uid != null && row.firebase_uid !== identity.uid) || row.replit_uid != null
@@ -257,6 +263,10 @@ router.get("/conversations/:id", async (req, res): Promise<void> => {
     res.status(503).json({ error: "Messaging is not currently available." });
     return;
   }
+  if (!await findParticipantRole(identity)) {
+    res.status(403).json({ error: "A unique verified investor or filmmaker account is required." });
+    return;
+  }
   const params = GetConversationParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: "Invalid conversation ID." });
@@ -294,6 +304,10 @@ router.get("/conversations/:id", async (req, res): Promise<void> => {
 router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
   const identity = await resolveProtectedIdentity(req, res);
   if (!identity) return;
+  if (!await findParticipantRole(identity)) {
+    res.status(403).json({ error: "A unique verified investor or filmmaker account is required." });
+    return;
+  }
   const params = SendConversationMessageParams.safeParse(req.params);
   const parsedBody = SendConversationMessageBody.safeParse(req.body);
   if (!params.success || !parsedBody.success) {
@@ -370,23 +384,29 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
     client.release();
   }
 
-  const appBaseUrl = safeAppBaseUrl();
-  if (notification?.email && appBaseUrl
-    && process.env.MAILJET_API_KEY?.trim()
-    && process.env.MAILJET_SECRET_KEY?.trim()
-    && process.env.MAILJET_SENDER_EMAIL?.trim()) {
-    try {
-      const status = await sendTransactionalEmail({
-        to: notification.email,
-        type: "conversation-message-notification",
-        subject: "You have a new private message",
-        text: `Sign in to Movie Show Investing to view your new private message: ${appBaseUrl}/messages`,
-        html: `<p>You have a new private message.</p><p><a href="${escapeHtml(appBaseUrl)}/messages">Sign in to view it</a>.</p>`,
-      });
-      if (status !== "sent") req.log.warn({ conversationId: params.data.id, status }, "Conversation message notification was not delivered");
-    } catch (error) {
-      req.log.warn({ conversationId: params.data.id, error: error instanceof Error ? error.message : "Email failed" }, "Conversation message notification failed");
+  try {
+    const appBaseUrl = safeAppBaseUrl();
+    if (notification?.email && appBaseUrl) {
+      const emailType = "conversation-message-notification";
+      if (!process.env.MAILJET_API_KEY?.trim()
+        || !process.env.MAILJET_SECRET_KEY?.trim()
+        || !process.env.MAILJET_SENDER_EMAIL?.trim()) {
+        await recordTransactionalEmailStatus(notification.email, emailType, "unconfigured");
+      } else {
+        const status = await sendTransactionalEmail({
+          to: notification.email,
+          type: emailType,
+          subject: "You have a new private message",
+          text: `Sign in to Movie Show Investing to view your new private message: ${appBaseUrl}/messages`,
+          html: `<p>You have a new private message.</p><p><a href="${escapeHtml(appBaseUrl)}/messages">Sign in to view it</a>.</p>`,
+        });
+        if (status !== "sent") req.log.warn({ conversationId: params.data.id, status }, "Conversation message notification was not delivered");
+      }
+    } else if (notification?.email) {
+      await recordTransactionalEmailStatus(notification.email, "conversation-message-notification", "unconfigured");
     }
+  } catch {
+    req.log.warn({ conversationId: params.data.id }, "Conversation message notification or email logging failed");
   }
   res.status(201).json(SendConversationMessageResponse.parse(inserted));
 });
@@ -394,6 +414,10 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
 router.post("/conversations/:id/report", async (req, res): Promise<void> => {
   const identity = await resolveProtectedIdentity(req, res);
   if (!identity) return;
+  if (!await findParticipantRole(identity)) {
+    res.status(403).json({ error: "A unique verified investor or filmmaker account is required." });
+    return;
+  }
   const params = ReportConversationParams.safeParse(req.params);
   const parsedBody = ReportConversationBody.safeParse(req.body);
   if (!params.success || !parsedBody.success) {
@@ -408,9 +432,12 @@ router.post("/conversations/:id/report", async (req, res): Promise<void> => {
   const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
   const result = await pool.query(
     `update conversations c
-     set reported = true, report_reason = coalesce(c.report_reason, $3),
-       reporter_role = coalesce(c.reporter_role, case when i.${uidColumn} = $2 then 'investor' else 'filmmaker' end),
-       reported_at = coalesce(c.reported_at, now()), updated_at = now()
+     set reported = true,
+       report_reason = case when c.reported then c.report_reason else $3 end,
+       reporter_role = case when c.reported then c.reporter_role
+         else case when i.${uidColumn} = $2 then 'investor' else 'filmmaker' end end,
+       reported_at = case when c.reported then c.reported_at else now() end,
+       updated_at = now()
      from investors i, filmmakers f
      where c.id = $1 and i.id = c.investor_id and f.id = c.filmmaker_id
         and (i.${uidColumn} = $2 or f.${uidColumn} = $2)

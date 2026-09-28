@@ -23,6 +23,9 @@ function ProjectDetail({ label, title, value }: { label: string; title: string; 
   if (!value?.trim()) return null;
   return <section className="dossier-section"><span className="dossier-kicker">{label}</span><h2>{title}</h2><p>{value}</p></section>;
 }
+function SecuritiesNotice() {
+  return <div className="dossier-notice" role="note" data-testid="text-securities-notice" style={{ marginTop: 0 }}>{securitiesNotice}</div>;
+}
 export default function Project() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug || '';
@@ -58,17 +61,17 @@ export default function Project() {
     if (ogDescription) ogDescription.content = description;
     // The server-rendered share endpoint owns crawler-readable metadata.
   }, [data]);
-  if (project.isLoading) return <section className="dossier"><div className="page-wrap dossier-hero" aria-label="Loading project"><p className="dossier-kicker">Opening the project dossier</p><div className="dossier-skeleton" style={{ width: 'min(95%, 750px)', height: 95 }}/><div className="dossier-skeleton" style={{ width: 'min(65%, 520px)' }}/></div></section>;
-  if (project.isError && project.error?.status !== 404) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Connection interrupted</p><h1 className="dossier-title">The page is<br/><em>out of reach.</em></h1><p className="dossier-lead" role="alert">We couldn’t load this project right now. Please try again.</p><button type="button" className="dossier-button" data-testid="button-retry-project" style={{ marginTop: 32 }} onClick={() => void project.refetch()}><RotateCcw size={16}/> Try again</button></div></section>;
-  if (!data) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Project unavailable</p><h1 className="dossier-title">Not every story<br/><em>has a page.</em></h1><p className="dossier-lead">This project link is unavailable. It may have changed or been removed.</p><Link href="/" data-testid="link-project-home" className="dossier-button" style={{ marginTop: 32 }}>Return to the site <ArrowUpRight size={17}/></Link></div></section>;
+  if (project.isLoading) return <section className="dossier"><div className="page-wrap"><SecuritiesNotice/><div className="dossier-hero" aria-label="Loading project"><p className="dossier-kicker">Opening the project dossier</p><div className="dossier-skeleton" style={{ width: 'min(95%, 750px)', height: 95 }}/><div className="dossier-skeleton" style={{ width: 'min(65%, 520px)' }}/></div></div></section>;
+  if (project.isError && project.error?.status !== 404) return <section className="dossier"><div className="page-wrap"><SecuritiesNotice/><div className="dossier-hero"><p className="dossier-kicker">Connection interrupted</p><h1 className="dossier-title">The page is<br/><em>out of reach.</em></h1><p className="dossier-lead" role="alert">We couldn’t load this project right now. Please try again.</p><button type="button" className="dossier-button" data-testid="button-retry-project" style={{ marginTop: 32 }} onClick={() => void project.refetch()}><RotateCcw size={16}/> Try again</button></div></div></section>;
+  if (!data) return <section className="dossier"><div className="page-wrap"><SecuritiesNotice/><div className="dossier-hero"><p className="dossier-kicker">Project unavailable</p><h1 className="dossier-title">Not every story<br/><em>has a page.</em></h1><p className="dossier-lead">This project link is unavailable. It may have changed or been removed.</p><Link href="/" data-testid="link-project-home" className="dossier-button" style={{ marginTop: 32 }}>Return to the site <ArrowUpRight size={17}/></Link></div></div></section>;
   const poster = safeUrl(data.poster_url);
   const thumbnail = safeUrl(data.trailer_thumbnail_url);
   const trailer = safeUrl(data.trailer_url);
   const bunnyEmbed = safeBunnyEmbed(data.trailer_url);
   const labels = [data.format, data.genre, data.stage].filter(Boolean).join(' / ');
   return <section className="dossier"><div className="page-wrap">
+    <SecuritiesNotice/>
     <div className="dossier-head"><Link href="/" className="dossier-kicker" data-testid="link-project-brand">Movie Show Investing / Projects</Link><span className="dossier-kicker">{data.approved && data.showcase_requested ? 'Showcase approved' : 'Unlisted / shared by link'}</span></div>
-    <div className="dossier-notice" data-testid="text-securities-notice" style={{ marginTop: 30 }}>{securitiesNotice}</div>
     <div className="dossier-hero"><p className="dossier-kicker">{labels || 'Independent project'} / Prelaunch</p><h1 className="dossier-title" data-testid="text-project-title">{data.title}<em>.</em></h1>{data.logline && <p className="dossier-lead" data-testid="text-project-logline">{data.logline}</p>}</div>
     <div className="dossier-rule"/>
     <div className="dossier-grid">

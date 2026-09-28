@@ -3858,8 +3858,8 @@ export const getModerateAdminConversationUrl = (id: number,) => {
 }
 
 /**
- * Requires a Firebase Bearer token with administrator access.
- * @summary Lock, unlock, or mark a conversation for review
+ * Requires a Firebase Bearer token with administrator access. Every action is audited. Only resolve clears a report; it requires a non-empty moderator note, preserves the separate lock state, and retains report details. Review and unlock never resolve a report.
+ * @summary Moderate, review, or explicitly resolve a conversation report
  */
 export const moderateAdminConversation = async (id: number,
     conversationModerationInput: ConversationModerationInput, options?: Parameters<typeof customFetch>[1]): Promise<ConversationModerationResult> => {
@@ -3926,7 +3926,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ModerateAdminConversationMutationVariables = {id: number;data: BodyType<ConversationModerationInput>}
 
     /**
- * @summary Lock, unlock, or mark a conversation for review
+ * @summary Moderate, review, or explicitly resolve a conversation report
  */
 export const useModerateAdminConversation = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof moderateAdminConversation>>, TError,ModerateAdminConversationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}

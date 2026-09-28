@@ -74,7 +74,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 7 — Explore and investor flow
 
-**Status:** not started  
+**Status:** implemented in development; gate pending. The investor worksheet, matching, allocation safeguards, and moderated project conversations are built, but I1–I6 and the messaging cross-account, persistence, moderation, and email-failure checks have not been completed with distinct real accounts. No disposable accounts were created. The existing messaging configuration currently makes the feature available; do not treat that setting alone as proof that the real-user safety gate has passed.
 **Deliverables:**
 
 - Explore with required securities notice, filters, sorting, and approved/non-hidden projects only.

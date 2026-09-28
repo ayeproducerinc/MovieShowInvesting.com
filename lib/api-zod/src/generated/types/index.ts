@@ -73,6 +73,7 @@ export * from './getExploreParams';
 export * from './getExploreStage';
 export * from './healthStatus';
 export * from './investorAllocationInput';
+export * from './investorAllocationView';
 export * from './investorIntentCurrent';
 export * from './investorIntentInput';
 export * from './investorIntentResult';

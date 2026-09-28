@@ -21,7 +21,13 @@ function Detail({ id, uid }: { id: number; uid: string }) {
     try {
       await moderate.mutateAsync({ id, data: { action, note: note.trim() } });
       setNote('');
-      setFeedback(`${action === 'review' ? 'Review recorded' : action === 'lock' ? 'Conversation paused' : 'Conversation reopened'}. The audit has been updated.`);
+      setFeedback(action === 'resolve'
+        ? `Report resolved. The conversation remains ${detail.data?.locked ? 'paused' : 'unlocked'}; report history is retained.`
+        : action === 'review' ? 'Review note recorded; report status is unchanged.'
+          : action === 'lock' ? 'Conversation paused.'
+            : detail.data?.reported
+              ? 'Conversation unlocked; the report remains active, so participant posting stays blocked.'
+              : 'Conversation unlocked.');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getGetAdminConversationQueryKey(id) }),
         queryClient.invalidateQueries({ queryKey: getGetAdminConversationsQueryKey() }),
@@ -35,10 +41,11 @@ function Detail({ id, uid }: { id: number; uid: string }) {
   return <article className="corr-admin-detail" data-testid={`admin-thread-${id}`}>
     <span className="corr-kicker">Conversation / {String(thread.id).padStart(3, '0')}</span><h3>{thread.project_title}</h3>
     <p>Other party: {thread.other_party_name}</p>
-    <p><strong>Status:</strong> {thread.locked ? 'Paused' : 'Open'} · {thread.reported ? 'Reported' : 'No report flag'}</p>
+     <p><strong>Status:</strong> {thread.locked ? 'Paused' : 'Unlocked'} · {thread.reported ? 'Reported — posting remains blocked until the report is resolved' : 'No active report'}</p>
+     {thread.reported && <p className="corr-muted">Review notes and unlocking do not resolve a report. Resolve it explicitly to restore posting, unless the conversation remains paused.</p>}
     <p className="corr-muted">Created {new Date(thread.created_at).toLocaleString()} · Last message {thread.last_message_at ? new Date(thread.last_message_at).toLocaleString() : 'none'}</p>
-    {thread.reported && <section aria-label="Report details" style={{ marginTop: 28, padding: '18px 22px', borderLeft: '3px solid #813d4d', background: '#f0dfda' }}>
-      <span className="corr-kicker">Report reason</span>
+     {(thread.reported || thread.report_reason) && <section aria-label="Report details" style={{ marginTop: 28, padding: '18px 22px', borderLeft: '3px solid #813d4d', background: '#f0dfda' }}>
+       <span className="corr-kicker">{thread.reported ? 'Active report reason' : 'Most recent report reason / resolved'}</span>
       <p data-testid="text-admin-report-reason" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: 0 }}>{thread.report_reason || 'No reason was provided.'}</p>
     </section>}
     <section aria-label="Conversation messages" style={{ marginTop: 32 }}>
@@ -51,9 +58,10 @@ function Detail({ id, uid }: { id: number; uid: string }) {
     <h3 style={{ fontSize: 29, marginTop: 30 }}>Moderation record</h3>
     {thread.audit.length ? <ul style={{ padding: 0 }}>{thread.audit.map((entry, index) => <li key={`${entry.at}-${index}`}><span className="corr-kicker">{entry.action} / {new Date(entry.at).toLocaleString()}</span><p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{entry.note || 'No note recorded.'}</p></li>)}</ul> : <p className="corr-muted">No moderation actions recorded.</p>}
     <form onSubmit={event => { event.preventDefault(); void submit(thread.locked ? 'unlock' : 'lock'); }}><div className="corr-field"><label htmlFor={`moderation-note-${id}`}>Moderation note (required, recorded in audit)</label><textarea id={`moderation-note-${id}`} value={note} onChange={event => setNote(event.target.value)} required data-testid="textarea-moderation-note" placeholder="Reason for the action…"/></div>
-      <div className="corr-actions" style={{ justifyContent: 'flex-start' }}>
-        <button type="submit" className="corr-button" disabled={!note.trim() || working} data-testid="button-moderate-lock">{thread.locked ? 'Reopen conversation' : 'Pause conversation'}</button>
-        <button type="button" className="corr-button secondary" disabled={!note.trim() || working} onClick={() => void submit('review')} data-testid="button-moderate-review">Record review</button>
+       <div className="corr-actions" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+        <button type="submit" className="corr-button" disabled={!note.trim() || working} data-testid="button-moderate-lock">{thread.locked ? 'Unlock conversation' : 'Pause conversation'}</button>
+        <button type="button" className="corr-button secondary" disabled={!note.trim() || working} onClick={() => void submit('review')} data-testid="button-moderate-review">Record review note</button>
+         {thread.reported && <button type="button" className="corr-button secondary" disabled={!note.trim() || working} onClick={() => void submit('resolve')} data-testid="button-moderate-resolve">Resolve report</button>}
       </div>
     </form>
     {feedback && <p className={feedback.startsWith('The moderation') ? 'corr-error' : 'corr-muted'} role={feedback.startsWith('The moderation') ? 'alert' : 'status'}>{feedback}</p>}

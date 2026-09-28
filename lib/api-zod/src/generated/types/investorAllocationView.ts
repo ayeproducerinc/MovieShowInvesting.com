@@ -6,12 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface InvestorAllocationInput {
+export interface InvestorAllocationView {
   /** @minimum 1 */
   project_id: number;
   /**
-     * Whole-dollar allocation of at least $25
-     * @minimum 25
+     * @minimum 1
      * @maximum 2147483647
      */
   amount: number;

@@ -5,7 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { InvestorAllocationInput } from './investorAllocationInput';
+import type { InvestorAllocationView } from './investorAllocationView';
 import type { InvestorMinima } from './investorMinima';
 
 export interface InvestorIntentView {
@@ -13,9 +13,12 @@ export interface InvestorIntentView {
   investor_id: number;
   name: string;
   email: string;
-  /** @minimum 1 */
+  /**
+     * @minimum 1
+     * @maximum 2147483647
+     */
   amount: number;
-  allocations: InvestorAllocationInput[];
+  allocations: InvestorAllocationView[];
   unallocated: boolean;
   accredited: boolean;
   experience: string[];

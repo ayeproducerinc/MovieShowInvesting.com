@@ -100,6 +100,10 @@ router.post("/admin/conversations/:id/moderation", async (req, res): Promise<voi
     return;
   }
   const note = body.data.note.trim();
+  if (body.data.action === "resolve" && !note) {
+    res.status(400).json({ error: "A moderator note is required to resolve a report." });
+    return;
+  }
   if (note.length > 4000) {
     res.status(400).json({ error: "Moderation notes must be 4000 characters or fewer." });
     return;
@@ -107,10 +111,18 @@ router.post("/admin/conversations/:id/moderation", async (req, res): Promise<voi
 
   const client = await pool.connect();
   let locked: boolean | undefined;
+  let auditNote: string | null = note || null;
   try {
     await client.query("begin");
-    const existing = await client.query<{ id: number }>(
-      "select id from conversations where id = $1 for update",
+    const existing = await client.query<{
+      id: number;
+      locked: boolean;
+      reported: boolean;
+      report_reason: string | null;
+      reporter_role: string | null;
+      reported_at: Date | null;
+    }>(
+      "select id, locked, reported, report_reason, reporter_role, reported_at from conversations where id = $1 for update",
       [params.data.id],
     );
     if (!existing.rows[0]) {
@@ -124,18 +136,28 @@ router.post("/admin/conversations/:id/moderation", async (req, res): Promise<voi
     } else if (body.data.action === "unlock") {
       locked = false;
       await client.query("update conversations set locked = false, updated_at = now() where id = $1", [params.data.id]);
+    } else if (body.data.action === "resolve") {
+      if (!existing.rows[0].reported) {
+        await client.query("rollback");
+        res.status(409).json({ error: "This conversation has no active report to resolve." });
+        return;
+      }
+      locked = existing.rows[0].locked;
+      const reportSnapshot = [
+        "Resolved report snapshot:",
+        `Reason: ${existing.rows[0].report_reason ?? "No reason was provided."}`,
+        `Reporter role: ${existing.rows[0].reporter_role ?? "unknown"}`,
+        `Reported at: ${existing.rows[0].reported_at?.toISOString() ?? "unknown"}`,
+      ].join("\n");
+      auditNote = `${note}\n\n${reportSnapshot}`;
+      await client.query("update conversations set reported = false, updated_at = now() where id = $1", [params.data.id]);
     } else {
-      const current = await client.query<{ locked: boolean }>(
-        "select locked from conversations where id = $1",
-        [params.data.id],
-      );
-      locked = current.rows[0].locked;
-      await client.query("update conversations set reported = true, updated_at = now() where id = $1", [params.data.id]);
+      locked = existing.rows[0].locked;
     }
     await client.query(
       `insert into conversation_moderation_audit (conversation_id, admin_uid, action, note)
        values ($1, $2, $3, $4)`,
-      [params.data.id, admin.uid, body.data.action, note || null],
+      [params.data.id, admin.uid, body.data.action, auditNote],
     );
     await client.query("commit");
   } catch (error) {
@@ -145,7 +167,9 @@ router.post("/admin/conversations/:id/moderation", async (req, res): Promise<voi
     client.release();
   }
   res.json(ModerateAdminConversationResponse.parse({
-    status: body.data.action === "review" ? "reviewed" : body.data.action === "lock" ? "locked" : "unlocked",
+    status: body.data.action === "review" ? "reviewed"
+      : body.data.action === "resolve" ? "resolved"
+        : body.data.action === "lock" ? "locked" : "unlocked",
     locked,
   }));
 });

@@ -8,6 +8,7 @@ import '../investor.css';
 
 const stages = [['','All stages'],['distribution','Distribution'],['production','Production'],['idea','Idea']] as const;
 const genres = ['','Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Other'];
+const securitiesNotice = "Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.";
 
 export default function Explore() {
   const [stage,setStage] = useState<GetExploreStage | ''>('');
@@ -16,7 +17,7 @@ export default function Explore() {
   const [sort,setSort] = useState('');
   const projects = useGetExplore({ ...(stage ? {stage}:{}), ...(genre ? {genre}:{}), ...(search.trim() ? {search:search.trim()}:{}), ...(sort ? {sort}:{}) });
   return <section className="inv">
-    <div className="page-wrap"><div className="inv-top"><span className="inv-kicker">Movie Show Investing / The collection</span><Link href="/invest" className="inv-kicker" data-testid="link-explore-invest">Express interest <ArrowRight size={13} className="inline"/></Link></div>
+    <div className="page-wrap"><div className="dossier-notice inv-securities-notice" role="note" data-testid="text-securities-notice">{securitiesNotice}</div><div className="inv-top"><span className="inv-kicker">Movie Show Investing / The collection</span><Link href="/invest" className="inv-kicker" data-testid="link-explore-invest">Express interest <ArrowRight size={13} className="inline"/></Link></div>
       <div className="inv-hero"><p className="inv-kicker">Independent stories / Open to discovery</p><h1>Find the stories<br/><em>worth following.</em></h1><p className="inv-lead">A collection of approved films and shows, at different points on their way to an audience. Look closer, ask questions, and decide what you believe in.</p></div>
     </div>
     <div className="inv-band"><div className="page-wrap inv-band-inner"><div><p className="inv-kicker" style={{color:'#d9b777'}}>A note before you browse</p><h2>Discovery first.<br/>Decisions later.</h2></div><p>These are project profiles, not investment offers. Expressing interest is non-binding, and no money is collected here. Returns aren’t guaranteed. You may get back less, or nothing.</p></div></div>

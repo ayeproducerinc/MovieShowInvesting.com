@@ -27,6 +27,13 @@ function split(amount:number, selected:ExploreProject[]) {
   const each = Math.floor(amount / selected.length);
   return selected.map((project,index)=>({project_id:project.id,amount:each + (index===0 ? amount - each * selected.length : 0)}));
 }
+function spreadRating(amount:number, lineup:Answers['lineup']) {
+  if (!lineup.length || amount <= 0) return null;
+  const largestShare = Math.max(...lineup.map(row=>Number(row.amount)||0)) / amount;
+  if (lineup.length === 1 || largestShare > 0.6) return 'Narrow';
+  if (lineup.length >= 4 && largestShare <= 0.35) return 'Wide';
+  return 'Moderate';
+}
 function toggle(items:string[], value:string) { return items.includes(value) ? items.filter(x=>x!==value) : [...items,value]; }
 function Field({label,id,value,onChange,type='text',required=false}: {label:string;id:string;value:string;onChange:(value:string)=>void;type?:string;required?:boolean}) {
   return <div className="inv-field"><label htmlFor={id}>{label}{!required && <span className="inv-small"> · optional</span>}</label><input className="inv-input" id={id} data-testid={`input-${id}`} type={type} required={required} value={value} onChange={e=>onChange(e.target.value)}/></div>;
@@ -36,6 +43,14 @@ function Option({label,checked,onChange,type='checkbox',description}: {label:str
 }
 function ErrorState({retry}: {retry:()=>void}) {
   return <div className="page-wrap inv-state"><p className="inv-kicker">Connection interrupted</p><h1>We couldn’t open your page.</h1><p>Your answers need a reliable connection before you continue. Please try again.</p><button type="button" className="inv-button" data-testid="button-retry-investor" onClick={retry}><RotateCcw size={16}/> Try again</button></div>;
+}
+
+function GuestDraftConflictState() {
+  return <div className="page-wrap inv-state" role="alert" data-testid="error-investor-guest-draft">
+    <p className="inv-kicker">Another worksheet is safe</p>
+    <h1>Your guest draft is still here.</h1>
+    <p>An unfinished guest worksheet in this browser has been kept unchanged. Sign out of your account to resume that draft here. Your account worksheet has not been changed.</p>
+  </div>;
 }
 
 export function InvestorDone() {
@@ -76,9 +91,12 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
   const [screen,setScreen] = useState(1);
   const [ready,setReady] = useState(false);
   const [matches,setMatches] = useState<ExploreProject[]>([]);
+  const [matchState,setMatchState] = useState<'idle'|'loading'|'matches'|'no-matches'|'unavailable'>('idle');
+  const [showAllAvailable,setShowAllAvailable] = useState(false);
   const [error,setError] = useState('');
   const [saving,setSaving] = useState(false);
   const initialised = useRef(false);
+  const restoredMatchStarted = useRef(false);
   const timer = useRef<number|null>(null);
   const lastSaved = useRef('');
   const queue = useRef<Promise<unknown>>(Promise.resolve());
@@ -93,7 +111,12 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
       setA(restored); setScreen(step); lastSaved.current=JSON.stringify({screen:step,a:restored}); setReady(true);
     } else if (progress.error?.status===404) { initialised.current=true; setReady(true); }
   },[progress.data,progress.error]);
-  useEffect(()=>{if (current.data?.intent) navigate('/invest/done');},[current.data?.intent,navigate]);
+  useEffect(()=>{
+    if (!ready || screen!==4 || !explore.isSuccess || matchState!=='idle' || restoredMatchStarted.current) return;
+    restoredMatchStarted.current=true;
+    void findCandidates(a,false).catch(()=>setError('We could not restore your project matches. Browse available projects manually, or retry matching.'));
+  },[ready,screen,explore.isSuccess,matchState]);
+  useEffect(()=>{if (current.data?.intent && !progress.isLoading && progress.error?.status!==409) navigate('/invest/done');},[current.data?.intent,progress.isLoading,progress.error,navigate]);
   useEffect(()=>{
     if (!ready) return;
     const json=JSON.stringify({screen,a});
@@ -119,6 +142,29 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
   const available = explore.data?.projects || [];
   const selected = available.filter(p=>a.lineup.some(row=>row.project_id===p.id));
   const allocated = a.lineup.reduce((sum,row)=>sum+Number(row.amount||0),0);
+  const rating = !a.unallocated ? spreadRating(a.amount,a.lineup) : null;
+  async function findCandidates(value:Answers, autoBuild:boolean):Promise<Answers> {
+    setError('');
+    setMatches([]);
+    setMatchState('loading');
+    setShowAllAvailable(false);
+    try {
+      const result=await match.mutateAsync({data:{amount:value.amount,favorite_genres:value.favorite_genres,stages:value.stages,minima:value.minima}});
+      const realIds=new Set(available.map(p=>p.id));
+      const candidates=result.projects.filter(p=>realIds.has(p.id));
+      setMatches(candidates);
+      setMatchState(candidates.length?'matches':'no-matches');
+      const selectedCandidates=candidates.slice(0,cap(value.amount));
+      if(autoBuild && !value.unallocated && !value.lineup.length && selectedCandidates.length && Math.floor(value.amount/selectedCandidates.length)>=25) {
+        return {...value,lineup:split(value.amount,selectedCandidates)};
+      }
+      return value;
+    } catch {
+      setMatches([]);
+      setMatchState('unavailable');
+      throw new Error('Matching failed');
+    }
+  }
   function validate(step:number) {
     if(step===1 && (!Number.isSafeInteger(a.amount) || a.amount<100)) return 'Enter a whole-dollar amount of at least $100.';
     if(step===2 && !a.terms_read) return 'Please acknowledge the ground rules before continuing.';
@@ -141,11 +187,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
     let updated=a;
     if(screen===3) {
       try {
-        const result=await match.mutateAsync({data:{amount:a.amount,favorite_genres:a.favorite_genres,stages:a.stages,minima:a.minima}});
-        const realIds=new Set(available.map(p=>p.id));
-        const candidates=result.projects.filter(p=>realIds.has(p.id)).slice(0,cap(a.amount));
-        setMatches(candidates);
-        if(!a.lineup.length && candidates.length && Math.floor(a.amount/candidates.length)>=25) updated={...a,lineup:split(a.amount,candidates)};
+        updated=await findCandidates(a,true);
       } catch {setError('We could not find matches right now. Please try again.');return;}
     }
     try {await persist(screen+1,updated);setA(updated);setScreen(screen+1);window.scrollTo({top:0,behavior:'smooth'});}catch {/* error shown by persist */}
@@ -169,6 +211,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
     const projects=ids.map(id=>available.find(p=>p.id===id)).filter((x):x is ExploreProject=>Boolean(x));
     change('lineup',split(a.amount,projects));
   }
+  if(progress.isError && progress.error?.status===409) return <section className="inv"><GuestDraftConflictState/></section>;
   if(authLoading || progress.isLoading || current.isLoading || explore.isLoading || !ready && !progress.isError) return <section className="inv"><div className="page-wrap inv-state" aria-label="Loading investor worksheet"><p className="inv-kicker">Opening your worksheet</p><div className="inv-skeleton" style={{height:85}}/><div className="inv-skeleton" style={{height:150}}/></div></section>;
   if(progress.isError && progress.error?.status!==404 || current.isError && current.error?.status!==404 || explore.isError) return <section className="inv"><ErrorState retry={()=>{void progress.refetch();void current.refetch();void explore.refetch();}}/></section>;
   return <section className="inv"><div className="page-wrap">
@@ -179,14 +222,21 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
         {screen===1 && <><p className="inv-label">How much might you be interested in? · USD</p><div className="inv-amount"><span>$</span>{a.amount || '—'}</div><div className="inv-options">{[100,250,500,1000].map(value=><Option key={value} type="radio" checked={a.amount===value} label={dollars(value)} onChange={()=>change('amount',value)}/>)}</div><div className="inv-field"><label htmlFor="invest-amount">Or enter an amount</label><input id="invest-amount" data-testid="input-invest-amount" className="inv-input" type="number" min="100" step="1" value={a.amount || ''} onChange={e=>change('amount',Number(e.target.value))}/></div><p className="inv-small">Minimum total interest: $100. You can adjust your project choices later.</p></>}
         {screen===2 && <><p className="inv-kicker">Read before continuing</p><div className="inv-section"><h2>Interest is not an investment.</h2><p>This worksheet records what you may want to explore. Your pledge is non-binding. No money is collected, and you are not committing to fund a project.</p></div><div className="inv-section"><h2>There is real risk.</h2><p>Returns aren’t guaranteed. You may get back less, or nothing.</p><p>Projects can change, pause, or never reach an audience. Any future opportunity would require separate information and a separate decision.</p></div><div className="inv-section"><Option label="I understand this is non-binding interest, not an investment or an offer." checked={a.terms_read} onChange={()=>change('terms_read',!a.terms_read)}/></div></>}
          {screen===3 && <><p className="inv-label">Genres you return to · choose any</p><div className="inv-grid">{genres.map(g=><Option key={g} label={g} checked={a.favorite_genres.includes(g)} onChange={()=>change('favorite_genres',toggle(a.favorite_genres,g))}/>)}</div><div className="inv-section"><p className="inv-label">Where in the process?</p><div className="inv-options">{stages.map(([value,label])=><Option key={value} label={label} checked={a.stages.includes(value)} onChange={()=>change('stages',toggle(a.stages,value))}/>)}</div></div><div className="inv-section"><h2>Your minimum preferences</h2><p>Optional minimum illustrative payback target per $100, by stage. Leave blank for no preference. These are preference filters, not promises of a return.</p><div className="inv-grid">{stages.map(([value,label])=><div className="inv-field" key={value}><label htmlFor={`minimum-${value}`}>{label}</label><input id={`minimum-${value}`} className="inv-input" data-testid={`input-minimum-${value}`} type="number" min="125" step="1" placeholder="No minimum" value={a.minima[value]??''} onChange={e=>change('minima',{...a.minima,[value]:e.target.value===''?null:Number(e.target.value)})}/></div>)}</div></div></>}
-        {screen===4 && <><p className="inv-kicker">Your possible lineup</p><h2 className="serif" style={{fontSize:'clamp(38px,4vw,58px)',lineHeight:1,margin:'15px 0'}}>Choose where your interest goes.</h2><p className="inv-small">Up to {cap(a.amount)} projects. Each allocation must be at least $25. Your total is {dollars(a.amount)}.</p>
+         {screen===4 && <><p className="inv-kicker">Your possible lineup</p><h2 className="serif" style={{fontSize:'clamp(38px,4vw,58px)',lineHeight:1,margin:'15px 0'}}>Choose where your interest goes.</h2><p className="inv-small">Up to {cap(a.amount)} projects. Each allocation must be at least $25. Your total is {dollars(a.amount)}.</p><p className="inv-small">When matches are available and you have not chosen projects, we start with an even split across up to {cap(a.amount)} matches. You can edit each amount, split evenly again, or manually choose other available projects.</p>
           <div className="inv-options"><Option type="radio" checked={!a.unallocated} label="Choose projects" description="Adjust amounts across a lineup of approved projects." onChange={()=>change('unallocated',false)}/><Option type="radio" checked={a.unallocated} label="Just pledge" description="Save your interest without selecting projects yet." onChange={()=>change('unallocated',true)}/></div>
-           {!a.unallocated && <><div className="inv-lineup">{a.lineup.map(row=>{const project=available.find(p=>p.id===row.project_id);const stageLabel=project ? String(project.stage)==='other' ? 'Other stage (legacy)' : project.stage || 'Stage not listed' : 'Please remove this project';return <div className="inv-lineup-row" key={row.project_id}><div><strong>{project?.title || 'Project no longer available'}</strong><small>{stageLabel}</small></div><input className="inv-input" type="number" min="25" step="1" aria-label={`Allocation for ${project?.title || 'project'}`} data-testid={`input-allocation-${row.project_id}`} value={row.amount || ''} onChange={e=>change('lineup',a.lineup.map(x=>x.project_id===row.project_id?{...x,amount:Number(e.target.value)}:x))}/><button type="button" data-testid={`button-remove-${row.project_id}`} onClick={()=>{const kept=a.lineup.filter(x=>x.project_id!==row.project_id);change('lineup',kept.length?split(a.amount,kept.map(x=>available.find(p=>p.id===x.project_id)).filter((x):x is ExploreProject=>Boolean(x))):[]);}}>Remove</button></div>;})}</div>
+           <div className="inv-spread" data-testid="text-allocation-spread">{a.unallocated ? <><strong>Allocation spread: None</strong><span>Your interest is unallocated.</span></> : rating ? <><strong>Allocation spread: {rating}</strong><span>Based on the number of projects and largest allocation share. This describes allocation only—not safety, performance, or expected return.</span></> : <><strong>Allocation spread: None</strong><span>No project allocations are currently selected.</span></>}</div>
+            {!a.unallocated && <><div className="inv-lineup">{a.lineup.map(row=>{const project=available.find(p=>p.id===row.project_id);const stageLabel=project ? String(project.stage)==='other' ? 'Other stage (legacy)' : project.stage || 'Stage not listed' : 'Please remove this project';return <div className="inv-lineup-row" key={row.project_id}><div><strong>{project?.title || 'Project no longer available'}</strong>{matchState==='matches' && matches.some(m=>m.id===row.project_id) && <span className="inv-match-badge" data-testid={`badge-match-selected-${row.project_id}`}>Matches your preferences</span>}<small>{stageLabel}</small></div><input className="inv-input" type="number" min="25" step="1" aria-label={`Allocation for ${project?.title || 'project'}`} data-testid={`input-allocation-${row.project_id}`} value={row.amount || ''} onChange={e=>change('lineup',a.lineup.map(x=>x.project_id===row.project_id?{...x,amount:Number(e.target.value)}:x))}/><button type="button" data-testid={`button-remove-${row.project_id}`} onClick={()=>{const kept=a.lineup.filter(x=>x.project_id!==row.project_id);change('lineup',kept.length?split(a.amount,kept.map(x=>available.find(p=>p.id===x.project_id)).filter((x):x is ExploreProject=>Boolean(x))):[]);}}>Remove</button></div>;})}</div>
             {a.lineup.length>0 && <div className="inv-actions" style={{marginTop:0}}><button type="button" className="inv-button secondary" data-testid="button-even-split" onClick={()=>change('lineup',split(a.amount,selected))}>Split evenly</button><span className="inv-small" data-testid="text-allocation-total">Allocated {dollars(allocated)} of {dollars(a.amount)}</span></div>}
-            <div className="inv-section"><h2>More to consider</h2><p>Only approved, available projects appear here. Browse a dossier before adding one.</p><div className="inv-projects" style={{paddingBottom:0}}>
-              {(matches.length ? matches : available).filter(p=>!a.lineup.some(x=>x.project_id===p.id)).map(project=><InvestorProjectCard key={project.id} project={project} action={{label:'Add to lineup',onClick:()=>add(project),disabled:a.lineup.length>=cap(a.amount)}}/>)}
-            </div>{!available.length && <p>No approved projects are available right now. You can still save unallocated interest with Just pledge.</p>}
-            {matches.length>0 && available.some(p=>!matches.some(m=>m.id===p.id) && !a.lineup.some(x=>x.project_id===p.id)) && <button type="button" className="inv-button secondary" data-testid="button-show-all-projects" onClick={()=>setMatches([])}>Show all available projects</button>}</div>
+             <div className="inv-section"><h2>More to consider</h2><p>Only approved, available projects appear here. Browse a dossier before adding one.</p>
+               {matchState==='no-matches' && <p className="inv-match-state" role="status" data-testid="text-no-project-matches">No project was returned as a match for both your chosen genres and stages and a qualifying offer at its stage minimum. Stages with no minimum set do not produce a match. You can still browse and choose any available project manually, or choose Just pledge.</p>}
+               {matchState==='unavailable' && <div className="inv-match-state" role="status"><p>Matches could not be restored. These are available projects for manual selection; none are labeled as matches.</p><button type="button" className="inv-button secondary" data-testid="button-retry-matching" onClick={()=>void findCandidates(a,false).catch(()=>setError('We could not find matches right now. Please try again.'))}>Retry matching</button></div>}
+               {matchState==='loading' && <p className="inv-match-state" role="status">Checking your preferences against available projects…</p>}
+               <div className="inv-projects" style={{paddingBottom:0}}>
+               {(showAllAvailable || matchState!=='matches' ? available : matches).filter(p=>!a.lineup.some(x=>x.project_id===p.id)).map(project=><InvestorProjectCard key={project.id} project={project} matched={matches.some(m=>m.id===project.id)} action={{label:'Add to lineup',onClick:()=>add(project),disabled:a.lineup.length>=cap(a.amount)}}/>)}
+             </div>{!available.length && <p>No approved projects are available right now. You can still save unallocated interest with Just pledge.</p>}
+             {matchState==='matches' && !showAllAvailable && available.some(p=>!matches.some(m=>m.id===p.id) && !a.lineup.some(x=>x.project_id===p.id)) && <button type="button" className="inv-button secondary" data-testid="button-show-all-projects" onClick={()=>setShowAllAvailable(true)}>Show all available projects</button>}
+             {matchState==='matches' && showAllAvailable && <button type="button" className="inv-button secondary" data-testid="button-show-matches-only" onClick={()=>setShowAllAvailable(false)}>Show matching projects only</button>}
+             </div>
           </>}
         </>}
         {screen===5 && <><div className="inv-grid"><Field id="invest-name" label="Your name" value={a.name} onChange={v=>change('name',v)} required/><Field id="invest-email" label="Email address" value={a.email} onChange={v=>change('email',v)} type="email" required/><Field id="invest-city" label="City" value={a.city||''} onChange={v=>change('city',v)}/><Field id="invest-state" label="State or region" value={a.state||''} onChange={v=>change('state',v)}/><Field id="invest-zip" label="Postal code" value={a.zip||''} onChange={v=>change('zip',v)}/></div>

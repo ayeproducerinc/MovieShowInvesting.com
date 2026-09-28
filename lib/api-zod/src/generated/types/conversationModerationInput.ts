@@ -9,5 +9,6 @@ import type { ConversationModerationInputAction } from './conversationModeration
 
 export interface ConversationModerationInput {
   action: ConversationModerationInputAction;
+  /** Required moderator note. A non-empty note is required for resolve. */
   note: string;
 }

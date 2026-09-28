@@ -12,6 +12,8 @@ import { useMessagingAuth } from '@/hooks/use-messaging-auth';
 import '@/components/conversation.css';
 import { useAuth } from '@workspace/replit-auth-web';
 
+const APPROVED_MESSAGING_NOTICE = 'Project messages are visible to the signed-in investor and the filmmaker for that project. Authorized Movie Show Investing administrators can also read messages and reports, review safety concerns, and lock conversations. Messages are stored on the platform. Email notifications, if enabled, contain no message text. Do not share confidential scripts or sensitive personal or financial information.';
+
 function date(value: string | null) {
   return value ? new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No messages yet';
 }
@@ -103,9 +105,10 @@ export default function Conversation() {
   const replitAuth = useAuth();
   const config = useGetMessagingConfig({ query: { queryKey: getGetMessagingConfigQueryKey(), retry: false, staleTime: 30000 } });
   const identityId = replitAuth.user?.id ?? auth.user?.uid;
-  const list = useGetMyConversations({ query: { queryKey: [...getGetMyConversationsQueryKey(), identityId], enabled: !replitAuth.isLoading && config.data?.available === true && !!identityId && (Boolean(replitAuth.user) || auth.ready), retry: false, refetchInterval: id ? 20000 : false } });
+  const messagingAvailable = config.data?.available === true && config.data.disclosure === APPROVED_MESSAGING_NOTICE;
+  const list = useGetMyConversations({ query: { queryKey: [...getGetMyConversationsQueryKey(), identityId], enabled: !replitAuth.isLoading && messagingAvailable && !!identityId && (Boolean(replitAuth.user) || auth.ready), retry: false, refetchInterval: id ? 20000 : false } });
   useEffect(() => { document.title = 'Correspondence | Movie Show Investing'; const meta = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]') ?? document.createElement('meta'); const old = meta.content; meta.name = 'robots'; meta.content = 'noindex, nofollow'; if (!meta.parentNode) document.head.append(meta); return () => { if (old) meta.content = old; else meta.remove(); }; }, []);
-  const unavailable = config.isError || !config.data?.available;
+  const unavailable = config.isError || !messagingAvailable;
   if (replitAuth.isLoading) return <main className="correspondence"><div className="corr-state" role="status" aria-label="Checking sign-in"><div className="corr-skeleton" style={{ width: '30%' }}/><div className="corr-skeleton" style={{ width: '75%', height: 90 }}/><div className="corr-skeleton" style={{ width: '54%' }}/></div></main>;
   return <main className="correspondence">
     <header className="corr-top"><Link href="/" className="corr-kicker" data-testid="link-correspondence-home">Movie Show Investing / Correspondence</Link><span className="corr-kicker">Private project conversations</span></header>
@@ -120,6 +123,6 @@ export default function Conversation() {
       : list.isError ? <div className="corr-state" role="alert"><h2>We couldn’t open your desk.</h2><p>We couldn’t verify access to your private conversations, so none are being shown. Try again when the connection returns.</p><button type="button" className="corr-button secondary" onClick={() => void list.refetch()} data-testid="button-retry-conversations">Try again <RotateCcw size={15}/></button></div>
        : <div className="corr-layout"><aside className="corr-list" aria-label="Your conversations"><div className="corr-list-head"><span className="corr-kicker">Your threads</span><span className="corr-kicker">{list.data?.conversations.length ?? 0}</span></div><div className="corr-list-scroll">{(list.data?.conversations ?? []).map(item => <Link key={item.id} href={`/messages/${item.id}`} className={`corr-item ${id === item.id ? 'is-active' : ''}`} aria-current={id === item.id ? 'page' : undefined} data-testid={`link-conversation-${item.id}`}><span className="corr-kicker">{item.locked ? 'Paused' : item.reported ? 'Under review' : 'Project / Private'}</span><strong>{item.project_title}</strong><small>{item.other_party_name} · {date(item.last_message_at)}</small></Link>)}{!list.data?.conversations.length && <div className="corr-state" style={{ padding: 25 }}><span className="corr-kicker">No conversations yet</span><p>Open a film dossier to begin a project conversation when available.</p></div>}</div></aside>{id && Number.isSafeInteger(id) ? <Thread id={id} uid={identityId!} onChange={() => void list.refetch()}/> : projectSlug ? <NewThread projectSlug={projectSlug} conversations={list.data?.conversations ?? []}/> : <div className="corr-state"><span className="corr-kicker">Select a thread</span><h1>Room to<br/><em>respond.</em></h1><p>Choose a conversation from the index to read its messages, or visit a film dossier to begin a new one.</p><Link href="/" className="corr-button secondary" data-testid="link-browse-projects">Return to the site <ArrowUpRight size={16}/></Link></div>}</div>}
     </>}
-    {config.data?.available && <footer className="corr-disclosure" data-testid="text-messaging-disclosure">{config.data.disclosure} Administrators can read and moderate conversations. Messages are text-only and are not an offer or an investment commitment.</footer>}
+     {messagingAvailable && <footer className="corr-disclosure" data-testid="text-messaging-disclosure">{config.data?.disclosure}</footer>}
   </main>;
 }
