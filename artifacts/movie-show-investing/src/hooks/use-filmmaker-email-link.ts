@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getApp, getApps, initializeApp } from 'firebase/app';
+import { FirebaseError, getApp, getApps, initializeApp } from 'firebase/app';
 import {
   getAuth, isSignInWithEmailLink, onAuthStateChanged,
   sendSignInLinkToEmail, signInWithEmailLink, signOut,
@@ -12,6 +12,30 @@ import { pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 
 const APP_NAME = 'movie-show-investing';
 const EMAIL_KEY = 'msi_filmmaker_sign_in_email';
+
+function emailLinkSendError(error: unknown): string {
+  const code = error instanceof FirebaseError ? error.code : null;
+  switch (code) {
+    case 'auth/invalid-email':
+      return 'Firebase says this email address is not valid. Check the spelling and try again.';
+    case 'auth/too-many-requests':
+    case 'auth/quota-exceeded':
+      return 'Firebase has temporarily limited sign-in emails. Please wait before requesting another link.';
+    case 'auth/network-request-failed':
+      return 'The request to Firebase could not connect. Check your connection and try again.';
+    case 'auth/unauthorized-domain':
+    case 'auth/unauthorized-continue-uri':
+    case 'auth/invalid-continue-uri':
+      return `Firebase has not authorized this app’s return address (${code}). The site owner needs to update its authorized domains.`;
+    case 'auth/operation-not-allowed':
+    case 'auth/configuration-not-found':
+      return `Email-link sign-in is not enabled for this Firebase project (${code}).`;
+    default:
+      return code
+        ? `Firebase could not send the sign-in link (${code}). Please share this error code so we can fix it.`
+        : 'The sign-in request failed before Firebase returned an error code. Please try again.';
+  }
+}
 
 export function useFilmmakerEmailLink() {
   const config = useGetFirebaseConfig({
@@ -101,11 +125,13 @@ export function useFilmmakerEmailLink() {
         setHandled(true);
       }
       attempted.current = false;
-    } catch {
+    } catch (error) {
       if (previous === null) window.localStorage.removeItem(EMAIL_KEY);
       else window.localStorage.setItem(EMAIL_KEY, previous);
       setSavedEmail(previous);
-      setFeedback('We couldn’t send the sign-in link. Check the address and try again.');
+      const code = error instanceof FirebaseError ? error.code : 'non-Firebase error';
+      if (import.meta.env.DEV) console.warn('[Movie Show Investing] Email-link request failed:', code);
+      setFeedback(emailLinkSendError(error));
     } finally {
       setBusy(false);
     }
