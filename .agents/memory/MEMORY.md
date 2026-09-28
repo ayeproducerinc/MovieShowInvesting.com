@@ -17,3 +17,4 @@
 - [Drizzle existing checks](drizzle-existing-checks.md) — a successful schema push may leave an altered PostgreSQL CHECK unchanged; inspect the live definition.
 - [Confirmed interest in unlisted projects](confirmed-interest-unlisted-projects.md) — a hidden project can retain a private signed indication, but ineligible projects must not show public confirmed totals.
 - [Repeat interest signatures](repeat-interest-signatures.md) — a new non-binding indication after confirmation must be a separate signed snapshot; never reinterpret the original investor record.
+- [Public sharing and browser activation](public-sharing-browser-activation.md) — refresh share eligibility in the background, but do not await a network check before native share or clipboard calls.

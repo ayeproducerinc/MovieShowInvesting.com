@@ -14,7 +14,7 @@ export function InvestorResultCard({ entry }: { entry: InvestorInterestHistoryIt
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState('');
   const [showCopyFallback, setShowCopyFallback] = useState(false);
-  const publicProjects = useGetExplore(undefined, { query: { queryKey: getGetExploreQueryKey(), refetchOnMount: 'always' } });
+  const publicProjects = useGetExplore(undefined, { query: { queryKey: getGetExploreQueryKey(), refetchOnMount: 'always', refetchOnWindowFocus: true, refetchInterval: 60_000 } });
   const shareable = entry.allocations.flatMap(row => {
     if (!row.project_visible || !row.project_slug) return [];
     const publicProject = publicProjects.data?.projects.find(project => project.id === row.project_id && project.slug === row.project_slug);
@@ -56,13 +56,14 @@ export function InvestorResultCard({ entry }: { entry: InvestorInterestHistoryIt
     <div className="investor-result__main">
       <div><h2>Interest, on record.</h2><p>{confirmedDate ? `Confirmed ${confirmedDate}` : 'Confirmed interest'}</p></div>
       <strong className="investor-result__amount" data-testid="investor-result-amount">{dollars(entry.amount)}</strong>
+      <p className="investor-result__risk">Returns aren’t guaranteed. You may get back less, or nothing.</p>
     </div>
     <ul className="investor-result__list" data-testid="done-confirmed-allocations" aria-label="Confirmed allocation details">
       {entry.unallocated ? <li className="investor-result__unallocated"><span>Not allocated to a project</span><strong>{dollars(entry.amount)}</strong></li> :
         entry.allocations.length ? entry.allocations.map(row => <li key={row.project_id} data-testid={`done-allocation-${row.project_id}`}><span>{row.project_title ?? `Project #${row.project_id}`}</span><strong>{dollars(row.amount)}</strong></li>) :
         <li><span>No project allocations are on record.</span></li>}
     </ul>
-    <p className="investor-result__legal">This is a private record of non-binding interest, not an investment or offer of securities. No money has been collected. If a project opens for investment, full offering documents will be provided before you decide. Returns are not guaranteed; you may get back less, or nothing.</p>
+     <p className="investor-result__legal">This is a private record of non-binding interest, not an investment or offer of securities. No money has been collected. If a project opens for investment, full offering documents will be provided before you decide.</p>
     <div className="investor-result__share">
       <p className="inv-kicker">Separate from your private record</p>
       <h3>Share a story, not your interest.</h3>

@@ -38,6 +38,7 @@
   letter-spacing: -.05em;
   white-space: nowrap;
 }
+.investor-result__risk { grid-column: 1 / -1; color: #586064; font-size: 12px !important; line-height: 1.55; }
 .investor-result__list { list-style: none; padding: 0 clamp(23px, 4vw, 38px); margin: 0; }
 .investor-result__list li {
   display: flex;
