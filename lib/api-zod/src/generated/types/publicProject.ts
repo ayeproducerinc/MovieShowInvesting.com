@@ -34,4 +34,5 @@ export interface PublicProject {
   confirmed_pledge_total: number;
   approved: boolean;
   showcase_requested: boolean;
+  phone_verified: boolean;
 }

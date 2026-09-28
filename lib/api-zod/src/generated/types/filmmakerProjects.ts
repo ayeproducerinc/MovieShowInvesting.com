@@ -10,4 +10,5 @@ import type { FilmmakerProjectListItem } from './filmmakerProjectListItem';
 export interface FilmmakerProjects {
   projects: FilmmakerProjectListItem[];
   has_resumable_draft: boolean;
+  phone_verified: boolean;
 }

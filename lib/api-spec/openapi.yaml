@@ -18,11 +18,146 @@ tags:
     description: Filmmaker submissions
   - name: projects
     description: Unlisted project pages and showcase requests
+  - name: questions
+    description: Private filmmaker question relay
   - name: locations
     description: International city and region suggestions
   - name: admin
     description: Firebase-protected administration
 paths:
+  /question-config:
+    get:
+      operationId: getQuestionConfig
+      tags: [questions]
+      summary: Public question form availability and Turnstile site key
+      responses:
+        "200":
+          description: Current question form configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionConfig"
+  /projects/{slug}/questions:
+    post:
+      operationId: askFilmmaker
+      tags: [questions]
+      summary: Send a private question to a project's filmmaker
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string, minLength: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "201":
+          description: Question delivered privately
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionSubmission"
+        "400": { description: Invalid question }
+        "403": { description: Anti-bot challenge failed }
+        "404": { description: Project unavailable }
+        "429": { description: Question rate limit reached }
+        "503": { description: Question delivery unavailable }
+  /filmmakers/projects/{projectId}/questions:
+    get:
+      operationId: getFilmmakerQuestions
+      tags: [questions]
+      summary: List account-owned project questions, unanswered first
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Private questions without asker email addresses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerQuestions"
+        "401": { description: Sign-in required }
+        "403": { description: Verified email required }
+        "404": { description: Project is not owned by this account }
+  /filmmakers/projects/{projectId}/questions/{messageId}/answer:
+    post:
+      operationId: answerFilmmakerQuestion
+      tags: [questions]
+      summary: Email a private answer from the signed-in filmmaker
+      security:
+        - firebaseBearer: []
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - in: path
+          name: messageId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionAnswerInput"
+      responses:
+        "200":
+          description: Answer delivered privately
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionAnswerResult"
+        "401": { description: Sign-in required }
+        "404": { description: Unanswered account-owned question not found }
+        "503": { description: Delivery unavailable; question remains unanswered }
+  /questions/answer-token:
+    post:
+      operationId: answerQuestionByToken
+      tags: [questions]
+      summary: Answer a question using a single-use emailed link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionTokenAnswerInput"
+      responses:
+        "200":
+          description: Answer delivered privately
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionAnswerResult"
+        "404": { description: "Link is invalid, expired, or used" }
+        "503": { description: Delivery unavailable; question remains unanswered }
+  /questions/report-token:
+    post:
+      operationId: reportQuestionByToken
+      tags: [questions]
+      summary: Report a private question using a single-use emailed link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionReportInput"
+      responses:
+        "200":
+          description: Question reported to moderation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuestionReportResult"
+        "404": { description: "Link is invalid, expired, or used" }
   /healthz:
     get:
       operationId: healthCheck
@@ -267,6 +402,25 @@ paths:
           description: Verified sign-in required
         "403":
           description: Firebase email must be verified
+        "503":
+          description: Firebase verification is unavailable
+  /filmmakers/phone-verification:
+    post:
+      operationId: verifyFilmmakerPhone
+      tags: [filmmakers]
+      summary: Synchronize or revoke the signed-in filmmaker's Firebase phone verification
+      description: Requires a verified Firebase email. Saves the phone_number claim decoded from the refreshed Firebase ID token across every filmmaker record attached to this UID, or clears phoneVerified for every record when the current token has no phone_number claim.
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Current Firebase phone verification synchronized or revoked for the filmmaker account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerPhoneVerification"
+        "401":
+          description: Verified sign-in required
         "503":
           description: Firebase verification is unavailable
   /filmmakers/projects/claim:
@@ -744,6 +898,81 @@ components:
       scheme: bearer
       bearerFormat: Firebase ID token
   schemas:
+    QuestionConfig:
+      type: object
+      additionalProperties: false
+      required: [available, turnstile_site_key]
+      properties:
+        available: { type: boolean }
+        turnstile_site_key: { type: ["string", "null"] }
+    QuestionInput:
+      type: object
+      additionalProperties: false
+      required: [first_name, email, question, turnstile_token]
+      properties:
+        first_name: { type: string, minLength: 1, maxLength: 80 }
+        email: { type: string, format: email, maxLength: 254 }
+        question: { type: string, minLength: 5, maxLength: 3000 }
+        turnstile_token: { type: string, minLength: 1 }
+    QuestionSubmission:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: submitted }
+    FilmmakerQuestion:
+      type: object
+      additionalProperties: false
+      required: [id, first_name, question, answer, asked_at, answered_at, reported, delivery_pending]
+      properties:
+        id: { type: integer }
+        first_name: { type: ["string", "null"] }
+        question: { type: ["string", "null"] }
+        answer: { type: ["string", "null"] }
+        asked_at: { type: string, format: date-time }
+        answered_at: { type: ["string", "null"], format: date-time }
+        reported: { type: boolean }
+        delivery_pending: { type: boolean }
+    FilmmakerQuestions:
+      type: object
+      additionalProperties: false
+      required: [questions]
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilmmakerQuestion"
+    QuestionAnswerInput:
+      type: object
+      additionalProperties: false
+      required: [answer]
+      properties:
+        answer: { type: string, minLength: 1, maxLength: 5000 }
+    QuestionTokenAnswerInput:
+      type: object
+      additionalProperties: false
+      required: [token, answer]
+      properties:
+        token: { type: string, pattern: "^[a-fA-F0-9]{64}$" }
+        answer: { type: string, minLength: 1, maxLength: 5000 }
+    QuestionAnswerResult:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: answered }
+    QuestionReportInput:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token: { type: string, pattern: "^[a-fA-F0-9]{64}$" }
+    QuestionReportResult:
+      type: object
+      additionalProperties: false
+      required: [reported]
+      properties:
+        reported: { type: boolean, const: true }
     HealthStatus:
       type: object
       properties:
@@ -900,13 +1129,20 @@ components:
     FilmmakerProjects:
       type: object
       additionalProperties: false
-      required: [projects, has_resumable_draft]
+      required: [projects, has_resumable_draft, phone_verified]
       properties:
         projects:
           type: array
           items:
             $ref: "#/components/schemas/FilmmakerProjectListItem"
         has_resumable_draft: { type: boolean }
+        phone_verified: { type: boolean }
+    FilmmakerPhoneVerification:
+      type: object
+      additionalProperties: false
+      required: [phone_verified]
+      properties:
+        phone_verified: { type: boolean }
     FilmmakerProjectListItem:
       type: object
       additionalProperties: false
@@ -1022,7 +1258,7 @@ components:
     PublicProject:
       type: object
       additionalProperties: false
-      required: [slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, confirmed_pledge_total, approved, showcase_requested]
+      required: [slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, confirmed_pledge_total, approved, showcase_requested, phone_verified]
       properties:
         slug: { type: string }
         title: { type: string }
@@ -1042,6 +1278,7 @@ components:
         confirmed_pledge_total: { type: number, minimum: 0 }
         approved: { type: boolean }
         showcase_requested: { type: boolean }
+        phone_verified: { type: boolean }
     FlowProgress:
       type: object
       required: [flow, last_screen, answers, completed, updated_at]

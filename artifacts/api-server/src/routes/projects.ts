@@ -149,6 +149,7 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
     confirmed_pledge_total: project.confirmedPledgeTotal,
     approved: project.approved,
     showcase_requested: project.showcaseRequested,
+    phone_verified: project.phoneVerified,
   };
   res.json(GetPublicProjectResponse.parse(response));
 });

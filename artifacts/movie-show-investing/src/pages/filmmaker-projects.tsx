@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import {
-  claimFilmmakerProject, getGetFilmmakerProjectsQueryKey,
+  claimFilmmakerProject, getGetFilmmakerProjectsQueryKey, getGetFilmmakerQuestionsQueryKey,
   getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey,
   getGetPriceGroupQueryKey, getPriceGroup,
   useGetFilmmakerProjects, useLeaveFilmmakerAccount,
@@ -11,6 +11,12 @@ import {
   useStartFilmmakerProject,
 } from '@workspace/api-client-react';
 import { ProjectHubView, type ProjectHubItem } from '@/components/project-hub-view';
+import {
+  FilmmakerPhoneVerification,
+  phoneSyncErrorMessage,
+  synchronizeFilmmakerPhone,
+} from '@/components/filmmaker-phone-verification';
+import { FilmmakerQuestionsDesk } from '@/components/filmmaker-questions-desk';
 import { useFilmmakerEmailLink } from '@/hooks/use-filmmaker-email-link';
 import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 
@@ -36,6 +42,7 @@ export default function FilmmakerProjects() {
   const [claimDoneUid, setClaimDoneUid] = useState<string | null>(null);
   const claimedUid = useRef<string | null>(null);
   const uid = auth.user?.uid;
+  const user = auth.user;
 
   const projects = useGetFilmmakerProjects({
     query: {
@@ -63,10 +70,19 @@ export default function FilmmakerProjects() {
     setClaiming(true);
     setClaimError('');
     try {
+      if (user) {
+        try {
+          await synchronizeFilmmakerPhone(user);
+        } catch (error) {
+          setClaimError(`We couldn’t refresh this account’s phone-verification status, so the current visit was not linked. ${phoneSyncErrorMessage(error)}`);
+          return;
+        }
+      }
       const linkAndContinue = async () => {
         // Serialize visitor-cookie changes and a one-time action across email-link tabs.
         await getPriceGroup();
         await claimFilmmakerProject();
+        if (user) await synchronizeFilmmakerPhone(user);
         await queryClient.invalidateQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
         if (initialAction === 'start' && navigator.locks && hasPendingStartAction()) {
           await start.mutateAsync();
@@ -86,7 +102,7 @@ export default function FilmmakerProjects() {
     } finally {
       setClaiming(false);
     }
-  }, [queryClient, uid, initialAction, navigate, start]);
+  }, [queryClient, uid, user, initialAction, navigate, start]);
 
   useEffect(() => {
     if (!uid || !auth.ready || auth.linkPresent || claimedUid.current === uid) return;
@@ -125,6 +141,7 @@ export default function FilmmakerProjects() {
       await leave.mutateAsync();
       await auth.leave();
       clearVisitorQueries();
+      for (const project of projects.data?.projects ?? []) queryClient.removeQueries({ queryKey: getGetFilmmakerQuestionsQueryKey(project.id) });
       queryClient.removeQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
       claimedUid.current = null;
       setClaimDoneUid(null);
@@ -188,11 +205,13 @@ export default function FilmmakerProjects() {
       loading={projects.isPending || claiming}
       busy={acting || claiming}
       error={projects.isError ? accountError(projects.error) : null}
+      phoneVerificationSlot={auth.user ? <FilmmakerPhoneVerification user={auth.user} verified={projects.data?.phone_verified ?? false} /> : null}
       onStart={() => void perform(() => start.mutateAsync(), '/start/filmmaker')}
       onResume={() => void perform(() => resume.mutateAsync(), '/start/filmmaker')}
       onOpen={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}
       onSignOut={() => void signOut()}
       onRetry={() => { void projects.refetch(); void linkCurrentVisit(); }}
     />
+    {!projects.isPending && !projects.isError && !claiming && <FilmmakerQuestionsDesk projects={projects.data?.projects ?? []}/>}
   </>;
 }

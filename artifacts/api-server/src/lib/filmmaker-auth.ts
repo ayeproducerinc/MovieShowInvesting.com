@@ -5,6 +5,7 @@ import { FirebaseConfigurationError, verifyFirebaseIdToken } from "./firebase-ad
 export type FilmmakerIdentity = {
   uid: string;
   email: string;
+  phoneNumber: string | null;
 };
 
 function errorMessage(error: unknown): string {
@@ -37,7 +38,11 @@ export async function authenticateFilmmaker(
       }
       return null;
     }
-    return { uid: decoded.uid, email: decoded.email.trim().toLowerCase() };
+    return {
+      uid: decoded.uid,
+      email: decoded.email.trim().toLowerCase(),
+      phoneNumber: typeof decoded.phone_number === "string" ? decoded.phone_number : null,
+    };
   } catch (error) {
     if (error instanceof FirebaseConfigurationError) {
       if (required) {

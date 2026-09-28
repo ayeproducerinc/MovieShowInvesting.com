@@ -79,6 +79,10 @@ export function FirebaseBootstrap() {
           queryClient.removeQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
           queryClient.removeQueries({ queryKey: getGetFilmmakerResultQueryKey() });
           queryClient.removeQueries({ queryKey: getGetFlowProgressQueryKey('filmmaker') });
+          queryClient.removeQueries({
+            predicate: query => typeof query.queryKey[0] === 'string'
+              && /^\/api\/filmmakers\/projects\/\d+\/questions$/.test(query.queryKey[0]),
+          });
           previousUid = user?.uid ?? null;
         }
         setAuthTokenGetter(user ? () => initializedAuth?.currentUser?.getIdToken() ?? null : null);

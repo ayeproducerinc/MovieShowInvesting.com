@@ -17,6 +17,7 @@ import Filmmaker from '@/pages/filmmaker';
 import FilmmakerDone from '@/pages/filmmaker-done';
 import FilmmakerProjects from '@/pages/filmmaker-projects';
 import Project from '@/pages/project';
+import QuestionToken from '@/pages/question-token';
 import NotFound from '@/pages/not-found';
 
 const queryClient = new QueryClient();
@@ -132,6 +133,8 @@ function App() {
       <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
         <Switch>
           <Route path="/admin" component={Admin} />
+          <Route path="/filmmaker/questions">{() => <QuestionToken kind="answer" />}</Route>
+          <Route path="/question-report">{() => <QuestionToken kind="report" />}</Route>
           <Route>{() => <PublicPages />}</Route>
         </Switch>
       </WouterRouter>

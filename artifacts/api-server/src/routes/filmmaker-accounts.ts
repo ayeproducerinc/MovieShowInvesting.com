@@ -85,6 +85,7 @@ router.get("/filmmakers/projects", async (req, res): Promise<void> => {
       created_at: project.createdAt,
     })),
     has_resumable_draft: result.hasResumableDraft,
+    phone_verified: result.phoneVerified,
   }));
 });
 

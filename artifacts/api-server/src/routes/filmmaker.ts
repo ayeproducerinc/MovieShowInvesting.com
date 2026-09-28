@@ -20,6 +20,7 @@ import {
   authorizeFilmmakerVisitor,
   requireMatchingFilmmakerContext,
 } from "../lib/filmmaker-auth";
+import { recordTransactionalEmailStatus, sendTransactionalEmail } from "../lib/mailjet";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -39,6 +40,46 @@ const INPUT_FIELDS = new Set([
 
 function hasText(value: unknown): boolean {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function htmlEscape(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]!);
+}
+
+function publicAppBase(): string | null {
+  const configured = process.env.PUBLIC_APP_URL;
+  if (!configured) return null;
+  try {
+    const url = new URL(configured);
+    const hostname = url.hostname.toLowerCase();
+    if (!["http:", "https:"].includes(url.protocol)
+      || !hostname || url.username || url.password || url.search || url.hash
+      || hostname === "localhost"
+      || hostname.endsWith(".localhost")
+      || hostname === "::1"
+      || hostname.startsWith("127.")) return null;
+    return `${url.origin}${url.pathname.replace(/\/$/, "")}`;
+  } catch {
+    return null;
+  }
+}
+
+function safeCalendlyUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) && url.hostname && !url.username && !url.password
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 router.post("/filmmakers", async (req, res): Promise<void> => {
@@ -107,6 +148,65 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
       firebaseEmail: identity?.email,
       data: data as FilmmakerSubmissionData,
     });
+
+    const emailType = "filmmaker_submission";
+    try {
+      let projectUrl: string | null = null;
+      let projectLookupFailed = false;
+      const appUrl = publicAppBase();
+      if (result.projectId !== null) {
+        try {
+          const completion = await getCompletedFilmmakerResult(cookieId);
+          if (completion?.project?.slug && appUrl) {
+            projectUrl = `${appUrl}/project/${encodeURIComponent(completion.project.slug)}`;
+          } else {
+            projectLookupFailed = true;
+          }
+        } catch {
+          projectLookupFailed = true;
+        }
+      }
+
+      if (projectLookupFailed || !appUrl) {
+        await recordTransactionalEmailStatus(data.email, emailType, "failed");
+        req.log.warn({ type: emailType }, "Filmmaker confirmation email could not include its project link");
+      } else {
+        const calendlyUrl = data.chat_opt_in ? safeCalendlyUrl(process.env.FILMMAKER_CALENDLY_URL) : null;
+        const textParts = [
+          `Hi ${data.name},`,
+          "",
+          "Thank you for submitting to Movie Show Investing. We’ve received your filmmaker submission.",
+          "",
+          `View your private filmmaker desk: ${appUrl}/me/projects`,
+        ];
+        if (projectUrl) textParts.push("", `Share your public project page: ${projectUrl}`);
+        if (calendlyUrl) textParts.push("", `Choose a time to chat: ${calendlyUrl}`);
+        textParts.push("", "The Movie Show Investing team");
+        const htmlParts = [
+          `<p>Hi ${htmlEscape(data.name)},</p>`,
+          "<p>Thank you for submitting to <strong>Movie Show Investing</strong>. We’ve received your filmmaker submission.</p>",
+          `<p><a href="${htmlEscape(`${appUrl}/me/projects`)}" style="display:inline-block;padding:12px 20px;background:#902f4d;color:#fff;text-decoration:none">View my project</a></p>`,
+        ];
+        if (projectUrl) {
+          htmlParts.push(`<p>Public share link: <a href="${htmlEscape(projectUrl)}">${htmlEscape(projectUrl)}</a></p>`);
+        }
+        if (calendlyUrl) {
+          htmlParts.push(`<p>Since you opted in to a conversation, <a href="${htmlEscape(calendlyUrl)}">choose a time to chat</a>.</p>`);
+        }
+        htmlParts.push("<p>Warmly,<br>The Movie Show Investing team</p>");
+        await sendTransactionalEmail({
+          to: data.email,
+          type: emailType,
+          subject: "We received your filmmaker submission",
+          text: textParts.join("\n"),
+          html: `<div style="max-width:600px;margin:0 auto;padding:32px 24px;font-family:Arial,sans-serif;line-height:1.6;color:#172033"><div style="margin-bottom:24px;font-size:20px;font-weight:bold;letter-spacing:.04em;color:#172554">MOVIE SHOW INVESTING</div>${htmlParts.join("")}</div>`,
+        });
+      }
+    } catch {
+      await recordTransactionalEmailStatus(data.email, emailType, "failed");
+      req.log.warn({ type: emailType }, "Filmmaker confirmation email handling failed");
+    }
+
     res.status(201).json(SubmitFilmmakerResponse.parse({
       filmmaker_id: result.filmmakerId,
       project_id: result.projectId,

@@ -9,6 +9,129 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Public question form availability and Turnstile site key
+ */
+export const GetQuestionConfigResponse = zod.object({
+  "available": zod.boolean(),
+  "turnstile_site_key": zod.string().nullable()
+})
+
+
+/**
+ * @summary Send a private question to a project's filmmaker
+ */
+
+
+
+export const AskFilmmakerParams = zod.object({
+  "slug": zod.coerce.string().min(1)
+})
+
+export const askFilmmakerBodyFirstNameMax = 80;
+
+export const askFilmmakerBodyEmailMax = 254;
+
+export const askFilmmakerBodyQuestionMin = 5;
+export const askFilmmakerBodyQuestionMax = 3000;
+
+
+
+
+export const AskFilmmakerBody = zod.object({
+  "first_name": zod.string().min(1).max(askFilmmakerBodyFirstNameMax),
+  "email": zod.string().email().max(askFilmmakerBodyEmailMax),
+  "question": zod.string().min(askFilmmakerBodyQuestionMin).max(askFilmmakerBodyQuestionMax),
+  "turnstile_token": zod.string().min(1)
+})
+
+export const AskFilmmakerResponse = zod.object({
+  "status": zod.literal("submitted")
+})
+
+
+/**
+ * @summary List account-owned project questions, unanswered first
+ */
+
+
+
+export const GetFilmmakerQuestionsParams = zod.object({
+  "projectId": zod.coerce.number().int().min(1)
+})
+
+export const GetFilmmakerQuestionsResponse = zod.object({
+  "questions": zod.array(zod.object({
+  "id": zod.number().int(),
+  "first_name": zod.string().nullable(),
+  "question": zod.string().nullable(),
+  "answer": zod.string().nullable(),
+  "asked_at": zod.coerce.date(),
+  "answered_at": zod.coerce.date().nullable(),
+  "reported": zod.boolean(),
+  "delivery_pending": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Email a private answer from the signed-in filmmaker
+ */
+
+
+
+
+export const AnswerFilmmakerQuestionParams = zod.object({
+  "projectId": zod.coerce.number().int().min(1),
+  "messageId": zod.coerce.number().int().min(1)
+})
+
+export const answerFilmmakerQuestionBodyAnswerMax = 5000;
+
+
+
+export const AnswerFilmmakerQuestionBody = zod.object({
+  "answer": zod.string().min(1).max(answerFilmmakerQuestionBodyAnswerMax)
+})
+
+export const AnswerFilmmakerQuestionResponse = zod.object({
+  "status": zod.literal("answered")
+})
+
+
+/**
+ * @summary Answer a question using a single-use emailed link
+ */
+export const answerQuestionByTokenBodyTokenRegExp = new RegExp('^[a-fA-F0-9]{64}$');
+export const answerQuestionByTokenBodyAnswerMax = 5000;
+
+
+
+export const AnswerQuestionByTokenBody = zod.object({
+  "token": zod.string().regex(answerQuestionByTokenBodyTokenRegExp),
+  "answer": zod.string().min(1).max(answerQuestionByTokenBodyAnswerMax)
+})
+
+export const AnswerQuestionByTokenResponse = zod.object({
+  "status": zod.literal("answered")
+})
+
+
+/**
+ * @summary Report a private question using a single-use emailed link
+ */
+export const reportQuestionByTokenBodyTokenRegExp = new RegExp('^[a-fA-F0-9]{64}$');
+
+
+export const ReportQuestionByTokenBody = zod.object({
+  "token": zod.string().regex(reportQuestionByTokenBodyTokenRegExp)
+})
+
+export const ReportQuestionByTokenResponse = zod.object({
+  "reported": zod.literal(true)
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */
@@ -275,7 +398,17 @@ export const GetFilmmakerProjectsResponse = zod.object({
   "review_state": zod.enum(['pending', 'approved', 'hidden']),
   "created_at": zod.coerce.date()
 })),
-  "has_resumable_draft": zod.boolean()
+  "has_resumable_draft": zod.boolean(),
+  "phone_verified": zod.boolean()
+})
+
+
+/**
+ * Requires a verified Firebase email. Saves the phone_number claim decoded from the refreshed Firebase ID token across every filmmaker record attached to this UID, or clears phoneVerified for every record when the current token has no phone_number claim.
+ * @summary Synchronize or revoke the signed-in filmmaker's Firebase phone verification
+ */
+export const VerifyFilmmakerPhoneResponse = zod.object({
+  "phone_verified": zod.boolean()
 })
 
 
@@ -510,7 +643,8 @@ export const GetPublicProjectResponse = zod.object({
   "poster_url": zod.string().url().nullable(),
   "confirmed_pledge_total": zod.number().min(getPublicProjectResponseConfirmedPledgeTotalMin),
   "approved": zod.boolean(),
-  "showcase_requested": zod.boolean()
+  "showcase_requested": zod.boolean(),
+  "phone_verified": zod.boolean()
 })
 
 

@@ -10,3 +10,4 @@
 - [Stream thumbnail fallback](bunny-thumbnail-access.md) — shared Stream CDN thumbnails stayed blocked; the owner approved poster-or-video-placeholder previews for this MVP.
 - [Bunny browser playback](bunny-browser-playback.md) — an embedded preview's HLS codec error can be browser-specific; confirm playback elsewhere before changing media.
 - [Multi-project ownership boundaries](multi-project-ownership.md) — real projects must survive a new submission; browser-wide selection is not a safe editing boundary across tabs.
+- [Question email delivery uncertainty](question-email-delivery-uncertainty.md) — ambiguous Mailjet answer outcomes must stay closed to retries until reconciled, preventing duplicate private replies.

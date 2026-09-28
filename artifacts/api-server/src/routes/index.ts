@@ -6,8 +6,10 @@ import adminRouter from "./admin";
 import filmmakerRouter from "./filmmaker";
 import filmmakerAccountsRouter from "./filmmaker-accounts";
 import filmmakerMediaRouter from "./filmmaker-media";
+import filmmakerPhoneRouter from "./filmmaker-phone";
 import locationsRouter from "./locations";
 import projectsRouter from "./projects";
+import questionsRouter from "./questions";
 
 const router: IRouter = Router();
 
@@ -18,7 +20,9 @@ router.use(adminRouter);
 router.use(filmmakerRouter);
 router.use(filmmakerAccountsRouter);
 router.use(filmmakerMediaRouter);
+router.use(filmmakerPhoneRouter);
 router.use(locationsRouter);
 router.use(projectsRouter);
+router.use(questionsRouter);
 
 export default router;

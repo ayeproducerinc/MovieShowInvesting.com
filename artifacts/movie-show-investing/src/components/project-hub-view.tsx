@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, ArrowUpRight, RotateCcw } from 'lucide-react';
 import './project-hub-view.css';
 
@@ -19,6 +19,7 @@ export type ProjectHubViewProps = {
   loading: boolean;
   busy: boolean;
   error: string | null;
+  phoneVerificationSlot: ReactNode;
   onStart: () => void;
   onResume: () => void;
   onOpen: (projectId: number) => void;
@@ -45,6 +46,7 @@ export function ProjectHubView({
   loading,
   busy,
   error,
+  phoneVerificationSlot,
   onStart,
   onResume,
   onOpen,
@@ -86,6 +88,7 @@ export function ProjectHubView({
           <button type="button" className="project-hub__action project-hub__action--outline" data-testid="button-project-hub-manage" onClick={manage} disabled={loading || busy || !!error}>Manage projects <ArrowRight size={17} aria-hidden="true" /></button>
           <button type="button" className="project-hub__action" data-testid="button-project-hub-start" onClick={onStart} disabled={loading || busy}>Start another project <ArrowRight size={17} aria-hidden="true" /></button>
         </div>
+        {phoneVerificationSlot}
 
         {(showProjects || loading || !!error) && <div className="project-hub__body">
           <div className="project-hub__main">

@@ -57,9 +57,11 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 **Gate:** F6 chosen-offer calculations and F7 approval/hide were checked against the implementation; an existing project's saved share image returned 200 and matched its crawler metadata; Bunny playback advanced in Chromium; upload size/type enforcement and owner-scoped media persistence were verified earlier. The live multi-project/cross-device sign-in gate is accepted provisionally at the owner's request while the Firebase email quota blocks new links. F7’s Explore visibility check waits for Phase 7, when Explore exists.
 
+**Non-blocking Phase 4 follow-up:** Consider “Continue with Google” through the existing Firebase Auth project. This is not required for Phase 5. If separately approved, preserve existing email-link project access, verified-email ownership and original-browser guest-claim proof, and the server-side admin allowlist.
+
 ## Phase 5 — Email, sign-in, verification, and filmmaker questions
 
-**Status:** not started  
+**Status:** implemented in development; the live gate is pending Mailjet sender/API setup, a canonical app URL and optional filmmaker Calendly link, Cloudflare Turnstile setup, Firebase Phone Authentication setup, and real delivery/SMS/question-relay checks. Do not mark complete from a typecheck alone.
 **Deliverables:**
 
 - Mailjet email sending and logging.

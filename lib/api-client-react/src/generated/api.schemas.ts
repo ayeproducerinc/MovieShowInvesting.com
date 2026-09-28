@@ -5,6 +5,86 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface QuestionConfig {
+  available: boolean;
+  /** @nullable */
+  turnstile_site_key: string | null;
+}
+
+export interface QuestionInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  first_name: string;
+  /** @maxLength 254 */
+  email: string;
+  /**
+     * @minLength 5
+     * @maxLength 3000
+     */
+  question: string;
+  /** @minLength 1 */
+  turnstile_token: string;
+}
+
+export const QuestionSubmissionValue = {
+  status: 'submitted',
+} as const;
+export type QuestionSubmission = typeof QuestionSubmissionValue;
+
+export interface FilmmakerQuestion {
+  id: number;
+  /** @nullable */
+  first_name: string | null;
+  /** @nullable */
+  question: string | null;
+  /** @nullable */
+  answer: string | null;
+  asked_at: string;
+  /** @nullable */
+  answered_at: string | null;
+  reported: boolean;
+  delivery_pending: boolean;
+}
+
+export interface FilmmakerQuestions {
+  questions: FilmmakerQuestion[];
+}
+
+export interface QuestionAnswerInput {
+  /**
+     * @minLength 1
+     * @maxLength 5000
+     */
+  answer: string;
+}
+
+export interface QuestionTokenAnswerInput {
+  /** @pattern ^[a-fA-F0-9]{64}$ */
+  token: string;
+  /**
+     * @minLength 1
+     * @maxLength 5000
+     */
+  answer: string;
+}
+
+export const QuestionAnswerResultValue = {
+  status: 'answered',
+} as const;
+export type QuestionAnswerResult = typeof QuestionAnswerResultValue;
+
+export interface QuestionReportInput {
+  /** @pattern ^[a-fA-F0-9]{64}$ */
+  token: string;
+}
+
+export const QuestionReportResultValue = {
+  reported: true,
+} as const;
+export type QuestionReportResult = typeof QuestionReportResultValue;
+
 export interface HealthStatus {
   status: string;
 }
@@ -278,6 +358,11 @@ export interface FilmmakerProjectListItem {
 export interface FilmmakerProjects {
   projects: FilmmakerProjectListItem[];
   has_resumable_draft: boolean;
+  phone_verified: boolean;
+}
+
+export interface FilmmakerPhoneVerification {
+  phone_verified: boolean;
 }
 
 export interface FilmmakerProjectClaim {
@@ -443,6 +528,7 @@ export interface PublicProject {
   confirmed_pledge_total: number;
   approved: boolean;
   showcase_requested: boolean;
+  phone_verified: boolean;
 }
 
 export type FlowProgressAnswers = { [key: string]: unknown };

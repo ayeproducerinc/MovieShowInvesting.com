@@ -217,6 +217,9 @@ export async function createFilmmakerSubmission(input: {
   data: FilmmakerSubmissionData;
 }): Promise<{ filmmakerId: number; projectId: number | null }> {
   return db.transaction(async (tx) => {
+    if (input.firebaseUid) {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.firebaseUid}))`);
+    }
     const [visitor] = await tx.select().from(visitorsTable)
       .where(eq(visitorsTable.visitorId, input.visitorId))
       .for("update");
@@ -285,10 +288,20 @@ export async function createFilmmakerSubmission(input: {
       accountUid = linked.firebaseUid;
     }
 
+    const [syncedPhone] = accountUid
+      ? await tx.select({ phone: filmmakersTable.phone })
+        .from(filmmakersTable)
+        .where(and(
+          eq(filmmakersTable.firebaseUid, accountUid),
+          eq(filmmakersTable.phoneVerified, true),
+        ))
+        .limit(1)
+      : [];
     const [filmmaker] = await tx.insert(filmmakersTable).values({
       name: input.data.name,
       email: input.data.email,
-      phone: input.data.phone,
+      phone: syncedPhone?.phone ?? input.data.phone,
+      phoneVerified: Boolean(syncedPhone),
       city: input.data.city,
       state: input.data.state,
       country: input.data.country,
@@ -443,8 +456,18 @@ export async function claimFilmmakerVisitor(input: {
       } else if (!filmmaker.noProjectYet) {
         throw new FilmmakerAccountError("submission_not_found", "The completed submission could not be verified.");
       }
-      if (filmmaker.firebaseUid !== input.firebaseUid) {
-        await tx.update(filmmakersTable).set({ firebaseUid: input.firebaseUid })
+      const [syncedPhone] = await tx.select({ phone: filmmakersTable.phone })
+        .from(filmmakersTable)
+        .where(and(
+          eq(filmmakersTable.firebaseUid, input.firebaseUid),
+          eq(filmmakersTable.phoneVerified, true),
+        ))
+        .limit(1);
+      if (filmmaker.firebaseUid !== input.firebaseUid || syncedPhone) {
+        await tx.update(filmmakersTable).set({
+          firebaseUid: input.firebaseUid,
+          ...(syncedPhone ? { phone: syncedPhone.phone, phoneVerified: true } : { phoneVerified: false }),
+        })
           .where(eq(filmmakersTable.id, filmmaker.id));
       }
       submissionClaimed = true;
@@ -484,6 +507,7 @@ export async function listFilmmakerAccountProjects(firebaseUid: string): Promise
     createdAt: Date;
   }>;
   hasResumableDraft: boolean;
+  phoneVerified: boolean;
 }> {
   const projects = await db.select({
     id: projectsTable.id,
@@ -506,6 +530,10 @@ export async function listFilmmakerAccountProjects(firebaseUid: string): Promise
     ))
     .where(eq(filmmakerAccountVisitorsTable.firebaseUid, firebaseUid))
     .limit(1);
+  const [verifiedPhone] = await db.select({ id: filmmakersTable.id })
+    .from(filmmakersTable)
+    .where(and(eq(filmmakersTable.firebaseUid, firebaseUid), eq(filmmakersTable.phoneVerified, true)))
+    .limit(1);
 
   return {
     projects: projects.map((project) => ({
@@ -516,7 +544,21 @@ export async function listFilmmakerAccountProjects(firebaseUid: string): Promise
       createdAt: project.createdAt,
     })),
     hasResumableDraft: Boolean(draft),
+    phoneVerified: Boolean(verifiedPhone),
   };
+}
+
+export async function syncFilmmakerPhoneVerification(firebaseUid: string, phoneNumber: string | null): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${firebaseUid}))`);
+    const rows = await tx.update(filmmakersTable)
+      .set(phoneNumber
+        ? { phone: phoneNumber, phoneVerified: true }
+        : { phoneVerified: false })
+      .where(eq(filmmakersTable.firebaseUid, firebaseUid))
+      .returning({ id: filmmakersTable.id });
+    return rows.length > 0;
+  });
 }
 
 export async function startOrResumeFilmmakerAccountDraft(input: {
@@ -948,7 +990,11 @@ export async function getPublicProjectBySlug(slug: string) {
     approved: projectsTable.approved,
     showcaseRequested: projectsTable.showcaseRequested,
     hidden: projectsTable.hidden,
-  }).from(projectsTable).where(and(eq(projectsTable.slug, slug), eq(projectsTable.hidden, false)));
+    phoneVerified: filmmakersTable.phoneVerified,
+    firebaseUid: filmmakersTable.firebaseUid,
+  }).from(projectsTable)
+    .leftJoin(filmmakersTable, eq(projectsTable.filmmakerId, filmmakersTable.id))
+    .where(and(eq(projectsTable.slug, slug), eq(projectsTable.hidden, false)));
   if (!project?.slug || !project.title) return null;
   const [pledges] = await db.select({ total: sql<number>`coalesce(sum(${schema.pledgesTable.amount}), 0)` })
     .from(schema.pledgesTable)
@@ -956,6 +1002,17 @@ export async function getPublicProjectBySlug(slug: string) {
       eq(schema.pledgesTable.projectId, project.id),
       eq(schema.pledgesTable.confirmed, true),
     ));
+  let phoneVerified = Boolean(project.phoneVerified);
+  if (!phoneVerified && project.firebaseUid) {
+    const [accountPhone] = await db.select({ id: filmmakersTable.id })
+      .from(filmmakersTable)
+      .where(and(
+        eq(filmmakersTable.firebaseUid, project.firebaseUid),
+        eq(filmmakersTable.phoneVerified, true),
+      ))
+      .limit(1);
+    phoneVerified = Boolean(accountPhone);
+  }
   return {
     slug: project.slug,
     title: project.title,
@@ -973,6 +1030,7 @@ export async function getPublicProjectBySlug(slug: string) {
     confirmedPledgeTotal: Number(pledges.total),
     approved: project.approved,
     showcaseRequested: Boolean(project.showcaseRequested),
+    phoneVerified,
   };
 }
 
