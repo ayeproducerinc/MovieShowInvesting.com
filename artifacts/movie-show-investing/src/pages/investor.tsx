@@ -48,6 +48,24 @@ function ErrorState({retry}: {retry:()=>void}) {
   return <div className="page-wrap inv-state"><p className="inv-kicker">Connection interrupted</p><h1>We couldn’t open your page.</h1><p>Your answers need a reliable connection before you continue. Please try again.</p><button type="button" className="inv-button" data-testid="button-retry-investor" onClick={retry}><RotateCcw size={16}/> Try again</button></div>;
 }
 
+function submissionFailure(cause: unknown): {message:string; checkLineup:boolean} {
+  const apiError = cause && typeof cause === 'object' ? cause as {status?:unknown;data?:unknown} : null;
+  const data = apiError?.data;
+  const detail = data && typeof data === 'object' && 'error' in data && typeof data.error === 'string' ? data.error : null;
+  if (apiError?.status === 409) {
+    if (detail?.includes('investor intent from another visitor')) {
+      return {
+        message:'This email already has guest interest from an earlier visit. This account cannot replace it. In the browser or browser profile where it was saved, open My lineup and choose “Claim guest interest from this browser.” This attempt was not saved.',
+        checkLineup:true,
+      };
+    }
+    return {message:`${detail ?? 'This account conflicts with existing investor interest.'} This attempt was not saved. Check My lineup before trying again.`,checkLineup:true};
+  }
+  if (apiError?.status === 403) return {message:`${detail ?? 'This account cannot save this interest.'} This attempt was not saved.`,checkLineup:false};
+  if (apiError?.status === 400 && detail) return {message:`${detail} This attempt was not saved.`,checkLineup:false};
+  return {message:'We could not confirm whether your interest was saved. Check My lineup before trying again.',checkLineup:true};
+}
+
 function GuestDraftConflictState() {
   return <div className="page-wrap inv-state" role="alert" data-testid="error-investor-guest-draft">
     <p className="inv-kicker">Another worksheet is safe</p>
@@ -123,6 +141,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
   const [otherMinimumSelected,setOtherMinimumSelected] = useState<Partial<Record<MinimumStage,boolean>>>({});
   const [customMinimumDrafts,setCustomMinimumDrafts] = useState<Partial<Record<MinimumStage,string>>>({});
   const [error,setError] = useState('');
+  const [checkLineup,setCheckLineup] = useState(false);
   const [saving,setSaving] = useState(false);
   const initialised = useRef(false);
   const restoredMatchStarted = useRef(false);
@@ -286,15 +305,21 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
   async function finish() {
     const issue=validate(5) || validate(4);
     if(issue){setError(issue);return;}
+    setCheckLineup(false);
+    try { await persist(5,a); } catch { return; }
+    const {terms_read: _terms, lineup: _lineup, location_manual: _manual, ...input}=a;
+    void _terms; void _lineup; void _manual;
     try {
-      await persist(5,a);
-      const {terms_read: _terms, lineup: _lineup, location_manual: _manual, ...input}=a;
-      void _terms; void _lineup; void _manual;
       await submit.mutateAsync({data:{...input,new_entry:newEntry || current.data?.intent?.entry_id != null && current.data.intent.status==='saved',name:a.name.trim(),email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,allocations:a.unallocated?[]:a.lineup,unallocated:a.unallocated}});
-      trackInvestorEvent('inv_complete', { path: newEntry ? 'new_entry' : revise ? 'revise' : 'initial', total: a.amount, accredited: a.accredited });
-      await queryClient.invalidateQueries({queryKey:getGetCurrentInvestorIntentQueryKey()});
-      navigate('/invest/done');
-    } catch {setError('Your interest could not be saved. Nothing has been submitted; please try again.');}
+    } catch (cause) {
+      const failure=submissionFailure(cause);
+      setError(failure.message);
+      setCheckLineup(failure.checkLineup);
+      return;
+    }
+    trackInvestorEvent('inv_complete', { path: newEntry ? 'new_entry' : revise ? 'revise' : 'initial', total: a.amount, accredited: a.accredited });
+    void queryClient.invalidateQueries({queryKey:getGetCurrentInvestorIntentQueryKey()});
+    navigate('/invest/done');
   }
   function add(project:ExploreProject) {
     if(a.lineup.some(x=>x.project_id===project.id) || a.lineup.length>=cap(a.amount)) return;
@@ -348,7 +373,7 @@ function InvestorWorksheet({ identityId, authLoading }: { identityId: string; au
            <label className="fm-check inv-section inv-contact-opt-in"><input type="checkbox" data-testid="checkbox-invest-chat-opt-in" checked={a.call_opt_in} onChange={e=>change('call_opt_in',e.target.checked)}/><span>I’m open to a quick 15-minute chat about my interests.</span></label>
            <p className="inv-small">By saving, you’re sharing information with Movie Show Investing for its launch MVP. This records non-binding interest only; no payment or signed confirmation takes place. See our <Link href="/privacy" className="underline" data-testid="link-invest-privacy">privacy policy</Link>.</p>
         </>}
-        {error && <p className="inv-error" role="alert" data-testid="error-investor">{error}</p>}
+        {error && <div className="inv-error" role="alert" data-testid="error-investor"><p>{error}</p>{checkLineup && <Link href="/lineup" data-testid="link-investor-conflict-lineup">Check my saved interest</Link>}</div>}
         <div className="inv-foot"><div>{screen>1 && <button type="button" className="inv-button secondary" data-testid="button-invest-back" disabled={saving || match.isPending || submit.isPending} onClick={()=>void back()}><ArrowLeft size={16}/> Back</button>}</div><button type="button" className="inv-button" data-testid={screen===5?'button-save-interest':'button-invest-next'} disabled={saving || match.isPending || submit.isPending} onClick={()=>void (screen===5?finish():next())}>{submit.isPending?'Saving interest…':match.isPending?'Finding projects…':saving?'Saving…':screen===5?'Save non-binding interest':'Continue'} <ArrowRight size={16}/></button></div>
       </div>
     </div>

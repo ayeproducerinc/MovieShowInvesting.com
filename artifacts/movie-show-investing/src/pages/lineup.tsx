@@ -91,8 +91,17 @@ export default function Lineup() {
     try {
       await claim.mutateAsync();
       await queryClient.invalidateQueries({ queryKey: getGetCurrentInvestorIntentQueryKey() });
-    } catch {
-      setClaimError('We couldn’t link guest interest to this account. This only works in the original browser with a matching verified email. No interest was changed.');
+    } catch (cause) {
+      const apiError = cause && typeof cause === 'object' ? cause as {status?:unknown} : null;
+      if (apiError?.status === 404) {
+        setClaimError('No guest interest was found in this browser. Return to the browser where you first saved it. Nothing was changed.');
+      } else if (apiError?.status === 403) {
+        setClaimError('This browser’s guest interest does not match the signed-in account. Sign in with the account for the guest email in the original browser. Nothing was changed.');
+      } else if (apiError?.status === 409) {
+        setClaimError('This account already has different investor interest. We cannot merge the two records automatically. Nothing was changed.');
+      } else {
+        setClaimError('We could not confirm whether guest interest was linked. Reload My lineup before trying again.');
+      }
     }
   }
 
