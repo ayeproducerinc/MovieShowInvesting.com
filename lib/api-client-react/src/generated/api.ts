@@ -1610,7 +1610,7 @@ export const getSubmitFilmmakerUrl = () => {
 }
 
 /**
- * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply; a single-use Turnstile response is required and verified server-side only when Turnstile is configured.
+ * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply; a single-use Turnstile response is required and verified server-side only when Turnstile is configured. A completed project receives a short-lived proof scoped only to its review checkout and status.
  * @summary Submit the filmmaker flow
  */
 export const submitFilmmaker = async (filmmakerSubmissionInput: FilmmakerSubmissionInput, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerSubmission> => {

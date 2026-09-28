@@ -22,3 +22,4 @@
 - [Turnstile hostname boundary](turnstile-host-boundary.md) — verify challenge hosts against configured app domains, not proxy-derived request headers.
 - [Showcase re-review boundary](showcase-rereview-boundary.md) — edits to approved public project content can pause listing; never show stale approval after saving.
 - [Stripe sandbox account boundary](stripe-sandbox-account-boundary.md) — checkout and verification must use the same account; the owner chose the app-connected sandbox for pitch-review tests.
+- [Guest review checkout handoff](guest-review-checkout-handoff.md) — recover checkout with a short-lived pitch-scoped proof, never by exposing the HttpOnly visitor identity.

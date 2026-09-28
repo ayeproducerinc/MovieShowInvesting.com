@@ -14,4 +14,6 @@ export interface FilmmakerSubmission {
      * @nullable
      */
   project_id: number | null;
+  /** @nullable */
+  checkout_proof: string | null;
 }

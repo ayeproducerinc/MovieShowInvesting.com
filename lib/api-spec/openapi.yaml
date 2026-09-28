@@ -384,7 +384,7 @@ paths:
       operationId: submitFilmmaker
       tags: [filmmakers]
       summary: Submit the filmmaker flow
-      description: Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply; a single-use Turnstile response is required and verified server-side only when Turnstile is configured.
+      description: Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply; a single-use Turnstile response is required and verified server-side only when Turnstile is configured. A completed project receives a short-lived proof scoped only to its review checkout and status.
       security:
         - firebaseBearer: []
         - {}
@@ -706,6 +706,11 @@ paths:
           in: header
           required: false
           schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Checkout-Proof
+          in: header
+          required: false
+          description: Short-lived submission proof for this pitch's review checkout when its guest visit cookie is lost.
+          schema: { type: string }
       responses:
         "200":
           description: Sandbox checkout URL, or already-submitted status
@@ -734,6 +739,11 @@ paths:
           in: header
           required: false
           schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Checkout-Proof
+          in: header
+          required: false
+          description: Short-lived submission proof for this pitch's review status when its guest visit cookie is lost.
+          schema: { type: string }
       responses:
         "200":
           description: Review payment and moderation status
@@ -1636,19 +1646,21 @@ components:
         country_code: { type: string, pattern: "^[A-Z]{2}$" }
     FilmmakerSubmission:
       type: object
-      required: [filmmaker_id, project_id]
+      required: [filmmaker_id, project_id, checkout_proof]
       properties:
         filmmaker_id: { type: integer, minimum: 1 }
         project_id: { type: ["integer", "null"], minimum: 1 }
+        checkout_proof: { type: ["string", "null"] }
     FilmmakerResult:
       type: object
       additionalProperties: false
-      required: [completed, no_project_yet, project_id, project_slug, stage, stage_other, title, format, genre, genre_other, logline, offer_per100, offer_other_text, wants_lower, budget, budget_from_example, price_group, deal_answer, payback_terms, payback_terms_other, showcase_requested, approved, hidden, synopsis, team_links, money_use, distribution_plan, trailer_url, poster_url, share_image_url]
+      required: [completed, no_project_yet, project_id, project_slug, checkout_proof, stage, stage_other, title, format, genre, genre_other, logline, offer_per100, offer_other_text, wants_lower, budget, budget_from_example, price_group, deal_answer, payback_terms, payback_terms_other, showcase_requested, approved, hidden, synopsis, team_links, money_use, distribution_plan, trailer_url, poster_url, share_image_url]
       properties:
         completed: { type: boolean, enum: [true] }
         no_project_yet: { type: boolean }
         project_id: { type: ["integer", "null"], minimum: 1 }
         project_slug: { type: ["string", "null"] }
+        checkout_proof: { type: ["string", "null"] }
         stage: { type: ["string", "null"], enum: [distribution, production, idea, other, null] }
         stage_other: { type: ["string", "null"] }
         title: { type: ["string", "null"] }

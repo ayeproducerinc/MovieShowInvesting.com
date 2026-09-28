@@ -335,7 +335,7 @@ export const SaveFlowProgressResponse = zod.object({
 
 
 /**
- * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply; a single-use Turnstile response is required and verified server-side only when Turnstile is configured.
+ * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply; a single-use Turnstile response is required and verified server-side only when Turnstile is configured. A completed project receives a short-lived proof scoped only to its review checkout and status.
  * @summary Submit the filmmaker flow
  */
 
@@ -396,7 +396,8 @@ export const SubmitFilmmakerBody = zod.object({
 
 export const SubmitFilmmakerResponse = zod.object({
   "filmmaker_id": zod.number().int().min(1),
-  "project_id": zod.number().int().min(1).nullable()
+  "project_id": zod.number().int().min(1).nullable(),
+  "checkout_proof": zod.string().nullable()
 })
 
 
@@ -424,6 +425,7 @@ export const GetFilmmakerResultResponse = zod.object({
   "no_project_yet": zod.boolean(),
   "project_id": zod.number().int().min(1).nullable(),
   "project_slug": zod.string().nullable(),
+  "checkout_proof": zod.string().nullable(),
   "stage": zod.union([zod.literal('distribution'),zod.literal('production'),zod.literal('idea'),zod.literal('other'),zod.literal(null)]).nullable(),
   "stage_other": zod.string().nullable(),
   "title": zod.string().nullable(),
@@ -653,7 +655,8 @@ export const UpdateFilmmakerShowcaseResponse = zod.object({
 
 
 export const StartPitchReviewCheckoutHeader = zod.object({
-  "X-MSI-Project-Id": zod.number().int().min(1).optional()
+  "X-MSI-Project-Id": zod.number().int().min(1).optional(),
+  "X-MSI-Checkout-Proof": zod.string().optional().describe('Short-lived submission proof for this pitch\'s review checkout when its guest visit cookie is lost.')
 })
 
 export const StartPitchReviewCheckoutResponse = zod.object({
@@ -669,7 +672,8 @@ export const StartPitchReviewCheckoutResponse = zod.object({
 
 
 export const GetPitchReviewCheckoutStatusHeader = zod.object({
-  "X-MSI-Project-Id": zod.number().int().min(1).optional()
+  "X-MSI-Project-Id": zod.number().int().min(1).optional(),
+  "X-MSI-Checkout-Proof": zod.string().optional().describe('Short-lived submission proof for this pitch\'s review status when its guest visit cookie is lost.')
 })
 
 export const GetPitchReviewCheckoutStatusResponse = zod.object({

@@ -24,6 +24,7 @@ import {
 import { recordTransactionalEmailStatus, sendTransactionalEmail } from "../lib/mailjet";
 import { reserveFilmmakerSubmissionAttempt } from "../lib/filmmaker-submission-limit";
 import { allowedTurnstileHostnames, getTurnstileConfig, verifyTurnstileToken } from "../lib/cloudflare-turnstile";
+import { issuePitchReviewProof } from "../lib/pitch-review-proof";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -276,6 +277,7 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     res.status(201).json(SubmitFilmmakerResponse.parse({
       filmmaker_id: result.filmmakerId,
       project_id: result.projectId,
+      checkout_proof: result.projectId ? issuePitchReviewProof(result.projectId) : null,
     }));
   } catch (error) {
     if (error instanceof FilmmakerSubmissionError) {
@@ -287,6 +289,7 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
 });
 
 router.get("/filmmakers/result", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "no-store");
   const cookieId = req.cookies?.[VISITOR_COOKIE];
   if (typeof cookieId !== "string" || !UUID.test(cookieId)) {
     res.status(404).json({ error: "No completed filmmaker submission was found." });
@@ -312,6 +315,7 @@ router.get("/filmmakers/result", async (req, res): Promise<void> => {
     no_project_yet: !project,
     project_id: project?.id ?? null,
     project_slug: project?.slug ?? null,
+    checkout_proof: project ? issuePitchReviewProof(project.id) : null,
     stage: project?.stage ?? stringAnswer("stage"),
     stage_other: project?.stageOther ?? stringAnswer("stage_other"),
     title: project?.title ?? stringAnswer("title"),

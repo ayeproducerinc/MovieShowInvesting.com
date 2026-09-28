@@ -1,26 +1,53 @@
 import { Router, type IRouter } from "express";
-import { getCompletedFilmmakerResult } from "@workspace/db";
-import { authorizeFilmmakerVisitor, requireMatchingFilmmakerContext } from "../lib/filmmaker-auth";
+import { db, filmmakersTable, getCompletedFilmmakerResult, getFilmmakerAccountProjectVisitor, projectsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { authenticateFilmmaker, authorizeFilmmakerVisitor, requireMatchingFilmmakerContext } from "../lib/filmmaker-auth";
 import { reconcileReviewCheckouts, startReviewCheckout } from "../lib/pitch-review-payments";
+import { verifyPitchReviewProof } from "../lib/pitch-review-proof";
 
 const router: IRouter = Router();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function currentPitch(req: Parameters<typeof authorizeFilmmakerVisitor>[0], res: Parameters<typeof authorizeFilmmakerVisitor>[1]) {
   const cookieId = req.cookies?.msi_visitor_id;
-  if (typeof cookieId !== "string" || !UUID.test(cookieId)) {
-    res.status(400).json({ error: "A completed pitch visit is required." });
+  const projectHeader = req.get("X-MSI-Project-Id");
+  const projectId = projectHeader && /^[1-9]\d*$/.test(projectHeader) ? Number(projectHeader) : null;
+  if (projectHeader && (!projectId || !Number.isSafeInteger(projectId))) {
+    res.status(400).json({ error: "Choose a valid completed pitch before starting checkout." });
     return null;
   }
-  const access = await authorizeFilmmakerVisitor(req, res, cookieId);
+  let visitorId: string | null = null;
+  if (projectId && verifyPitchReviewProof(req.get("X-MSI-Checkout-Proof"), projectId)) {
+    const [owner] = await db.select({ visitorId: filmmakersTable.visitorId })
+      .from(projectsTable)
+      .innerJoin(filmmakersTable, eq(projectsTable.filmmakerId, filmmakersTable.id))
+      .where(eq(projectsTable.id, projectId))
+      .limit(1);
+    visitorId = owner?.visitorId ?? null;
+  }
+  if (!visitorId && projectId && (req.get("authorization") || req.isAuthenticated?.())) {
+    const identity = await authenticateFilmmaker(req, res, false);
+    if (!identity) return null;
+    visitorId = await getFilmmakerAccountProjectVisitor(identity.uid, projectId, identity.provider);
+  }
+  visitorId ??= typeof cookieId === "string" && UUID.test(cookieId) ? cookieId : null;
+  if (!visitorId) {
+    res.status(400).json({ error: "This browser no longer has the visit that submitted the pitch. Sign in and open your pitch from My projects, or return to the original browser." });
+    return null;
+  }
+  const access = await authorizeFilmmakerVisitor(req, res, visitorId);
   if (!access.allowed) return null;
-  const result = await getCompletedFilmmakerResult(cookieId);
+  const result = await getCompletedFilmmakerResult(visitorId);
   if (!result?.project) {
     res.status(404).json({ error: "No completed pitch is selected." });
     return null;
   }
+  if (projectId && result.project.id !== projectId) {
+    res.status(409).json({ error: "The selected pitch changed. Open My projects and select it again." });
+    return null;
+  }
   if (access.identity && !requireMatchingFilmmakerContext(req, res, "X-MSI-Project-Id", result.project.id, "project")) return null;
-  return { visitorId: cookieId, project: result.project };
+  return { visitorId, project: result.project };
 }
 
 router.post("/filmmakers/review-checkout", async (req, res): Promise<void> => {

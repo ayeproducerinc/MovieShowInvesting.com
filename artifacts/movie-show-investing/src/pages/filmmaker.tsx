@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { recordPitchForReview } from '@/lib/pitch-review-intent';
+import { recordPitchForReview, storePitchReviewProof } from '@/lib/pitch-review-intent';
 import { getGetFilmmakerResultQueryKey, getGetFilmmakerSubmissionConfigQueryKey, getGetFlowProgressQueryKey, useGetFilmmakerResult, useGetFilmmakerSubmissionConfig, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
 import type { FilmmakerSubmissionInput } from '@workspace/api-client-react';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
@@ -247,6 +247,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
       await persist(6, a);
       const submitted = await submit.mutateAsync({ data:{ ...payload(a), website, ...(submissionConfig.data.turnstile_site_key ? { turnstile_token:token } : {}) } });
       recordPitchForReview(submitted.project_id);
+      storePitchReviewProof(submitted.project_id, submitted.checkout_proof);
       turnstileResetRef.current?.();
       if (identityId === 'visitor') showGuestConfirmation();
       navigate('/start/filmmaker/done');

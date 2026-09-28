@@ -1,4 +1,24 @@
 const KEY = 'msi_pitch_review_choice';
+const PROOF_KEY = 'msi_pitch_review_checkout_proof';
+
+export function storePitchReviewProof(projectId: number | null, proof: string | null) {
+  try {
+    if (projectId && proof) window.sessionStorage.setItem(PROOF_KEY, JSON.stringify({ projectId, proof }));
+    else window.sessionStorage.removeItem(PROOF_KEY);
+  } catch {
+    // The result endpoint can issue a fresh checkout proof when storage is unavailable.
+  }
+}
+
+export function getPitchReviewProof(projectId: number | null): string | null {
+  if (!projectId) return null;
+  try {
+    const saved = JSON.parse(window.sessionStorage.getItem(PROOF_KEY) || 'null');
+    return saved?.projectId === projectId && typeof saved.proof === 'string' ? saved.proof : null;
+  } catch {
+    return null;
+  }
+}
 
 export function choosePitchReview(paid: boolean) {
   if (paid) window.sessionStorage.setItem(KEY, 'selected');

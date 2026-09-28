@@ -306,6 +306,8 @@ export interface FilmmakerSubmission {
      * @nullable
      */
   project_id: number | null;
+  /** @nullable */
+  checkout_proof: string | null;
 }
 
 /**
@@ -342,6 +344,8 @@ export interface FilmmakerResult {
   project_id: number | null;
   /** @nullable */
   project_slug: string | null;
+  /** @nullable */
+  checkout_proof: string | null;
   /** @nullable */
   stage: FilmmakerResultStage;
   /** @nullable */

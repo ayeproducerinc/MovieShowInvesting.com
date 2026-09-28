@@ -6,7 +6,7 @@ import type { FilmmakerResult, FilmmakerShowcaseUpdate } from '@workspace/api-cl
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { closeGuestConfirmation, guestConfirmationVisible } from '@/lib/filmmaker-confirmation';
 import { setFilmmakerAction } from '@/lib/filmmaker-intent';
-import { consumePitchReviewChoice } from '@/lib/pitch-review-intent';
+import { consumePitchReviewChoice, getPitchReviewProof } from '@/lib/pitch-review-intent';
 import { ProjectShare } from '@/components/project-share';
 import { FilmmakerMedia } from '@/components/filmmaker-media';
 import { calculateDeal, money, type Stage } from './filmmaker-calculator';
@@ -33,7 +33,11 @@ type ShowcaseStatus = {
 
 function ShowcaseForm({ result, onSaved, reviewStatus }: { result: FilmmakerResult; onSaved: (updated: ShowcaseStatus) => Promise<ShowcaseStatus>; reviewStatus?: { paid: boolean; pending: boolean; approved: boolean; declined: boolean } }) {
   const update = useUpdateFilmmakerShowcase({ request: { headers: result.project_id ? { 'X-MSI-Project-Id': String(result.project_id) } : {} } });
-  const checkout = useStartPitchReviewCheckout({ request: { headers: result.project_id ? { 'X-MSI-Project-Id': String(result.project_id) } : {} } });
+  const checkoutProof = result.checkout_proof || getPitchReviewProof(result.project_id);
+  const checkout = useStartPitchReviewCheckout({ request: { headers: result.project_id ? {
+    'X-MSI-Project-Id': String(result.project_id),
+    ...(checkoutProof ? { 'X-MSI-Checkout-Proof': checkoutProof } : {}),
+  } : {} } });
   const [showPaywall, setShowPaywall] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
   const [checking, setChecking] = useState(false);
@@ -160,15 +164,34 @@ function ShowcaseForm({ result, onSaved, reviewStatus }: { result: FilmmakerResu
             <button type="button" className="dossier-button" disabled={checkout.isPending || needsReselect || unsavedDetails} data-testid="button-pay-review" onClick={() => void (async () => {
               setCheckoutError('');
               try {
-                const current = await getFilmmakerResult();
-                if (current.project_id !== result.project_id) { setNeedsReselect(true); setCheckoutError('The selected pitch changed. Open My projects and select it again.'); return; }
+                let current: FilmmakerResult | null = null;
+                try {
+                  current = await getFilmmakerResult();
+                } catch (error) {
+                  const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
+                  if (status !== 404 || !checkoutProof) throw error;
+                }
+                if (current && current.project_id !== result.project_id) { setNeedsReselect(true); setCheckoutError('The selected pitch changed. Open My projects and select it again.'); return; }
                 const started = await checkout.mutateAsync();
                 if (started.already_submitted) { setShowPaywall(false); await onSaved({ project_id: result.project_id, project_slug: result.project_slug ?? '', showcase_requested: true, approved: Boolean(result.approved), hidden: Boolean(result.hidden) }); return; }
                 if (!started.url) throw new Error('Missing checkout URL');
                 window.location.assign(started.url);
-              } catch { setCheckoutError('Checkout could not start. Your free pitch is saved; please try again.'); }
+              } catch (error) {
+                const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
+                if (status === 409 || status === 404 || status === 403) {
+                  setNeedsReselect(true);
+                  setCheckoutError('This pitch could not be verified for checkout. Sign in and select it again from My projects. No payment was started.');
+                } else if (status === 400 || status === 401) {
+                  setCheckoutError('This browser no longer has access to the visit that submitted this pitch. Return to the original browser or sign in and open it from My projects. No payment was started.');
+                } else if (status === 503) {
+                  setCheckoutError('Test checkout is temporarily unavailable. Your free pitch remains saved. If you completed a checkout already, check its review status before trying to pay again.');
+                } else {
+                  setCheckoutError('Checkout could not start. Your free pitch is saved; please try again.');
+                }
+              }
             })()}>{checkout.isPending ? 'Opening checkout…' : 'Continue to $49 test checkout'}</button>
             <button type="button" className="dossier-button dossier-button-outline" disabled={checkout.isPending} onClick={() => setShowPaywall(false)}>Not now</button>
+            {needsReselect && <Link href="/me/projects" className="underline">Open My projects</Link>}
           </div>
         </div>
       </div>}
@@ -196,8 +219,12 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
   const [guestVisible] = useState(guestConfirmationVisible);
   const result = useGetFilmmakerResult({ query: { queryKey: [...getGetFilmmakerResultQueryKey(), identityId], enabled: authReady && !authLoading, refetchOnMount: 'always', retry: (count, error) => error.status !== 404 && count < 2 } });
   const data = result.data;
+  const checkoutProof = data?.checkout_proof || getPitchReviewProof(data?.project_id ?? null);
   const reviewStatus = useGetPitchReviewCheckoutStatus({
-    request: { headers: data?.project_id ? { 'X-MSI-Project-Id': String(data.project_id) } : {} },
+    request: { headers: data?.project_id ? {
+      'X-MSI-Project-Id': String(data.project_id),
+      ...(checkoutProof ? { 'X-MSI-Checkout-Proof': checkoutProof } : {}),
+    } : {} },
     query: { queryKey: ['/api/filmmakers/review-checkout/status', identityId, data?.project_id], enabled: authReady && !authLoading && !!data?.project_id, refetchOnMount: 'always', refetchInterval: 20_000, retry: false },
   });
   useEffect(() => {

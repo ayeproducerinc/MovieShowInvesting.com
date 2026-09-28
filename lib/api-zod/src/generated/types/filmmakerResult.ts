@@ -19,6 +19,8 @@ export interface FilmmakerResult {
   /** @nullable */
   project_slug: string | null;
   /** @nullable */
+  checkout_proof: string | null;
+  /** @nullable */
   stage: FilmmakerResultStage;
   /** @nullable */
   stage_other: string | null;
