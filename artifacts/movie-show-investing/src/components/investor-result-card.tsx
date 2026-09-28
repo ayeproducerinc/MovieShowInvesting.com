@@ -43,7 +43,7 @@ export function InvestorResultCard({ entry }: { entry: InvestorInterestHistoryIt
     if (!selected || publicProjects.isFetching || publicProjects.isError) return;
     if (!navigator.share) { await copy(); return; }
     try {
-      await navigator.share({ title: selected.title, url });
+      await navigator.share({ url });
       trackInvestorEvent('inv_share_click', { method: 'share', project_slug: selected.slug });
       setFeedback('Public project page shared.');
     } catch (error) {
@@ -70,7 +70,7 @@ export function InvestorResultCard({ entry }: { entry: InvestorInterestHistoryIt
     <div className="investor-result__share">
       <p className="inv-kicker">Separate from your private record</p>
       <h3>Share a story, not your interest.</h3>
-      <p>Only a currently public project page can be shared. Your name, signed amount, allocations and this private record are never included.</p>
+       <p>Only the public project URL is shared—not your private interest, amount, or contact details. A project’s current public-listing eligibility can change, so availability to share may change too.</p>
       {publicProjects.isPending || publicProjects.isFetching ? <div role="status" aria-label="Checking public projects"><div className="inv-skeleton" style={{ height: 43, maxWidth: 290 }}/></div> :
         publicProjects.isError ? <div><p role="alert" className="investor-result__feedback">We couldn’t check which projects are public. Sharing is unavailable for now.</p><button type="button" className="inv-button secondary" onClick={() => void publicProjects.refetch()}><RotateCcw size={15}/> Try again</button></div> :
         shareable.length === 0 ? <p className="investor-result__feedback">No project from this entry is currently public to share.</p> :

@@ -42,6 +42,17 @@ const INPUT_FIELDS = new Set([
   "funding_sources", "funding_other", "reached_goal", "funding_experience", "name", "email",
   "city", "state", "country", "favorite_genres", "chat_opt_in", "phone",
 ]);
+const FUNDING_SOURCES = new Set([
+  "Own money",
+  "Friends & family",
+  "Kickstarter / Indiegogo / Seed&Spark",
+  "Grants",
+  "Investors",
+  "Studios",
+  "Haven’t yet",
+  "Other",
+]);
+const NO_FUNDING_YET = "Haven’t yet";
 
 function hasText(value: unknown): boolean {
   return typeof value === "string" && value.trim().length > 0;
@@ -150,10 +161,17 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
       ["wants_lower", data.wants_lower],
       ["payback_terms", data.payback_terms],
       ["funding_sources", data.funding_sources],
-      ["reached_goal", data.reached_goal],
-      ["funding_experience", data.funding_experience],
     ];
+    const sources = data.funding_sources ?? [];
+    const hasNoFundingYet = sources.includes(NO_FUNDING_YET);
+    const hasFundingHistory = !(sources.length === 1 && hasNoFundingYet);
     if (requiredProjectValues.some(([, value]) => value === undefined)
+      || sources.length === 0
+      || sources.some((source) => !FUNDING_SOURCES.has(source))
+      || (hasNoFundingYet && sources.length !== 1)
+      || (sources.includes("Other") && !hasText(data.funding_other))
+      || (hasFundingHistory && (data.reached_goal === undefined || !hasText(data.funding_experience)))
+      || (!hasFundingHistory && (data.reached_goal !== undefined || data.funding_experience !== undefined))
       || !hasText(data.title)
       || !hasText(data.logline)
       || (data.genre === "Other" && !hasText(data.genre_other))

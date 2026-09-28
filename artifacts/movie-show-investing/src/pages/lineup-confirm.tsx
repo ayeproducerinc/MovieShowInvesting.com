@@ -100,7 +100,7 @@ export default function LineupConfirm() {
     <div className="lineup-heading">
       <p className="inv-kicker">Review before you sign</p>
       <h1>Confirm your <em>interest.</em></h1>
-      <p>Confirm the interest you already saved. This is a non-binding record of interest, not an investment or a payment.</p>
+      <p>Review and sign the exact saved snapshot of your non-binding indication of interest. Signing does not reserve a project, require payment, or make an investment.</p>
     </div>
     {!ready || (signedIn && (current.isPending || current.isFetching) && !intent) ? <div className="lineup-loading" role="status" aria-label="Loading your saved interest"><div className="inv-skeleton" style={{height:140}}/><div className="inv-skeleton" style={{height:220}}/></div> :
     !signedIn ? <div className="lineup-empty"><p className="inv-kicker">Sign-in required</p><h2>Confirm with your account.</h2><p>Sign in to review and confirm your saved interest. If you saved as a guest, use the original browser and claim the interest explicitly from your lineup after signing in.</p><div className="inv-actions"><GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-confirm-sign-in" label="Sign in to continue" /><Link href="/lineup" className="inv-button secondary" data-testid="link-confirm-guest-lineup">View my lineup</Link></div></div> :
@@ -121,14 +121,14 @@ export default function LineupConfirm() {
       </div>
       <aside className="lineup-review-aside">
         <p className="inv-kicker">03 / Your acknowledgment</p><h2>Sign the saved record.</h2>
-        <p>The full name saved with this interest is <strong data-testid="confirm-saved-name">{intent.name}</strong>. Type it exactly to confirm this non-binding interest.</p>
+         <p>The full name saved with this interest is <strong data-testid="confirm-saved-name">{intent.name}</strong>. Type that saved name exactly as your signature for this snapshot; this is not a request to repeat your contact details.</p>
         <form className="lineup-confirm-form" onSubmit={event => void submit(event)}>
-          <label htmlFor="signature-name">Your full name</label>
+           <label htmlFor="signature-name">Signature · type your saved full name</label>
           <input id="signature-name" data-testid="input-confirm-signature" type="text" autoComplete="name" value={signature} onChange={event => { setSignature(event.target.value); setError(''); }} aria-invalid={Boolean(signature && signature !== intent.name)} required disabled={confirm.isPending || current.isFetching}/>
-          <p className="lineup-hint">Must match the saved name exactly, including spacing and capitalization.</p>
-          <label className="lineup-check" htmlFor="confirm-acknowledgment"><input id="confirm-acknowledgment" data-testid="checkbox-confirm-acknowledgment" type="checkbox" checked={accepted} onChange={event => { setAccepted(event.target.checked); setError(''); }} disabled={confirm.isPending || current.isFetching}/><span>I understand this confirms only my non-binding interest. No investment is being made and no money is collected.</span></label>
+           <p className="lineup-hint">This signature must match the saved name exactly, including spacing and capitalization.</p>
+           <label className="lineup-check" htmlFor="confirm-acknowledgment"><input id="confirm-acknowledgment" data-testid="checkbox-confirm-acknowledgment" type="checkbox" checked={accepted} onChange={event => { setAccepted(event.target.checked); setError(''); }} disabled={confirm.isPending || current.isFetching}/><span>I understand this signs only the exact saved snapshot of my non-binding interest. No investment is being made and no money is collected.</span></label>
           {error && <p className="lineup-review-error" role="alert" data-testid="error-confirm">{error}</p>}
-          <button type="submit" className="inv-button" data-testid="button-confirm-interest" disabled={signature !== intent.name || !accepted || confirm.isPending || current.isFetching}>{confirm.isPending || current.isFetching ? 'Verifying saved record…' : 'Confirm non-binding interest'} <ArrowRight size={16}/></button>
+           <button type="submit" className="inv-button" data-testid="button-confirm-interest" disabled={signature !== intent.name || !accepted || confirm.isPending || current.isFetching}>{confirm.isPending || current.isFetching ? 'Verifying saved record…' : 'Sign and confirm interest'} <ArrowRight size={16}/></button>
         </form>
       </aside>
     </div>}

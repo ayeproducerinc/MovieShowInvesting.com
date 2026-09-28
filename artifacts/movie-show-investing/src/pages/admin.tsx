@@ -23,7 +23,7 @@ const SECTIONS: { id: AdminSection; label: string; description: string }[] = [
   { id: 'funnels', label: 'Funnels', description: 'A view of progress through the filmmaker and investor journeys.' },
   { id: 'market', label: 'Market', description: 'Responses that help characterize the emerging market.' },
   { id: 'price-test', label: 'Price test', description: 'Results from the current price-test assignment.' },
-  { id: 'queues', label: 'Queues', description: 'Submissions awaiting the next step.' },
+  { id: 'queues', label: 'Queues', description: 'Showcase requests awaiting review, alongside other recorded follow-up queues.' },
   { id: 'messages', label: 'Messages', description: 'Messages received through the site.' },
   { id: 'channels', label: 'Channels', description: 'Campaign and referral attribution in one place.' },
   { id: 'email-log', label: 'Email log', description: 'A record of outgoing email activity.' },
@@ -100,6 +100,10 @@ function numericId(value: string | undefined): number | null {
   return Number.isSafeInteger(id) ? id : null;
 }
 
+function columnIndex(columns: string[], pattern: RegExp): number {
+  return columns.findIndex(column => pattern.test(column.trim()));
+}
+
 function reviewStatus(value: string | undefined) {
   const status = (value ?? '').trim().toLowerCase();
   return { approved: status.includes('approved'), hidden: status.includes('hidden') };
@@ -120,9 +124,13 @@ function ReviewActions({ section, row, columns, onResult }: {
   const [working, setWorking] = useState(false);
   const lock = useRef(false);
   const isProject = section === 'queues';
-  const id = numericId(row[row.length - 1]);
-  const eligible = !isProject || row[0]?.trim().toLowerCase() === 'approval';
-  const { approved, hidden: projectHidden } = reviewStatus(row[5]);
+  const queueIndex = columnIndex(columns, /^queue$/i);
+  const statusIndex = columnIndex(columns, /^(status|visibility)$/i);
+  const idIndex = columnIndex(columns, isProject ? /^project id$/i : /^message id$/i);
+  const queueType = queueIndex >= 0 ? (row[queueIndex] ?? '').trim().toLowerCase() : '';
+  const id = numericId(idIndex >= 0 ? row[idIndex] : undefined);
+  const eligible = !isProject || (queueType === 'approval' || queueType === 'showcase request');
+  const { approved, hidden: projectHidden } = reviewStatus(statusIndex >= 0 ? row[statusIndex] : undefined);
   // Messages may expose a "Hidden", "Status", or "Visibility" column.
   const messageHidden = MessageHidden({ row, columns });
   if (!eligible || id === null) return <span className="admin-action-na">—</span>;
@@ -173,9 +181,10 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
   if (isPending) return <div style={{ paddingTop: 30 }}><Skeleton /></div>;
   return <>
     <div className="admin-data-head">
-      <h2 data-testid="text-table-title">{data?.title || section.label}</h2>
+      <h2 data-testid="text-table-title">{section.id === 'queues' ? 'Showcase requests and other queues' : data?.title || section.label}</h2>
       <span className="admin-mono admin-count" data-testid="text-row-total">{data ? `${data.total.toLocaleString()} ${data.total === 1 ? 'record' : 'records'}` : 'Unavailable'}</span>
     </div>
+    {section.id === 'queues' && <p data-testid="text-showcase-queue-guidance">Showcase requests awaiting review appear as “Showcase request” with status “Awaiting review.” Approved requests are eligible for discovery only while the project is not hidden.</p>}
     {result?.message && <p className={`admin-review-feedback ${result.failed ? 'error' : ''}`} role={result.failed ? 'alert' : 'status'} data-testid="status-review-result">{result.message}</p>}
     {isError ? <Notice icon={<ShieldAlert size={20} />} title="This view could not be loaded" action="Try again" onAction={() => void refetch()}>
       {error?.status === 403 ? 'Access to this data was denied. Your account may no longer have administrator access.' : 'The connection to this section failed. Your other sections are still available.'}
@@ -183,7 +192,12 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
       <table className="admin-table" data-testid={`table-${section.id}`}>
         <thead><tr>{data.columns.map((column, i) => <th scope="col" key={`${column}-${i}`}>{column}</th>)}{(section.id === 'queues' || section.id === 'messages') && <th scope="col">Actions</th>}</tr></thead>
         <tbody>{data.rows.map((row, i) => <tr key={`${row[row.length - 1] ?? ''}-${i}`} data-testid={`row-${section.id}-${i}`}>
-          {data.columns.map((_, j) => <td key={j}>{row[j] ?? ''}</td>)}
+          {data.columns.map((column, j) => {
+            const value = row[j] ?? '';
+            const isShowcaseQueue = section.id === 'queues' && column.trim().toLowerCase() === 'queue' && value.trim().toLowerCase() === 'approval';
+            const isWaitingShowcase = section.id === 'queues' && column.trim().toLowerCase() === 'status' && row[columnIndex(data.columns, /^queue$/i)]?.trim().toLowerCase() === 'approval' && value.trim().toLowerCase() === 'pending';
+            return <td key={j}>{isShowcaseQueue ? 'Showcase request' : isWaitingShowcase ? 'Awaiting review' : value}</td>;
+          })}
           {(section.id === 'queues' || section.id === 'messages') && <td><ReviewActions section={section.id} row={row} columns={data.columns} onResult={(message, failed = false) => setResult({ message, failed })} /></td>}
         </tr>)}</tbody>
       </table>
