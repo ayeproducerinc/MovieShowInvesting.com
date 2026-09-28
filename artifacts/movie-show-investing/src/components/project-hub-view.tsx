@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, RotateCcw } from 'lucide-react';
 import './project-hub-view.css';
 
@@ -12,6 +13,7 @@ export type ProjectHubItem = {
 
 export type ProjectHubViewProps = {
   email: string;
+  initiallyOpen?: boolean;
   projects: ProjectHubItem[];
   draftAvailable: boolean;
   loading: boolean;
@@ -37,6 +39,7 @@ function formattedDate(value: string) {
 
 export function ProjectHubView({
   email,
+  initiallyOpen = false,
   projects,
   draftAvailable,
   loading,
@@ -48,6 +51,14 @@ export function ProjectHubView({
   onSignOut,
   onRetry,
 }: ProjectHubViewProps) {
+  const projectsHeading = useRef<HTMLHeadingElement>(null);
+  const [showProjects, setShowProjects] = useState(initiallyOpen);
+  useEffect(() => {
+    if (showProjects && !loading && !error) projectsHeading.current?.focus();
+  }, [showProjects, loading, error]);
+  function manage() {
+    setShowProjects(true);
+  }
   return (
     <section className="project-hub" aria-label="Your film projects" aria-busy={loading || busy}>
       <div className="project-hub__wrap">
@@ -71,10 +82,15 @@ export function ProjectHubView({
           </div>
         </div>
 
-        <div className="project-hub__body">
+        <div className="project-hub__entry-actions" aria-label="Project desk actions">
+          <button type="button" className="project-hub__action project-hub__action--outline" data-testid="button-project-hub-manage" onClick={manage} disabled={loading || busy || !!error}>Manage projects <ArrowRight size={17} aria-hidden="true" /></button>
+          <button type="button" className="project-hub__action" data-testid="button-project-hub-start" onClick={onStart} disabled={loading || busy}>Start another project <ArrowRight size={17} aria-hidden="true" /></button>
+        </div>
+
+        {(showProjects || loading || !!error) && <div className="project-hub__body">
           <div className="project-hub__main">
             <div className="project-hub__section-head">
-              <h2>Projects on file</h2>
+              <h2 ref={projectsHeading} tabIndex={-1}>Projects on file</h2>
               {!loading && !error && <span className="project-hub__meta" data-testid="text-project-hub-count">{projects.length} {projects.length === 1 ? 'project' : 'projects'}</span>}
             </div>
 
@@ -153,9 +169,8 @@ export function ProjectHubView({
               <div className="project-hub__side-rule" />
               <p className="project-hub__fineprint">This is a prelaunch space for filmmakers. No investments are available and no money is collected here.</p>
             </div>
-            <button type="button" className="project-hub__action project-hub__start" data-testid="button-project-hub-start" onClick={onStart} disabled={busy || loading}>Start another project <ArrowRight size={17} aria-hidden="true" /></button>
           </aside>
-        </div>
+        </div>}
       </div>
     </section>
   );

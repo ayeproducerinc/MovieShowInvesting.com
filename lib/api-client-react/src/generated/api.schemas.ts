@@ -534,3 +534,15 @@ export const UploadFilmmakerImageKind = {
   share: 'share',
 } as const;
 
+export type DeleteFilmmakerImageParams = {
+kind: DeleteFilmmakerImageKind;
+};
+
+export type DeleteFilmmakerImageKind = typeof DeleteFilmmakerImageKind[keyof typeof DeleteFilmmakerImageKind];
+
+
+export const DeleteFilmmakerImageKind = {
+  poster: 'poster',
+  share: 'share',
+} as const;
+

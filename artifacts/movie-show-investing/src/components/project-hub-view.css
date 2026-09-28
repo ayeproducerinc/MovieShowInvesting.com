@@ -24,6 +24,8 @@
 .project-hub__mark { color: var(--hub-wine); }
 .project-hub__identity { display: flex; align-items: center; gap: 17px; min-width: 0; }
 .project-hub__identity span { font-size: 12px; color: var(--hub-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px; }
+.project-hub__entry-actions { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 0 36px; }
+.project-hub__entry-actions .project-hub__action { min-width: 210px; }
 .project-hub__text-button { border: 0; border-bottom: 1px solid currentColor; background: transparent; color: var(--hub-ink); padding: 4px 0; font-size: 12px !important; font-weight: 700 !important; white-space: nowrap; }
 .project-hub__text-button:hover:not(:disabled) { color: var(--hub-wine); }
 .project-hub__intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, .32fr); align-items: end; gap: 45px; padding: clamp(65px, 8vw, 119px) 0 clamp(49px, 6vw, 83px); }

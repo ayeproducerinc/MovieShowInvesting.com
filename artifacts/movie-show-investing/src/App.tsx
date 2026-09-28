@@ -75,7 +75,15 @@ function adminEmailLinkTarget() {
       if (target.origin === window.location.origin && target.pathname === projectsPath) path = projectsPath;
     }
   } catch { /* Unknown email-link continuation keeps the existing admin fallback. */ }
-  return `${window.location.origin}${path}${window.location.search}${window.location.hash}`;
+  const continuation = params.get('continueUrl');
+  const intent = continuation && (() => {
+    try {
+      const target = new URL(continuation);
+      const action = target.searchParams.get('action');
+      return target.origin === window.location.origin && target.pathname === projectsPath && (action === 'start' || action === 'manage') ? action : null;
+    } catch { return null; }
+  })();
+  return `${window.location.origin}${path}${path === projectsPath && intent ? `?action=${intent}&` + window.location.search.slice(1) : window.location.search}${window.location.hash}`;
 }
 
 function PublicPages() {

@@ -14,6 +14,8 @@ export * from './adminProjectReview';
 export * from './adminProjectReviewInput';
 export * from './adminSection';
 export * from './adminTable';
+export * from './deleteFilmmakerImageKind';
+export * from './deleteFilmmakerImageParams';
 export * from './filmmakerAccountLeave';
 export * from './filmmakerDraftState';
 export * from './filmmakerDraftStateStatus';

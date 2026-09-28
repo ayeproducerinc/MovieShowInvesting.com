@@ -8,10 +8,13 @@ import {
   clearOwnedPendingBunnyVideo,
   finalizeOwnedBunnyVideo,
   getOwnedFilmmakerMedia,
+  removeOwnedFilmmakerImage,
   saveOwnedFilmmakerImage,
   setOwnedPendingBunnyVideo,
 } from "@workspace/db";
 import {
+  DeleteFilmmakerImageHeader,
+  DeleteFilmmakerImageQueryParams,
   GetFilmmakerMediaConfigResponse,
   UploadFilmmakerTrailerResponse,
   UploadFilmmakerImageQueryParams,
@@ -169,6 +172,33 @@ function imageTypeForSharp(format: string | undefined): typeof IMAGE_TYPES[numbe
   if (format === "png") return "image/png";
   if (format === "webp") return "image/webp";
   return null;
+}
+
+function ownedFilmmakerImageStorageUrl(
+  config: BunnyConfig,
+  projectId: number,
+  cdnUrl: string,
+): string | null {
+  try {
+    const base = new URL(config.cdnBaseUrl);
+    const image = new URL(cdnUrl);
+    const ownedPrefix = `${base.pathname.replace(/\/+$/, "")}/${encodeURIComponent(IMAGE_STORAGE_FOLDER)}/filmmakers/${projectId}/`;
+    if (image.protocol !== "https:" || image.origin !== base.origin
+      || image.username || image.password || image.search || image.hash
+      || !image.pathname.startsWith(ownedPrefix)) {
+      return null;
+    }
+
+    const filename = image.pathname.slice(ownedPrefix.length);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:jpg|png|webp)$/i.test(filename)) {
+      return null;
+    }
+    const path = `${IMAGE_STORAGE_FOLDER}/filmmakers/${projectId}/${filename}`;
+    return `https://${config.storageHost}/${encodeURIComponent(config.storageZone)}/${path
+      .split("/").map(encodeURIComponent).join("/")}`;
+  } catch {
+    return null;
+  }
 }
 
 router.get("/filmmakers/media/config", (_req, res): void => {
@@ -520,5 +550,92 @@ router.post(
     res.json(UploadFilmmakerImageResponse.parse({ kind: query.data.kind, image_url: cdnUrl }));
   },
 );
+
+router.delete("/filmmakers/media/image", async (req, res): Promise<void> => {
+  const query = DeleteFilmmakerImageQueryParams.safeParse(req.query);
+  if (!query.success) {
+    res.status(400).json({ error: "Image kind must be poster or share." });
+    return;
+  }
+  const ownerId = visitorId(req);
+  if (!ownerId) {
+    res.status(400).json({ error: "A recorded visitor cookie is required." });
+    return;
+  }
+  const access = await authorizeFilmmakerVisitor(req, res, ownerId);
+  if (!access.allowed) return;
+  const owner = await getOwnedFilmmakerMedia(ownerId);
+  if (!owner) {
+    res.status(404).json({ error: "No completed filmmaker project was found." });
+    return;
+  }
+  if (access.identity
+    && !requireMatchingFilmmakerContext(req, res, "X-MSI-Project-Id", owner.id, "project")) return;
+
+  const parsedHeader = DeleteFilmmakerImageHeader.safeParse({
+    "X-MSI-Expected-Image-Url": req.get("X-MSI-Expected-Image-Url"),
+  });
+  if (!parsedHeader.success) {
+    res.status(409).json({ error: "The expected image URL is missing or invalid. Refresh the project before retrying." });
+    return;
+  }
+  const expectedUrl = parsedHeader.data["X-MSI-Expected-Image-Url"];
+  const currentUrl = query.data.kind === "poster" ? owner.posterUrl : owner.shareImageUrl;
+  if (!currentUrl || currentUrl !== expectedUrl) {
+    res.status(409).json({ error: "This image changed since it was shown. Refresh the project before retrying." });
+    return;
+  }
+
+  const config = readConfig().storage;
+  if (!config) {
+    res.status(503).json({ error: "Bunny Storage is not configured, so this image cannot be safely removed." });
+    return;
+  }
+  const storageUrl = ownedFilmmakerImageStorageUrl(config, owner.id, currentUrl);
+  let result: Awaited<ReturnType<typeof removeOwnedFilmmakerImage>>;
+  try {
+    result = await removeOwnedFilmmakerImage({
+      visitorId: ownerId,
+      projectId: owner.id,
+      kind: query.data.kind,
+      expectedUrl,
+      removeStoredObject: async () => {
+        if (!storageUrl) return;
+        let deleted: Response;
+        try {
+          deleted = await bunnyRequest(storageUrl, {
+            method: "DELETE",
+            headers: { AccessKey: config.storageKey },
+          });
+        } catch {
+          req.log.warn({ projectId: owner.id, kind: query.data.kind }, "Bunny Storage image deletion request failed");
+          throw new BunnyError("Bunny Storage is temporarily unavailable.");
+        }
+        if (!deleted.ok && deleted.status !== 404) {
+          req.log.warn({ statusCode: deleted.status, projectId: owner.id, kind: query.data.kind }, "Bunny Storage image deletion failed");
+          throw new BunnyError("Bunny Storage could not remove this image.");
+        }
+      },
+    });
+  } catch (error) {
+    if (error instanceof BunnyError) {
+      res.status(502).json({ error: `${error.message} The image remains attached to the project.` });
+      return;
+    }
+    throw error;
+  }
+  if (result === "not_found") {
+    res.status(404).json({ error: "No completed filmmaker project was found." });
+    return;
+  }
+  if (result === "changed") {
+    res.status(409).json({ error: "This image changed during removal. Refresh the project before retrying." });
+    return;
+  }
+  if (!storageUrl) {
+    req.log.warn({ projectId: owner.id, kind: query.data.kind }, "Skipping deletion for an image outside the project's owned Bunny Storage path");
+  }
+  res.sendStatus(204);
+});
 
 export default router;

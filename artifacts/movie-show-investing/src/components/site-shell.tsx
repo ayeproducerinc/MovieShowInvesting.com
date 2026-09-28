@@ -1,6 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { ArrowUpRight, Menu, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
+import { signOut } from 'firebase/auth';
+import { useQueryClient } from '@tanstack/react-query';
+import { getGetFilmmakerProjectsQueryKey, getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey, leaveFilmmakerAccount } from '@workspace/api-client-react';
+import { getInitializedAuth, useFirebaseUser } from '@/components/firebase-bootstrap';
+import { clearFilmmakerAction } from '@/lib/filmmaker-intent';
 
 const navigation = [
   { href: '/', label: 'Home' },
@@ -11,7 +16,31 @@ const navigation = [
 
 export function SiteShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
+  const user = useFirebaseUser();
+  const queryClient = useQueryClient();
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
+  async function leave() {
+    const auth = getInitializedAuth();
+    if (!auth || signingOut) return;
+    setSigningOut(true);
+    setSignOutError('');
+    try {
+      await leaveFilmmakerAccount();
+      await signOut(auth);
+      clearFilmmakerAction();
+      queryClient.removeQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
+      queryClient.removeQueries({ queryKey: getGetFilmmakerResultQueryKey() });
+      queryClient.removeQueries({ queryKey: getGetFlowProgressQueryKey('filmmaker') });
+      setOpen(false);
+      navigate('/');
+    } catch {
+      setSignOutError('Could not sign out. Please try again.');
+    } finally {
+      setSigningOut(false);
+    }
+  }
   return (
     <div className="min-h-[100dvh] flex flex-col">
       <header className="relative z-20 border-b hairline bg-[#f4f0e7]">
@@ -23,19 +52,31 @@ export function SiteShell({ children }: { children: ReactNode }) {
             </span>
             <span className="text-[15px] font-bold leading-[1.05] tracking-[-.055em] md:text-[17px]">MOVIE SHOW<br/>INVESTING<span className="text-[#9c4256]">.</span></span>
           </Link>
-          <nav className="hidden items-center gap-9 md:flex" aria-label="Main navigation">
+          <nav className="hidden items-center gap-5 lg:gap-9 md:flex" aria-label="Main navigation">
             {navigation.slice(1).map((item) => (
               <Link key={item.href} href={item.href} data-testid={`link-nav-${item.href.replaceAll('/', '-')}`} className={`text-[13px] font-semibold transition-colors hover:text-[#9c4256] ${location === item.href ? 'text-[#9c4256]' : 'text-[#26303d]'}`}>{item.label}</Link>
             ))}
           </nav>
           <div className="flex items-center gap-4">
-            <span className="hidden text-[10px] uppercase tracking-[.14em] text-[#686b69] lg:block mono">A place to begin</span>
+            <div className="hidden items-center gap-3 md:flex">
+              {user ? <>
+                <Link href="/me/projects" data-testid="link-header-my-projects" className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">My projects</Link>
+                <button type="button" data-testid="button-header-sign-out" onClick={() => void leave()} disabled={signingOut} className="text-[12px] font-semibold whitespace-nowrap underline underline-offset-4">Sign out</button>
+              </> : <Link href="/me/projects" data-testid="link-header-sign-in" onClick={clearFilmmakerAction} className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">Sign in</Link>}
+            </div>
             <button type="button" data-testid="button-toggle-menu" className="inline-flex h-10 w-10 items-center justify-center border border-[#26303d] md:hidden" aria-expanded={open} aria-label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen(!open)}>{open ? <X size={19} /> : <Menu size={19} />}</button>
           </div>
+        </div>
+        <div className="page-wrap flex min-h-10 items-center justify-end gap-5 border-t border-[#d7d0c5] py-2 md:hidden" aria-label="Account controls">
+          {user ? <>
+            <Link href="/me/projects" data-testid="link-mobile-my-projects" onClick={() => setOpen(false)} className="text-[12px] font-bold text-[#902f4d]">My projects</Link>
+            <button type="button" data-testid="button-mobile-sign-out" onClick={() => void leave()} disabled={signingOut} className="text-[12px] font-semibold underline underline-offset-4">Sign out</button>
+          </> : <Link href="/me/projects" data-testid="link-mobile-sign-in" onClick={() => { clearFilmmakerAction(); setOpen(false); }} className="text-[12px] font-bold text-[#902f4d]">Sign in</Link>}
         </div>
         {open && <nav className="absolute top-full left-0 right-0 border-b border-[#bcb4a7] bg-[#f4f0e7] px-5 pb-5 shadow-lg md:hidden" aria-label="Mobile navigation">
           {navigation.map((item) => <Link key={item.href} href={item.href} data-testid={`link-mobile-${item.href.replaceAll('/', '-')}`} onClick={() => setOpen(false)} className="flex items-center justify-between border-t border-[#cec7bb] py-4 text-lg font-semibold">{item.label}<ArrowUpRight size={18}/></Link>)}
         </nav>}
+        {signOutError && <p className="page-wrap pb-2 text-sm text-[#902f4d]" role="alert">{signOutError}</p>}
       </header>
       <main className="flex-1">{children}</main>
       <footer className="bg-[#202936] text-[#f4f0e7]">

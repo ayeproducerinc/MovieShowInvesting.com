@@ -552,6 +552,48 @@ paths:
           description: Bunny Storage or Firebase verification is unavailable
         "409":
           description: Project context header is missing or does not match the current project
+    delete:
+      operationId: deleteFilmmakerImage
+      tags: [filmmakers]
+      summary: Remove the selected owned poster or share image
+      description: Unlinked guests are authorized by their visitor cookie. An account-linked visitor requires a verified Bearer token matching its Firebase UID. Only the selected image pointer is removed, and the stored file is deleted only when its URL matches this project's owned Bunny Storage path.
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: false
+          description: Required for account-linked visitors; must match the completed project resolved from the current visitor cookie.
+          schema: { type: integer, minimum: 1 }
+        - name: kind
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [poster, share]
+        - name: X-MSI-Expected-Image-Url
+          in: header
+          required: true
+          description: Exact image URL shown in the client when removal was requested. Prevents a stale tab from removing a newly uploaded replacement.
+          schema: { type: string, minLength: 1, maxLength: 2048 }
+      responses:
+        "204":
+          description: Selected image removed (or already absent)
+        "400":
+          description: Invalid image kind or missing visitor cookie
+        "404":
+          description: No completed owned project
+        "401":
+          description: Verified sign-in required for an account-linked visitor
+        "403":
+          description: Firebase UID does not own this visitor
+        "409":
+          description: Project context is stale or the selected image changed during removal
+        "502":
+          description: Bunny Storage could not remove the selected image
+        "503":
+          description: Bunny Storage or Firebase verification is unavailable
   /projects/{slug}:
     get:
       operationId: getPublicProject

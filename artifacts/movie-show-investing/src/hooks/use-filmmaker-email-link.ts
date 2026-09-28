@@ -8,6 +8,7 @@ import {
 import {
   getGetFirebaseConfigQueryKey, setAuthTokenGetter, useGetFirebaseConfig,
 } from '@workspace/api-client-react';
+import { pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 
 const APP_NAME = 'movie-show-investing';
 const EMAIL_KEY = 'msi_filmmaker_sign_in_email';
@@ -91,7 +92,7 @@ export function useFilmmakerEmailLink() {
       window.localStorage.setItem(EMAIL_KEY, normalized);
       setSavedEmail(normalized);
       await sendSignInLinkToEmail(auth, normalized, {
-        url: `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}/me/projects`,
+        url: `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}/me/projects${pendingFilmmakerAction() ? `?action=${pendingFilmmakerAction()}` : ''}`,
         handleCodeInApp: true,
       });
       setSentTo(normalized);

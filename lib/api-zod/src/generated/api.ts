@@ -457,6 +457,27 @@ export const UploadFilmmakerImageResponse = zod.object({
 
 
 /**
+ * Unlinked guests are authorized by their visitor cookie. An account-linked visitor requires a verified Bearer token matching its Firebase UID. Only the selected image pointer is removed, and the stored file is deleted only when its URL matches this project's owned Bunny Storage path.
+ * @summary Remove the selected owned poster or share image
+ */
+export const DeleteFilmmakerImageQueryParams = zod.object({
+  "kind": zod.enum(['poster', 'share'])
+})
+
+
+export const deleteFilmmakerImageHeaderXMSIExpectedImageUrlMax = 2048;
+
+
+
+export const DeleteFilmmakerImageHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1).optional().describe('Required for account-linked visitors; must match the completed project resolved from the current visitor cookie.'),
+  "X-MSI-Expected-Image-Url": zod.string().min(1).max(deleteFilmmakerImageHeaderXMSIExpectedImageUrlMax).describe('Exact image URL shown in the client when removal was requested. Prevents a stale tab from removing a newly uploaded replacement.')
+})
+
+export const DeleteFilmmakerImageResponse = zod.void()
+
+
+/**
  * @summary Read safe public details for a project accessible by unlisted link
  */
 export const getPublicProjectPathSlugMax = 120;

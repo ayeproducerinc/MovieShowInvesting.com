@@ -4,6 +4,7 @@ import {
   getUploadFilmmakerTrailerUrl,
   useGetFilmmakerMediaConfig,
   useUploadFilmmakerImage,
+  useDeleteFilmmakerImage,
 } from '@workspace/api-client-react';
 import type { FilmmakerMediaConfig, FilmmakerResult, FilmmakerTrailerUpload } from '@workspace/api-client-react';
 import { getInitializedAuth } from './firebase-bootstrap';
@@ -41,11 +42,17 @@ function ImageUploader({ kind, config, persistedUrl, projectId, onSaved }: {
   const [preview, setPreview] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [removedUrl, setRemovedUrl] = useState<string | null>(null);
   // Orval defaults to image/jpeg for raw Blob requests. Override for PNG/WebP.
   const upload = useUploadFilmmakerImage({ request: { headers: {
     'Content-Type': file?.type || 'image/jpeg',
     ...(projectId ? { 'X-MSI-Project-Id': String(projectId) } : {}),
   } } });
+  const remove = useDeleteFilmmakerImage({ request: { headers: {
+    ...(projectId ? { 'X-MSI-Project-Id': String(projectId) } : {}),
+    ...(persistedUrl ? { 'X-MSI-Expected-Image-Url': persistedUrl } : {}),
+  } } });
+  const currentUrl = persistedUrl === removedUrl ? null : persistedUrl;
   useEffect(() => {
     if (!file) { setPreview(''); return; }
     const url = URL.createObjectURL(file);
@@ -72,20 +79,38 @@ function ImageUploader({ kind, config, persistedUrl, projectId, onSaved }: {
     try {
       await upload.mutateAsync({ data: file, params: { kind } });
       setFile(null);
-      setSuccess(`${label} uploaded. Your project is pending review again if it was previously approved.`);
+      setSuccess(`${label} saved to your project. You can leave this page. A previously approved project returns to review.`);
       onSaved();
     } catch { setError(`${label} upload failed. Your existing image is unchanged. Please retry.`); }
+  }
+  async function removeSaved() {
+    if (!currentUrl || upload.isPending || remove.isPending || !window.confirm(`Remove this project's ${label.toLowerCase()}? This cannot be undone.`)) return;
+    setError(''); setSuccess('');
+    try {
+      await remove.mutateAsync({ params: { kind } });
+      setRemovedUrl(currentUrl);
+      setFile(null);
+      setSuccess(`${label} removed from your project.`);
+      onSaved();
+    } catch (cause) {
+      if ((cause as { status?: number }).status === 409) {
+        setError(`This ${label.toLowerCase()} changed in another tab. Nothing was removed. The current image is being refreshed.`);
+        onSaved();
+      } else {
+        setError(`We could not remove this ${label.toLowerCase()}. Nothing was removed. Please try again.`);
+      }
+    }
   }
   return <div className="dossier-media-tile">
     <span className="dossier-kicker">{label}</span>
     <p className="dossier-status">{kind === 'poster' ? 'Artwork for your project page.' : 'Artwork for link previews. Keep financial figures off the image.'} {config.image_types.map(type => type.split('/')[1].toUpperCase()).join(', ')} · up to {Math.round(config.image_max_bytes / 1048576)} MB.</p>
-    {(preview || safeMediaUrl(persistedUrl)) && <img className="dossier-media-preview" src={preview || safeMediaUrl(persistedUrl) || ''} alt={preview ? `Selected ${label.toLowerCase()} preview` : `Current ${label.toLowerCase()}`} data-testid={`img-${kind}-preview`} />}
-    {safeMediaUrl(persistedUrl) && <a href={safeMediaUrl(persistedUrl) || undefined} target="_blank" rel="noopener noreferrer" className="dossier-media-link" data-testid={`link-current-${kind}`}>View current {label.toLowerCase()} <ArrowUpRight size={14} style={{ display: 'inline' }}/></a>}
+    {(preview || safeMediaUrl(currentUrl)) && <img className="dossier-media-preview" src={preview || safeMediaUrl(currentUrl) || ''} alt={preview ? `Selected ${label.toLowerCase()} preview` : `Current ${label.toLowerCase()}`} data-testid={`img-${kind}-preview`} />}
+    {safeMediaUrl(currentUrl) && <><a href={safeMediaUrl(currentUrl) || undefined} target="_blank" rel="noopener noreferrer" className="dossier-media-link" data-testid={`link-current-${kind}`}>View current {label.toLowerCase()} <ArrowUpRight size={14} style={{ display: 'inline' }}/></a><p className="dossier-status" role="status">Saved to your project. You can leave this page.</p><button type="button" className="dossier-button dossier-button-outline" data-testid={`button-remove-${kind}`} onClick={() => void removeSaved()} disabled={remove.isPending || upload.isPending}>{remove.isPending ? 'Removing…' : `Remove ${label.toLowerCase()}`}</button></>}
     <label className="dossier-file-label" htmlFor={`media-${kind}`}>Choose {label.toLowerCase()}<input id={`media-${kind}`} data-testid={`input-${kind}-file`} type="file" accept={config.image_types.join(',')} onChange={select} disabled={upload.isPending}/></label>
     {file && <p className="dossier-status" data-testid={`text-${kind}-selected`}>{file.name} · {(file.size / 1048576).toFixed(1)} MB</p>}
     {error && <p className="dossier-error" role="alert" data-testid={`error-${kind}-upload`}>{error}</p>}
     {success && <p className="dossier-status" role="status" data-testid={`status-${kind}-upload`}>{success}</p>}
-    {file && <div className="dossier-actions" style={{ marginTop: 15 }}><button type="button" className="dossier-button" data-testid={`button-upload-${kind}`} disabled={upload.isPending} onClick={() => void save()}><UploadCloud size={16}/> {upload.isPending ? 'Uploading…' : `Upload ${label.toLowerCase()}`}</button><button type="button" className="dossier-button dossier-button-outline" data-testid={`button-clear-${kind}`} disabled={upload.isPending} onClick={() => setFile(null)}>Clear selection</button></div>}
+    {file && <div className="dossier-actions" style={{ marginTop: 15 }}><button type="button" className="dossier-button" data-testid={`button-upload-${kind}`} disabled={upload.isPending || remove.isPending} onClick={() => void save()}><UploadCloud size={16}/> {upload.isPending ? 'Saving…' : `Save ${label.toLowerCase()} to project`}</button><button type="button" className="dossier-button dossier-button-outline" data-testid={`button-clear-${kind}`} disabled={upload.isPending || remove.isPending} onClick={() => setFile(null)}>Clear selection</button></div>}
   </div>;
 }
 
@@ -144,7 +169,7 @@ function TrailerUploader({ config, trailerUrl, projectId, onSaved }: {
         try { payload = typeof xhr.response === 'string' ? JSON.parse(xhr.response) as FilmmakerTrailerUpload : xhr.response as FilmmakerTrailerUpload; }
         catch { /* An invalid response is not a confirmed upload. */ }
         if (xhr.status >= 200 && xhr.status < 300 && payload?.trailer_url && payload.video_id) {
-          setStatus('complete'); setProgress(100); onSaved();
+          setStatus('complete'); setProgress(100); setFile(null); onSaved();
         } else {
           setStatus('error');
           setError(xhr.status === 413 ? 'This file exceeds the server limit of 500 MiB. Choose a smaller video.' : 'The server could not save this video. Retry will send the entire file again.');
@@ -166,14 +191,14 @@ function TrailerUploader({ config, trailerUrl, projectId, onSaved }: {
   return <div className="dossier-media-tile">
     <span className="dossier-kicker">Trailer / direct video upload</span>
     <p className="dossier-status">MP4, WebM or MOV · up to {Math.round(config.trailer_max_bytes / 1048576)} MiB. Uploads are sent in one request and cannot be resumed. Replacing media sends an approved project back to review.</p>
-    {safeMediaUrl(trailerUrl) && <a href={safeMediaUrl(trailerUrl) || undefined} target="_blank" rel="noopener noreferrer" className="dossier-media-link" data-testid="link-current-trailer">View current trailer <ArrowUpRight size={14} style={{ display: 'inline' }}/></a>}
+    {safeMediaUrl(trailerUrl) && <><a href={safeMediaUrl(trailerUrl) || undefined} target="_blank" rel="noopener noreferrer" className="dossier-media-link" data-testid="link-current-trailer">View current trailer <ArrowUpRight size={14} style={{ display: 'inline' }}/></a><p className="dossier-status" role="status">Current trailer saved to your project. You can leave this page.</p></>}
     <label className="dossier-file-label" htmlFor="media-trailer">Choose video<input id="media-trailer" data-testid="input-trailer-file" type="file" accept={config.trailer_types.join(',')} disabled={busy} onChange={select}/></label>
     {file && <p className="dossier-status" data-testid="text-trailer-selected">{file.name} · {(file.size / 1048576).toFixed(1)} MB</p>}
     {busy && <div className="dossier-upload-progress"><div role="progressbar" aria-label="Trailer upload" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} style={{ width: `${progress}%` }}/></div>}
-    <p className="dossier-status" role="status" data-testid="status-trailer-upload">{status === 'uploading' ? `Uploading video · ${progress}%` : status === 'finalizing' ? 'Upload sent. Waiting for the server to save it…' : status === 'complete' ? 'Video saved. Processing may take a moment before it appears on the project page.' : status === 'cancelled' ? 'Upload cancelled in your browser. If it had just finished, check the project page before retrying.' : ''}</p>
+    <p className="dossier-status" role="status" data-testid="status-trailer-upload">{status === 'uploading' ? `Uploading video · ${progress}%` : status === 'finalizing' ? 'Upload sent. Waiting for the server to save it…' : status === 'complete' ? 'Trailer saved to your project. You can leave this page. Processing may take a moment before it appears on the project page.' : status === 'cancelled' ? 'Upload cancelled in your browser. If it had just finished, check the project page before retrying.' : ''}</p>
     {error && <p className="dossier-error" role="alert" data-testid="error-trailer-upload">{error}</p>}
     {file && <div className="dossier-actions" style={{ marginTop: 14 }}>
-      {!busy && <button type="button" className="dossier-button" data-testid="button-upload-trailer" onClick={start}><UploadCloud size={16}/>{status === 'error' ? 'Retry full upload' : 'Upload trailer'}</button>}
+      {!busy && <button type="button" className="dossier-button" data-testid="button-upload-trailer" onClick={start}><UploadCloud size={16}/>{status === 'error' ? 'Retry full upload' : 'Save trailer to project'}</button>}
       {busy && <button type="button" className="dossier-button dossier-button-outline" data-testid="button-cancel-trailer" onClick={cancel}><X size={16}/> Cancel upload</button>}
     </div>}
   </div>;

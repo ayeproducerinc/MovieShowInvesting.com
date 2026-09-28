@@ -27,6 +27,7 @@ import type {
   AdminProjectReviewInput,
   AdminSection,
   AdminTable,
+  DeleteFilmmakerImageParams,
   FilmmakerAccountLeave,
   FilmmakerDraftState,
   FilmmakerImageUpload,
@@ -1698,6 +1699,88 @@ export const useUploadFilmmakerImage = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUploadFilmmakerImageMutationOptions(options));
+    }
+
+export const getDeleteFilmmakerImageUrl = (params: DeleteFilmmakerImageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/filmmakers/media/image?${stringifiedParams}` : `/api/filmmakers/media/image`
+}
+
+/**
+ * Unlinked guests are authorized by their visitor cookie. An account-linked visitor requires a verified Bearer token matching its Firebase UID. Only the selected image pointer is removed, and the stored file is deleted only when its URL matches this project's owned Bunny Storage path.
+ * @summary Remove the selected owned poster or share image
+ */
+export const deleteFilmmakerImage = async (params: DeleteFilmmakerImageParams, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteFilmmakerImageUrl(params),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteFilmmakerImageMutationKey = () => ['deleteFilmmakerImage'] as const;
+
+export const getDeleteFilmmakerImageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFilmmakerImage>>, TError,DeleteFilmmakerImageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteFilmmakerImage>>, TError,DeleteFilmmakerImageMutationVariables, TContext> => {
+
+const mutationKey = getDeleteFilmmakerImageMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteFilmmakerImage>>, DeleteFilmmakerImageMutationVariables> = (props) => {
+          const {params} = props ?? {};
+
+          return  deleteFilmmakerImage(params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteFilmmakerImageMutationResult = NonNullable<Awaited<ReturnType<typeof deleteFilmmakerImage>>>
+
+    export type DeleteFilmmakerImageMutationError = ErrorType<void>
+    export type DeleteFilmmakerImageMutationVariables = {params: DeleteFilmmakerImageParams}
+
+    /**
+ * @summary Remove the selected owned poster or share image
+ */
+export const useDeleteFilmmakerImage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFilmmakerImage>>, TError,DeleteFilmmakerImageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteFilmmakerImage>>,
+        TError,
+        DeleteFilmmakerImageMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteFilmmakerImageMutationOptions(options));
     }
 
 export const getGetPublicProjectUrl = (slug: string,) => {

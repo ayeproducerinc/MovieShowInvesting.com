@@ -12,6 +12,7 @@ import {
 } from '@workspace/api-client-react';
 import { ProjectHubView, type ProjectHubItem } from '@/components/project-hub-view';
 import { useFilmmakerEmailLink } from '@/hooks/use-filmmaker-email-link';
+import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 
 function accountError(error: unknown): string {
   if (error && typeof error === 'object' && 'status' in error) {
@@ -31,6 +32,8 @@ export default function FilmmakerProjects() {
   const [claimError, setClaimError] = useState('');
   const [claiming, setClaiming] = useState(false);
   const [acting, setActing] = useState(false);
+  const [initialAction] = useState(pendingFilmmakerAction);
+  const [claimDoneUid, setClaimDoneUid] = useState<string | null>(null);
   const claimedUid = useRef<string | null>(null);
   const uid = auth.user?.uid;
 
@@ -60,16 +63,30 @@ export default function FilmmakerProjects() {
     setClaiming(true);
     setClaimError('');
     try {
-      // Establish a recorded visitor on a new device before linking its draft.
-      await getPriceGroup();
-      await claimFilmmakerProject();
-      await queryClient.invalidateQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
+      const linkAndContinue = async () => {
+        // Serialize visitor-cookie changes and a one-time action across email-link tabs.
+        await getPriceGroup();
+        await claimFilmmakerProject();
+        await queryClient.invalidateQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
+        if (initialAction === 'start' && navigator.locks && hasPendingStartAction()) {
+          await start.mutateAsync();
+          clearVisitorQueries();
+          clearFilmmakerAction();
+          await queryClient.invalidateQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
+          navigate('/start/filmmaker');
+        } else {
+          setClaimDoneUid(uid ?? null);
+          if (initialAction === 'manage') clearFilmmakerAction();
+        }
+      };
+      if (navigator.locks && uid) await navigator.locks.request(`msi-filmmaker-account-${uid}`, linkAndContinue);
+      else await linkAndContinue();
     } catch (error) {
       setClaimError(accountError(error));
     } finally {
       setClaiming(false);
     }
-  }, [queryClient]);
+  }, [queryClient, uid, initialAction, navigate, start]);
 
   useEffect(() => {
     if (!uid || !auth.ready || auth.linkPresent || claimedUid.current === uid) return;
@@ -89,6 +106,7 @@ export default function FilmmakerProjects() {
     try {
       await action();
       clearVisitorQueries();
+      clearFilmmakerAction();
       await queryClient.invalidateQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
       navigate(destination);
     } catch (error) {
@@ -109,6 +127,8 @@ export default function FilmmakerProjects() {
       clearVisitorQueries();
       queryClient.removeQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
       claimedUid.current = null;
+      setClaimDoneUid(null);
+      clearFilmmakerAction();
     } catch (error) {
       setActionError(accountError(error));
     } finally {
@@ -145,7 +165,7 @@ export default function FilmmakerProjects() {
       {auth.sentTo && <p className="dossier-status" role="status">Check {auth.sentTo} for your sign-in link. You can keep this page open.</p>}
       {auth.feedback && <p className="dossier-status" role="alert">{auth.feedback}</p>}
       {auth.linkPresent && auth.feedback && <button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 16 }} disabled={auth.busy || !email.trim()} onClick={() => void auth.requestLink(email)}>Request a new link <ArrowRight size={17}/></button>}
-      <p className="dossier-status" style={{ marginTop: 28 }}><Link href="/start/filmmaker/done">Back to your current submission</Link></p>
+      <p className="dossier-status" style={{ marginTop: 28 }}><Link href="/">Back to the site</Link></p>
     </div></section>;
   }
 
@@ -162,6 +182,7 @@ export default function FilmmakerProjects() {
     {actionError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{actionError}</div>}
     <ProjectHubView
       email={auth.user.email ?? ''}
+      initiallyOpen={initialAction === 'manage'}
       projects={items}
       draftAvailable={projects.data?.has_resumable_draft ?? false}
       loading={projects.isPending || claiming}

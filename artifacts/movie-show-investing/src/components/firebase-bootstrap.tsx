@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, type Auth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, type Auth, type User } from 'firebase/auth';
 import {
   getGetFirebaseConfigQueryKey,
   getGetFilmmakerProjectsQueryKey,
@@ -15,6 +15,7 @@ const APP_NAME = 'movie-show-investing';
 let initializedAuth: Auth | null = null;
 let reportedConfigError = false;
 let sessionReady = false;
+let currentUser: User | null = null;
 let previousUid: string | null = null;
 const listeners = new Set<() => void>();
 
@@ -30,6 +31,14 @@ export function useFirebaseSessionReady() {
     listener => { listeners.add(listener); return () => { listeners.delete(listener); }; },
     () => sessionReady,
     () => false,
+  );
+}
+
+export function useFirebaseUser() {
+  return useSyncExternalStore(
+    listener => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    () => currentUser,
+    () => null,
   );
 }
 
@@ -73,8 +82,12 @@ export function FirebaseBootstrap() {
           previousUid = user?.uid ?? null;
         }
         setAuthTokenGetter(user ? () => initializedAuth?.currentUser?.getIdToken() ?? null : null);
+        currentUser = user;
+        listeners.forEach(listener => listener());
         setSessionReady(true);
       }, () => {
+        currentUser = null;
+        listeners.forEach(listener => listener());
         setAuthTokenGetter(null);
         setSessionReady(true);
       });

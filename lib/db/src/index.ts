@@ -885,6 +885,50 @@ export async function saveOwnedFilmmakerImage(input: {
   return Boolean(updated);
 }
 
+export async function removeOwnedFilmmakerImage(input: {
+  visitorId: string;
+  projectId: number;
+  kind: "poster" | "share";
+  expectedUrl: string;
+  removeStoredObject: () => Promise<void>;
+}): Promise<"removed" | "changed" | "not_found"> {
+  const owner = await getOwnedCompletedProject(input.visitorId);
+  if (!owner?.projectId || owner.projectId !== input.projectId) return "not_found";
+
+  return db.transaction(async (tx) => {
+    const [project] = await tx.select({
+      posterUrl: projectsTable.posterUrl,
+      shareImageUrl: projectsTable.shareImageUrl,
+    }).from(projectsTable).where(and(
+      eq(projectsTable.id, input.projectId),
+      eq(projectsTable.filmmakerId, owner.filmmakerId),
+    )).for("update");
+    if (!project) return "not_found";
+
+    const currentUrl = input.kind === "poster" ? project.posterUrl : project.shareImageUrl;
+    if (currentUrl !== input.expectedUrl) return "changed";
+
+    // Hold the project row lock while removing the exact object. Concurrent uploads
+    // and edits wait until the provider result is known, so a failure can roll back
+    // without compensating writes or overwriting a newer review state.
+    await input.removeStoredObject();
+
+    const [updated] = await tx.update(projectsTable)
+      .set(input.kind === "poster"
+        ? { posterUrl: null, approved: false }
+        : { shareImageUrl: null, approved: false })
+      .where(and(
+        eq(projectsTable.id, input.projectId),
+        eq(projectsTable.filmmakerId, owner.filmmakerId),
+        input.kind === "poster"
+          ? eq(projectsTable.posterUrl, input.expectedUrl)
+          : eq(projectsTable.shareImageUrl, input.expectedUrl),
+      ))
+      .returning({ id: projectsTable.id });
+    return updated ? "removed" : "changed";
+  });
+}
+
 export async function getPublicProjectBySlug(slug: string) {
   const [project] = await db.select({
     id: projectsTable.id,
