@@ -367,15 +367,10 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
 
       for (const slate of SLATES) {
         const minimum = minimums[slate];
-        const legacyAcceptsValue = minimum === null || [125, 150, 175, 200].includes(minimum) || minimum >= 250;
         const prior = await client.query<{ id: number }>(
           "select id from investor_minimums where investor_id = $1 and slate = $2",
           [investorId, slate],
         );
-        if (!legacyAcceptsValue) {
-          if (prior.rows[0]) await client.query("delete from investor_minimums where id = $1", [prior.rows[0].id]);
-          continue;
-        }
         if (prior.rows[0]) {
           await client.query(
             "update investor_minimums set min_per100 = $1, not_interested = $2 where id = $3",

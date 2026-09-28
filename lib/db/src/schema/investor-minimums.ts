@@ -15,7 +15,7 @@ export const investorMinimumsTable = pgTable("investor_minimums", {
 }, (table) => [
   unique("investor_minimums_investor_slate_unique").on(table.investorId, table.slate),
   check("investor_minimums_slate_check", sql`${table.slate} in ('distribution', 'production', 'idea')`),
-  check("investor_minimums_ladder_check", sql`${table.minPer100} is null or ${table.minPer100} in (125, 150, 175, 200) or ${table.minPer100} >= 250`),
+  check("investor_minimums_ladder_check", sql`${table.minPer100} is null or ${table.minPer100} >= 125`),
 ]);
 
 export const insertInvestorMinimumSchema = createInsertSchema(investorMinimumsTable).omit({ id: true, createdAt: true });
