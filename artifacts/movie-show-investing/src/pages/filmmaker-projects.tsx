@@ -3,10 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import {
-  claimFilmmakerProject, getGetFilmmakerProjectsQueryKey, getGetFilmmakerQuestionsQueryKey,
+  claimFilmmakerProject, getGetFilmmakerProjectsQueryKey,
   getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey,
   getGetPriceGroupQueryKey, getPriceGroup,
-  useGetFilmmakerProjects, useLeaveFilmmakerAccount,
+  useGetFilmmakerProjects,
   useResumeFilmmakerProject, useSelectFilmmakerProject,
   useStartFilmmakerProject,
 } from '@workspace/api-client-react';
@@ -60,7 +60,6 @@ export default function FilmmakerProjects() {
   const start = useStartFilmmakerProject();
   const resume = useResumeFilmmakerProject();
   const select = useSelectFilmmakerProject();
-  const leave = useLeaveFilmmakerAccount();
 
   useEffect(() => {
     const meta = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]') ?? document.createElement('meta');
@@ -137,32 +136,6 @@ export default function FilmmakerProjects() {
     }
   }
 
-  async function signOut() {
-    if (ssoUser) {
-      clearFilmmakerAction();
-      queryClient.clear();
-      replitAuth.logout('/me/projects');
-      return;
-    }
-    setActing(true);
-    setActionError('');
-    try {
-      // Rotate an account-owned visitor cookie before leaving the Firebase session.
-      // An unclaimed guest submission keeps its original-browser claim proof.
-      await leave.mutateAsync();
-      await auth.leave();
-      clearVisitorQueries();
-      for (const project of projects.data?.projects ?? []) queryClient.removeQueries({ queryKey: getGetFilmmakerQuestionsQueryKey(project.id) });
-      queryClient.removeQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
-      claimedUid.current = null;
-      clearFilmmakerAction();
-    } catch (error) {
-      setActionError(accountError(error));
-    } finally {
-      setActing(false);
-    }
-  }
-
     if (replitAuth.isLoading || (!ssoUser && (auth.configPending || (!auth.configError && !auth.ready)))) {
     return <section className="dossier"><div className="page-wrap dossier-hero" role="status"><p className="dossier-kicker">Your filmmaker desk</p><h1 className="dossier-title">Finding your<br/><em>projects.</em></h1></div></section>;
   }
@@ -212,7 +185,6 @@ export default function FilmmakerProjects() {
       onStart={() => void perform(() => start.mutateAsync(), '/start/filmmaker')}
       onResume={() => void perform(() => resume.mutateAsync(), '/start/filmmaker')}
       onOpen={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}
-      onSignOut={() => void signOut()}
       onRetry={() => { void projects.refetch(); if (!ssoUser) void linkCurrentVisit(); }}
     />
     {!projects.isPending && !projects.isError && !claiming && <FilmmakerQuestionsDesk projects={projects.data?.projects ?? []}/>}

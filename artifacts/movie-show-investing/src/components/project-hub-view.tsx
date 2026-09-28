@@ -23,7 +23,6 @@ export type ProjectHubViewProps = {
   onStart: () => void;
   onResume: () => void;
   onOpen: (projectId: number) => void;
-  onSignOut: () => void;
   onRetry: () => void;
 };
 
@@ -50,7 +49,6 @@ export function ProjectHubView({
   onStart,
   onResume,
   onOpen,
-  onSignOut,
   onRetry,
 }: ProjectHubViewProps) {
   const projectsHeading = useRef<HTMLHeadingElement>(null);
@@ -68,7 +66,6 @@ export function ProjectHubView({
           <span className="project-hub__mark">Movie Show Investing / Filmmaker desk</span>
           <div className="project-hub__identity">
             <span data-testid="text-project-hub-email" title={email}>{email}</span>
-            <button type="button" className="project-hub__text-button" data-testid="button-project-hub-sign-out" onClick={onSignOut} disabled={busy}>Sign out</button>
           </div>
         </header>
 
