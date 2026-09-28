@@ -643,6 +643,15 @@ export interface InvestorAllocationView {
      * @maximum 2147483647
      */
   amount: number;
+  /**
+     * Saved project's title
+     * @nullable
+     */
+  project_title: string | null;
+  /** @nullable */
+  project_slug: string | null;
+  /** Whether the project is currently approved and visible in Explore */
+  project_visible: boolean;
 }
 
 export interface InvestorIntentInput {

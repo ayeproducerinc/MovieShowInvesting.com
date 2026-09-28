@@ -65,7 +65,7 @@ export function InvestorDone() {
       <p className="inv-kicker">Interest saved / The next chapter</p><h1>Thank you, {current.data.intent.name.split(' ')[0]}.</h1>
       <p data-testid="text-intent-saved">Your non-binding interest of {dollars(current.data.intent.amount)} has been saved. No money has been collected, and you have not made an investment. A signed confirmation step is not available yet.</p>
       <p>Returns aren’t guaranteed. You may get back less, or nothing. We’ll use the details you shared to keep you informed about what happens next.</p>
-      <div className="inv-actions"><Link href="/explore" className="inv-button" data-testid="link-done-explore">Explore projects <ArrowRight size={16}/></Link><Link href="/messages" className="inv-button secondary" data-testid="link-done-messages">Messages</Link></div>
+       <div className="inv-actions"><Link href="/lineup" className="inv-button" data-testid="link-done-lineup">View my saved lineup <ArrowRight size={16}/></Link><Link href="/explore" className="inv-button secondary" data-testid="link-done-explore">Explore projects</Link><Link href="/messages" className="inv-button secondary" data-testid="link-done-messages">Messages</Link></div>
     </div> : <div className="inv-state"><p className="inv-kicker">Nothing saved yet</p><h1>Your story starts here.</h1><p>There is no saved investor interest associated with this visit.</p><Link className="inv-button" href="/invest" data-testid="link-done-invest">Start the worksheet <ArrowRight size={16}/></Link></div>}
   </div></section>;
 }

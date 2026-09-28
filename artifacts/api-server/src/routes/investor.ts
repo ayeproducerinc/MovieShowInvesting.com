@@ -403,6 +403,7 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
 });
 
 router.get("/investor/intents/current", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
   const identity = await resolveProtectedIdentity(req, res, false);
   if (req.get("authorization") && !identity) return;
   const cookieCandidate = req.cookies?.[VISITOR_COOKIE];
@@ -434,8 +435,18 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
     return;
   }
 
-  const { rows: pendingAllocations } = await pool.query<{ project_id: number | null; amount: number }>(
-    "select project_id, amount from pledges where investor_id = $1 and confirmed = false order by id",
+  const { rows: pendingAllocations } = await pool.query<{
+    project_id: number | null;
+    amount: number;
+    project_title: string | null;
+    project_slug: string | null;
+    project_visible: boolean;
+  }>(
+    `select pl.project_id, pl.amount, p.title as project_title, p.slug as project_slug,
+       coalesce(p.approved = true and p.showcase_requested = true and p.hidden = false
+         and p.stage in ('idea', 'production', 'distribution'), false) as project_visible
+     from pledges pl left join projects p on p.id = pl.project_id
+     where pl.investor_id = $1 and pl.confirmed = false order by pl.id`,
     [investor.id],
   );
   const intent = {
@@ -444,8 +455,14 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
     email: investor.email ?? "",
     amount: investor.investment_amount ?? Number.parseInt(investor.amount_choice ?? "0", 10),
     allocations: pendingAllocations
-      .filter((allocation): allocation is { project_id: number; amount: number } => allocation.project_id !== null)
-      .map((allocation) => ({ project_id: allocation.project_id, amount: allocation.amount })),
+      .filter((allocation): allocation is typeof allocation & { project_id: number } => allocation.project_id !== null)
+      .map((allocation) => ({
+        project_id: allocation.project_id,
+        amount: allocation.amount,
+        project_title: allocation.project_title,
+        project_slug: allocation.project_slug,
+        project_visible: allocation.project_visible,
+      })),
     unallocated: investor.unallocated ?? false,
     accredited: investor.accredited === "yes",
     experience: investor.experience ?? [],

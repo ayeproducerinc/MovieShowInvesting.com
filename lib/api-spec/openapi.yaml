@@ -1711,10 +1711,13 @@ components:
     InvestorAllocationView:
       type: object
       additionalProperties: false
-      required: [project_id, amount]
+      required: [project_id, amount, project_title, project_slug, project_visible]
       properties:
         project_id: { type: integer, minimum: 1 }
         amount: { type: integer, minimum: 1, maximum: 2147483647 }
+        project_title: { type: ["string", "null"], description: Saved project's title, even if it is no longer listed in Explore }
+        project_slug: { type: ["string", "null"] }
+        project_visible: { type: boolean, description: Whether the project is currently approved and visible in Explore }
     InvestorIntentInput:
       type: object
       additionalProperties: false

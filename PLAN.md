@@ -89,7 +89,7 @@ Build one phase at a time. Each phase ends at its stated gate; do not start the 
 
 ## Phase 8 — Pledge confirmation and lineup
 
-**Status:** not started  
+**Status:** partly implemented in development. The private `/lineup` page now shows the current saved, unconfirmed investor interest and project allocations using the existing account/visitor-scoped endpoint; signed confirmation, confirmed-only public totals, email recovery, and the rest of this phase have not started.
 **Deliverables:**
 
 - Investor result/share card and non-binding pledge-confirmation email containing the signed indication, securities notice, and required disclosures.

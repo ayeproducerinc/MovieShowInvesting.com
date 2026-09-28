@@ -877,7 +877,10 @@ export const GetCurrentInvestorIntentResponse = zod.object({
   "amount": zod.number().int().min(1).max(getCurrentInvestorIntentResponseIntentOneAmountMax),
   "allocations": zod.array(zod.object({
   "project_id": zod.number().int().min(1),
-  "amount": zod.number().int().min(1).max(getCurrentInvestorIntentResponseIntentOneAllocationsItemAmountMax)
+  "amount": zod.number().int().min(1).max(getCurrentInvestorIntentResponseIntentOneAllocationsItemAmountMax),
+  "project_title": zod.string().nullable().describe('Saved project\'s title'),
+  "project_slug": zod.string().nullable(),
+  "project_visible": zod.boolean().describe('Whether the project is currently approved and visible in Explore')
 })),
   "unallocated": zod.boolean(),
   "accredited": zod.boolean(),
