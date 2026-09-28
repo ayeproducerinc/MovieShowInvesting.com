@@ -13,4 +13,5 @@
 - [Question email delivery uncertainty](question-email-delivery-uncertainty.md) — ambiguous Mailjet answer outcomes must stay closed to retries until reconciled, preventing duplicate private replies.
 - [Account-switch visitor handoff](account-switch-visitor-handoff.md) — rotate account-owned visitor cookies with the old identity, and separate network preparation from popup activation.
 - [Legacy message sender identity](legacy-message-sender-identity.md) — do not guess the provider of historical messages that lack provider-qualified sender identity.
+- [Mixed-provider thread access](mixed-provider-thread-access.md) — nullable opposite-provider UIDs require NULL-safe exclusion checks in private conversation queries.
 - [Drizzle existing checks](drizzle-existing-checks.md) — a successful schema push may leave an altered PostgreSQL CHECK unchanged; inspect the live definition.

@@ -67,18 +67,6 @@ function escapeHtml(value: string): string {
   })[character]!);
 }
 
-async function findParticipantRole(identity: Identity): Promise<ParticipantRole | null> {
-  const investorUidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
-  const filmmakerUidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
-  const result = await pool.query<{ role: ParticipantRole }>(
-    `select 'investor' as role from investors where ${investorUidColumn} = $1
-     union
-     select 'filmmaker' as role from filmmakers where ${filmmakerUidColumn} = $1`,
-    [identity.uid],
-  );
-  return result.rows.length === 1 ? result.rows[0].role : null;
-}
-
 function isMessagingBlocked(row: { locked: boolean; reported: boolean }): boolean {
   return row.locked || row.reported;
 }
@@ -100,17 +88,18 @@ router.post("/projects/:slug/conversations", async (req, res): Promise<void> => 
     return;
   }
 
-  const filmmakerUidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
   const projectResult = await pool.query<{
     id: number;
     slug: string;
     title: string;
     filmmaker_id: number;
-    filmmaker_uid: string | null;
+    filmmaker_firebase_uid: string | null;
+    filmmaker_replit_uid: string | null;
     filmmaker_name: string | null;
   }>(
     `select p.id, p.slug, p.title, f.id as filmmaker_id,
-        f.${filmmakerUidColumn} as filmmaker_uid, f.name as filmmaker_name
+        f.firebase_uid as filmmaker_firebase_uid, f.replit_uid as filmmaker_replit_uid,
+        f.name as filmmaker_name
      from projects p
      inner join filmmakers f on f.id = p.filmmaker_id
      where p.slug = $1 and p.title is not null and p.approved = true
@@ -119,7 +108,11 @@ router.post("/projects/:slug/conversations", async (req, res): Promise<void> => 
     [parsedParams.data.slug],
   );
   const project = projectResult.rows[0];
-  if (!project || !project.filmmaker_uid || project.filmmaker_uid === identity.uid) {
+  const sameProviderOwner = project && (identity.provider === "firebase"
+    ? project.filmmaker_firebase_uid === identity.uid
+    : project.filmmaker_replit_uid === identity.uid);
+  if (!project || (!project.filmmaker_firebase_uid && !project.filmmaker_replit_uid)
+    || sameProviderOwner) {
     res.status(404).json({ error: "Project not found or unavailable for messaging." });
     return;
   }
@@ -137,26 +130,20 @@ router.post("/projects/:slug/conversations", async (req, res): Promise<void> => 
       await client.query("select pg_advisory_xact_lock(hashtext($1))", [key]);
     }
 
-    type InvestorRow = { id: number; name: string | null; email: string | null; firebase_uid: string | null; replit_uid: string | null };
+    type InvestorRow = { id: number; name: string | null; email: string | null; firebase_uid: string | null; replit_uid: string | null; investment_amount: number | null };
     const investorUidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
     const uidInvestors = await client.query<InvestorRow>(
-      `select id, name, email, firebase_uid, replit_uid from investors
+      `select id, name, email, firebase_uid, replit_uid, investment_amount from investors
        where ${investorUidColumn} = $1 order by id for update`,
       [identity.uid],
     );
     const emailInvestors = await client.query<InvestorRow>(
-      `select id, name, email, firebase_uid, replit_uid from investors
+      `select id, name, email, firebase_uid, replit_uid, investment_amount from investors
        where lower(trim(email)) = $1 order by id for update`,
       [identity.email],
     );
-    const uidFilmmakers = await client.query<{ id: number }>(
-      `select id from filmmakers where ${identity.provider === "firebase" ? "firebase_uid" : "replit_uid"} = $1`,
-      [identity.uid],
-    );
-
     const identityConflict = uidInvestors.rows.length > 1
       || emailInvestors.rows.length > 1
-      || uidFilmmakers.rows.length > 0
       || emailInvestors.rows.some((row) =>
         identity.provider === "firebase"
           ? (row.firebase_uid != null && row.firebase_uid !== identity.uid) || row.replit_uid != null
@@ -170,10 +157,10 @@ router.post("/projects/:slug/conversations", async (req, res): Promise<void> => 
       return;
     }
 
-    let investor = uidInvestors.rows[0];
-    if (!investor) {
+    const investor = uidInvestors.rows[0];
+    if (!investor || investor.investment_amount === null || investor.investment_amount < 100) {
       await client.query("rollback");
-      res.status(404).json({ error: "No investor record matches this verified account." });
+      res.status(404).json({ error: "Save your non-binding investor interest before starting a conversation." });
       return;
     }
     const uidClaims = await client.query<{ id: number }>(
@@ -234,10 +221,6 @@ router.get("/me/conversations", async (req, res): Promise<void> => {
     res.status(503).json({ error: "Messaging is not currently available." });
     return;
   }
-  if (!await findParticipantRole(identity)) {
-    res.status(403).json({ error: "A verified investor or filmmaker account is required." });
-    return;
-  }
   const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
   const result = await pool.query<ConversationRow>(
     `select c.id, c.project_id, p.slug as project_slug, p.title as project_title,
@@ -249,7 +232,8 @@ router.get("/me/conversations", async (req, res): Promise<void> => {
      inner join projects p on p.id = c.project_id
      inner join investors i on i.id = c.investor_id
      inner join filmmakers f on f.id = c.filmmaker_id
-      where i.${uidColumn} = $1 or f.${uidColumn} = $1
+      where (i.${uidColumn} = $1 or f.${uidColumn} = $1)
+        and (i.${uidColumn} is distinct from $1 or f.${uidColumn} is distinct from $1)
      order by c.last_message_at desc nulls last, c.created_at desc`,
     [identity.uid],
   );
@@ -261,10 +245,6 @@ router.get("/conversations/:id", async (req, res): Promise<void> => {
   if (!identity) return;
   if (!messagingConfig().available) {
     res.status(503).json({ error: "Messaging is not currently available." });
-    return;
-  }
-  if (!await findParticipantRole(identity)) {
-    res.status(403).json({ error: "A unique verified investor or filmmaker account is required." });
     return;
   }
   const params = GetConversationParams.safeParse(req.params);
@@ -284,6 +264,7 @@ router.get("/conversations/:id", async (req, res): Promise<void> => {
      inner join investors i on i.id = c.investor_id
      inner join filmmakers f on f.id = c.filmmaker_id
       where c.id = $1 and (i.${uidColumn} = $2 or f.${uidColumn} = $2)
+        and (i.${uidColumn} is distinct from $2 or f.${uidColumn} is distinct from $2)
      limit 1`,
     [params.data.id, identity.uid],
   );
@@ -304,10 +285,6 @@ router.get("/conversations/:id", async (req, res): Promise<void> => {
 router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
   const identity = await resolveProtectedIdentity(req, res);
   if (!identity) return;
-  if (!await findParticipantRole(identity)) {
-    res.status(403).json({ error: "A unique verified investor or filmmaker account is required." });
-    return;
-  }
   const params = SendConversationMessageParams.safeParse(req.params);
   const parsedBody = SendConversationMessageBody.safeParse(req.body);
   if (!params.success || !parsedBody.success) {
@@ -422,10 +399,6 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
 router.post("/conversations/:id/report", async (req, res): Promise<void> => {
   const identity = await resolveProtectedIdentity(req, res);
   if (!identity) return;
-  if (!await findParticipantRole(identity)) {
-    res.status(403).json({ error: "A unique verified investor or filmmaker account is required." });
-    return;
-  }
   const params = ReportConversationParams.safeParse(req.params);
   const parsedBody = ReportConversationBody.safeParse(req.body);
   if (!params.success || !parsedBody.success) {
@@ -449,6 +422,7 @@ router.post("/conversations/:id/report", async (req, res): Promise<void> => {
      from investors i, filmmakers f
      where c.id = $1 and i.id = c.investor_id and f.id = c.filmmaker_id
         and (i.${uidColumn} = $2 or f.${uidColumn} = $2)
+        and (i.${uidColumn} is distinct from $2 or f.${uidColumn} is distinct from $2)
      returning c.id`,
     [params.data.id, identity.uid, reason],
   );
