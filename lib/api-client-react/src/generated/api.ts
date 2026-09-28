@@ -1610,8 +1610,8 @@ export const getSubmitFilmmakerUrl = () => {
 }
 
 /**
- * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. The single-use Turnstile response is verified server-side before creating a submission.
- * @summary Submit the filmmaker flow after Cloudflare Turnstile verification
+ * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply; a single-use Turnstile response is required and verified server-side only when Turnstile is configured.
+ * @summary Submit the filmmaker flow
  */
 export const submitFilmmaker = async (filmmakerSubmissionInput: FilmmakerSubmissionInput, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerSubmission> => {
 
@@ -1677,7 +1677,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SubmitFilmmakerMutationVariables = {data: BodyType<FilmmakerSubmissionInput>}
 
     /**
- * @summary Submit the filmmaker flow after Cloudflare Turnstile verification
+ * @summary Submit the filmmaker flow
  */
 export const useSubmitFilmmaker = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitFilmmaker>>, TError,SubmitFilmmakerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -1699,7 +1699,7 @@ export const getGetFilmmakerSubmissionConfigUrl = () => {
 }
 
 /**
- * @summary Read filmmaker final-submission availability and public Turnstile site key
+ * @summary Read filmmaker final-submission availability and optional Turnstile site key
  */
 export const getFilmmakerSubmissionConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerSubmissionConfig> => {
 
@@ -1746,7 +1746,7 @@ export type GetFilmmakerSubmissionConfigQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Read filmmaker final-submission availability and public Turnstile site key
+ * @summary Read filmmaker final-submission availability and optional Turnstile site key
  */
 
 export function useGetFilmmakerSubmissionConfig<TData = Awaited<ReturnType<typeof getFilmmakerSubmissionConfig>>, TError = ErrorType<unknown>>(

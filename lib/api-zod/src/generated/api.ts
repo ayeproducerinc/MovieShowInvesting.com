@@ -335,8 +335,8 @@ export const SaveFlowProgressResponse = zod.object({
 
 
 /**
- * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. The single-use Turnstile response is verified server-side before creating a submission.
- * @summary Submit the filmmaker flow after Cloudflare Turnstile verification
+ * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply; a single-use Turnstile response is required and verified server-side only when Turnstile is configured.
+ * @summary Submit the filmmaker flow
  */
 
 
@@ -358,7 +358,7 @@ export const submitFilmmakerBodyCountryRegExp = new RegExp('^[A-Z]{2}$');
 
 export const SubmitFilmmakerBody = zod.object({
   "website": zod.string().optional().describe('Leave blank. Bot-detection field; never stored with the submission.'),
-  "turnstile_token": zod.string().min(1).max(submitFilmmakerBodyTurnstileTokenMax).describe('Single-use Cloudflare Turnstile response, verified server-side and never stored.'),
+  "turnstile_token": zod.string().min(1).max(submitFilmmakerBodyTurnstileTokenMax).optional().describe('Required only when Turnstile is configured; verified server-side and never stored.'),
   "no_project_yet": zod.boolean(),
   "stage": zod.enum(['distribution', 'production', 'idea']).optional(),
   "title": zod.string().optional(),
@@ -401,13 +401,13 @@ export const SubmitFilmmakerResponse = zod.object({
 
 
 /**
- * @summary Read filmmaker final-submission availability and public Turnstile site key
+ * @summary Read filmmaker final-submission availability and optional Turnstile site key
  */
 
 
 
 export const GetFilmmakerSubmissionConfigResponse = zod.object({
-  "available": zod.boolean(),
+  "available": zod.boolean().describe('True if the form can submit, including when no Turnstile keys have been configured.'),
   "turnstile_site_key": zod.string().min(1).nullable()
 })
 

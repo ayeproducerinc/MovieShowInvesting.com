@@ -15,11 +15,11 @@ export interface FilmmakerSubmissionInput {
   /** Leave blank. Bot-detection field; never stored with the submission. */
   website?: string;
   /**
-     * Single-use Cloudflare Turnstile response, verified server-side and never stored.
+     * Required only when Turnstile is configured; verified server-side and never stored.
      * @minLength 1
      * @maxLength 2048
      */
-  turnstile_token: string;
+  turnstile_token?: string;
   no_project_yet: boolean;
   stage?: FilmmakerSubmissionInputStage;
   title?: string;

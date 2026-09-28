@@ -7,6 +7,7 @@
  */
 
 export interface FilmmakerSubmissionConfig {
+  /** True if the form can submit, including when no Turnstile keys have been configured. */
   available: boolean;
   /**
      * @minLength 1

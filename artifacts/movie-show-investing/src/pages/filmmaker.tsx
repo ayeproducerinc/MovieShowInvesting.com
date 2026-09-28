@@ -228,11 +228,11 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
   }
   async function finish() {
     if (submit.isPending) return;
-    if (!submissionConfig.data?.available || !submissionConfig.data.turnstile_site_key) {
-      setValidation('We could not load the submission verification check. Your answers are saved. Try “Check again” below.');
+    if (!submissionConfig.data?.available) {
+      setValidation('We could not prepare the final submission. Your answers are saved. Try “Check again” below.');
       return;
     }
-    if (!turnstileToken) {
+    if (submissionConfig.data.turnstile_site_key && !turnstileToken) {
       setValidation('Complete the Cloudflare verification before sending your answers.');
       return;
     }
@@ -245,7 +245,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
     if (editTimer.current !== null) window.clearTimeout(editTimer.current);
     try {
       await persist(6, a);
-      const submitted = await submit.mutateAsync({ data:{ ...payload(a), website, turnstile_token:token } });
+      const submitted = await submit.mutateAsync({ data:{ ...payload(a), website, ...(submissionConfig.data.turnstile_site_key ? { turnstile_token:token } : {}) } });
       recordPitchForReview(submitted.project_id);
       turnstileResetRef.current?.();
       if (identityId === 'visitor') showGuestConfirmation();
@@ -392,17 +392,17 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
           <label className="fm-check fm-section"><input type="checkbox" data-testid="checkbox-chat-opt-in" checked={a.chat_opt_in} onChange={e=>change('chat_opt_in',e.target.checked)}/><span>I’m open to a quick 15-minute chat about my experience.</span></label>
           <p className="fm-small">By submitting, you’re sharing information with Movie Show Investing for its launch MVP. This does not create a project listing or an investment opportunity. See our <Link href="/privacy" className="underline" data-testid="link-flow-privacy">privacy policy</Link>.</p>
            {submissionConfig.isLoading ? <p className="fm-small" role="status">Loading secure submission verification…</p>
-             : submissionConfig.isError ? <div className="fm-error" role="alert">We could not check anti-bot protection. Nothing has been sent. <button type="button" className="underline" onClick={()=>void submissionConfig.refetch()}>Check again</button></div>
-             : !submissionConfig.data?.available || !submissionConfig.data.turnstile_site_key ? <div className="fm-error" role="status">We could not load the submission verification check. Your answers remain saved. <button type="button" className="underline" onClick={()=>void submissionConfig.refetch()}>Check again</button></div>
-             : <FilmmakerTurnstile siteKey={submissionConfig.data.turnstile_site_key} onToken={setTurnstileToken} resetRef={turnstileResetRef}/>}
+             : submissionConfig.isError ? <div className="fm-error" role="alert">We could not check submission settings. Nothing has been sent. <button type="button" className="underline" onClick={()=>void submissionConfig.refetch()}>Check again</button></div>
+             : !submissionConfig.data?.available ? <div className="fm-error" role="status">We could not prepare the final submission. Your answers remain saved. <button type="button" className="underline" onClick={()=>void submissionConfig.refetch()}>Check again</button></div>
+             : submissionConfig.data.turnstile_site_key ? <FilmmakerTurnstile siteKey={submissionConfig.data.turnstile_site_key} onToken={setTurnstileToken} resetRef={turnstileResetRef}/> : null}
         </>}
         {validation && <p className="fm-error" data-testid="error-validation" role="alert">{validation}</p>}
         {saveError && <div className="fm-error" data-testid="error-save" role="alert">{saveError} {saveError.startsWith('This draft') ? <Link href="/me/projects" data-testid="link-reselect-draft">My projects</Link> : <button type="button" data-testid="button-retry-save" className="underline" onClick={()=>void persist(screenRef.current,answersRef.current).catch(()=>undefined)}>Retry save</button>}</div>}
         <div className="fm-steps">
           {screen>1 ? <button type="button" data-testid="button-back" className="fm-back" disabled={saving || submit.isPending} onClick={()=>void back()}><ArrowLeft size={17}/> Back</button> : <span className="fm-small">Your answers save as you go.</span>}
           {screen===1 && !a.stage ? <span className="fm-small">Choose a stage to continue</span> :
-             <button type="button" data-testid={screen===6?'button-submit-filmmaker':'button-continue'} className="fm-primary" disabled={saving || submit.isPending || screen===6 && (submissionConfig.isLoading || submissionConfig.isError || !submissionConfig.data?.available || !turnstileToken) || screen===4 && (otherOfferError || !a.offer_choice || !validListedOffer(a.offer_per100))} onClick={()=>screen===6 ? void finish() : void advance(a.no_project_yet && screen===2 ? 6 : screen+1)}>
-               {submit.isPending ? 'Submitting…' : saving ? 'Saving…' : screen===6 ? !turnstileToken ? 'Complete verification to submit' : 'Send my answers' : 'Continue'} {!submit.isPending && <ArrowRight size={17}/>}
+             <button type="button" data-testid={screen===6?'button-submit-filmmaker':'button-continue'} className="fm-primary" disabled={saving || submit.isPending || screen===6 && (submissionConfig.isLoading || submissionConfig.isError || !submissionConfig.data?.available || Boolean(submissionConfig.data?.turnstile_site_key && !turnstileToken)) || screen===4 && (otherOfferError || !a.offer_choice || !validListedOffer(a.offer_per100))} onClick={()=>screen===6 ? void finish() : void advance(a.no_project_yet && screen===2 ? 6 : screen+1)}>
+               {submit.isPending ? 'Submitting…' : saving ? 'Saving…' : screen===6 ? submissionConfig.data?.turnstile_site_key && !turnstileToken ? 'Complete verification to submit' : 'Send my answers' : 'Continue'} {!submit.isPending && <ArrowRight size={17}/>}
             </button>}
         </div>
         <p className="fm-status" role="status" data-testid="status-save" style={{marginTop:15}}>{saveError ? 'Changes not saved' : saving ? 'Saving your answers…' : lastSaved.current === JSON.stringify({screen,answers:a}) ? 'All changes saved' : 'Changes save automatically'}</p>

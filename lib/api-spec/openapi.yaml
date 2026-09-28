@@ -383,8 +383,8 @@ paths:
     post:
       operationId: submitFilmmaker
       tags: [filmmakers]
-      summary: Submit the filmmaker flow after Cloudflare Turnstile verification
-      description: Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. The single-use Turnstile response is verified server-side before creating a submission.
+      summary: Submit the filmmaker flow
+      description: Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply; a single-use Turnstile response is required and verified server-side only when Turnstile is configured.
       security:
         - firebaseBearer: []
         - {}
@@ -414,7 +414,7 @@ paths:
         "403":
           description: Firebase UID does not own this visitor, or Turnstile verification failed, expired, or was already used
         "503":
-          description: Firebase verification or required anti-bot protection is unavailable
+          description: Firebase verification, rate limiting, or a partially configured Turnstile check failed
         "409":
           description: Draft context header is missing or does not match the current draft
         "429":
@@ -423,10 +423,10 @@ paths:
     get:
       operationId: getFilmmakerSubmissionConfig
       tags: [filmmakers]
-      summary: Read filmmaker final-submission availability and public Turnstile site key
+      summary: Read filmmaker final-submission availability and optional Turnstile site key
       responses:
         "200":
-          description: Final submission protection configuration; unavailable until both Turnstile keys are configured
+          description: Submission is available without Turnstile; a partial Turnstile setup blocks submission rather than silently bypassing its check
           content:
             application/json:
               schema:
@@ -1573,10 +1573,10 @@ components:
     FilmmakerSubmissionInput:
       type: object
       additionalProperties: false
-      required: [no_project_yet, name, email, city, favorite_genres, chat_opt_in, turnstile_token]
+      required: [no_project_yet, name, email, city, favorite_genres, chat_opt_in]
       properties:
         website: { type: string, description: "Leave blank. Bot-detection field; never stored with the submission." }
-        turnstile_token: { type: string, minLength: 1, maxLength: 2048, description: "Single-use Cloudflare Turnstile response, verified server-side and never stored." }
+        turnstile_token: { type: string, minLength: 1, maxLength: 2048, description: "Required only when Turnstile is configured; verified server-side and never stored." }
         no_project_yet: { type: boolean }
         stage: { type: string, enum: [distribution, production, idea] }
         title: { type: string }
@@ -1616,7 +1616,7 @@ components:
       type: object
       required: [available, turnstile_site_key]
       properties:
-        available: { type: boolean }
+        available: { type: boolean, description: "True if the form can submit, including when no Turnstile keys have been configured." }
         turnstile_site_key: { type: ["string", "null"], minLength: 1 }
     LocationSearchPayload:
       type: object

@@ -100,10 +100,12 @@ function safeCalendlyUrl(value: string | undefined): string | null {
 
 router.get("/filmmaker-submission-config", (_req, res): void => {
   const config = getTurnstileConfig();
-  const available = Boolean(config.siteKey && config.secretKey && allowedTurnstileHostnames().length);
+  const configured = Boolean(config.siteKey || config.secretKey);
+  const turnstileReady = Boolean(config.siteKey && config.secretKey && allowedTurnstileHostnames().length);
+  const available = !configured || turnstileReady;
   res.json(GetFilmmakerSubmissionConfigResponse.parse({
     available,
-    turnstile_site_key: available ? config.siteKey : null,
+    turnstile_site_key: turnstileReady ? config.siteKey : null,
   }));
 });
 
@@ -125,8 +127,9 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     return;
   }
   const turnstileConfig = getTurnstileConfig();
-  if (!turnstileConfig.siteKey || !turnstileConfig.secretKey || !allowedTurnstileHostnames().length) {
-    res.status(503).json({ error: "Filmmaker submissions are temporarily unavailable until anti-bot protection is configured." });
+  const turnstileConfigured = Boolean(turnstileConfig.siteKey || turnstileConfig.secretKey);
+  if (turnstileConfigured && (!turnstileConfig.siteKey || !turnstileConfig.secretKey || !allowedTurnstileHostnames().length)) {
+    res.status(503).json({ error: "The verification service is not fully configured." });
     return;
   }
 
@@ -193,13 +196,14 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     return;
   }
 
-  const verifiedTurnstile = await verifyTurnstileToken(turnstileToken, {
-    ip: req.ip || req.socket.remoteAddress || undefined,
-    action: TURNSTILE_ACTION,
-  });
-  if (!verifiedTurnstile) {
-    res.status(403).json({ error: "The anti-bot verification could not be verified. Please complete it again and retry." });
-    return;
+  if (turnstileConfigured) {
+    if (!turnstileToken || !await verifyTurnstileToken(turnstileToken, {
+      ip: req.ip || req.socket.remoteAddress || undefined,
+      action: TURNSTILE_ACTION,
+    })) {
+      res.status(403).json({ error: "The anti-bot verification could not be verified. Please complete it again and retry." });
+      return;
+    }
   }
 
   try {
