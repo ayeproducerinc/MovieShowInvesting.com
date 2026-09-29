@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowRight, Check, RotateCcw } from 'lucide-react';
+import { ArrowRight, Check, RotateCcw, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { getFilmmakerResult, getGetFilmmakerResultQueryKey, useGetFilmmakerResult, useGetPitchReviewCheckoutConfig, useGetPitchReviewCheckoutStatus, useStartPitchReviewCheckout, useUpdateFilmmakerShowcase } from '@workspace/api-client-react';
 import type { FilmmakerResult, FilmmakerShowcaseUpdate } from '@workspace/api-client-react';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { closeGuestConfirmation, guestConfirmationVisible } from '@/lib/filmmaker-confirmation';
 import { setFilmmakerAction } from '@/lib/filmmaker-intent';
-import { consumePitchReviewChoice, getPitchReviewProof } from '@/lib/pitch-review-intent';
+import { consumePitchReviewChoice, getPitchReviewProof, type PitchReviewChoice } from '@/lib/pitch-review-intent';
 import { ProjectShare } from '@/components/project-share';
 import { FilmmakerMedia } from '@/components/filmmaker-media';
 import { calculateDeal, money, type Stage } from './filmmaker-calculator';
@@ -39,7 +39,9 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
     ...(checkoutProof ? { 'X-MSI-Checkout-Proof': checkoutProof } : {}),
   } : {} } });
   const [showPaywall, setShowPaywall] = useState(false);
+  const [offerSource, setOfferSource] = useState<PitchReviewChoice | 'manual'>('manual');
   const paywallRef = useRef<HTMLDivElement>(null);
+  const paywallTriggerRef = useRef<HTMLButtonElement>(null);
   const [checkoutError, setCheckoutError] = useState('');
   const [checking, setChecking] = useState(false);
   const [needsReselect, setNeedsReselect] = useState(false);
@@ -66,9 +68,12 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
     || clean(trailer) !== (result.trailer_url || null);
   useEffect(() => {
     if (autoOpenReady && result.project_id && !result.showcase_requested
-      && !result.hidden && !reviewStatus?.paid && !reviewStatus?.pending
-      && consumePitchReviewChoice(result.project_id)) {
-      setShowPaywall(true);
+      && !result.hidden && !reviewStatus?.paid && !reviewStatus?.pending) {
+      const choice = consumePitchReviewChoice(result.project_id);
+      if (choice) {
+        setOfferSource(choice);
+        setShowPaywall(true);
+      }
     }
   }, [result.project_id, result.showcase_requested, result.hidden, reviewStatus?.paid, reviewStatus?.pending, autoOpenReady]);
   useEffect(() => {
@@ -77,6 +82,34 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
   useEffect(() => {
     if (showPaywall) paywallRef.current?.focus();
   }, [showPaywall]);
+  useEffect(() => {
+    if (!showPaywall) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !checkout.isPending) {
+        event.preventDefault();
+        setShowPaywall(false);
+        window.requestAnimationFrame(() => paywallTriggerRef.current?.focus());
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(paywallRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]') ?? []);
+      if (!focusable.length) { event.preventDefault(); return; }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === paywallRef.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showPaywall, checkout.isPending]);
+  function closePaywall() {
+    setShowPaywall(false);
+    window.requestAnimationFrame(() => paywallTriggerRef.current?.focus());
+  }
   useEffect(() => {
     if (!trailerDirty.current) setTrailer(result.trailer_url || '');
   }, [result.trailer_url]);
@@ -164,12 +197,13 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
       <div className="dossier-notice" style={{ marginTop: 24 }}>
          <strong>Submit for editorial review · $49 once per pitch</strong>
         <p>The free unlisted page and share link remain yours. If approved, your pitch will join Explore’s public Pitch Collection with no preset expiration date. Investors will be able to browse when they join.</p>
-         <button type="button" className="dossier-button" data-testid="button-open-review-paywall" onClick={() => { if (result.project_id) consumePitchReviewChoice(result.project_id); setCheckoutError(''); setShowPaywall(true); }}>Submit for review <ArrowRight size={17}/></button>
+         <button ref={paywallTriggerRef} type="button" className="dossier-button" data-testid="button-open-review-paywall" onClick={() => { if (result.project_id) consumePitchReviewChoice(result.project_id); setOfferSource('manual'); setCheckoutError(''); setShowPaywall(true); }}>Submit for review <ArrowRight size={17}/></button>
          {!canCheckout && <p role="status">{paymentNotice}</p>}
       </div>
       {showPaywall && <div ref={paywallRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Pitch review checkout" className="fixed inset-0 z-50 flex items-center justify-center bg-[#202936]/75 p-4">
-        <div className="w-full max-w-lg bg-[#f4f0e7] p-7 shadow-2xl md:p-10">
-            <p className="dossier-kicker">Editorial review · $49 per pitch</p>
+        <div className="relative max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto bg-[#f4f0e7] p-7 shadow-2xl md:p-10">
+          <button type="button" aria-label="Close editorial review offer" data-testid="button-close-review-paywall" disabled={checkout.isPending} onClick={closePaywall} className="absolute right-4 top-4 rounded p-2 text-[#202936] hover:bg-[#e7dfd2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"><X size={22} aria-hidden="true" /></button>
+             <p className="dossier-kicker pr-10">Editorial review · $49 per pitch</p>
           <h2 className="serif mt-3 text-4xl">Submit your pitch for review</h2>
           <p className="mt-5 leading-relaxed"><strong>$49 one time.</strong> This pays for editorial review of this pitch. Approval is not guaranteed. If approved, we’ll list it in the public Pitch Collection with no preset expiration date.</p>
            <p className="mt-3 text-sm">After we complete your review, a declined pitch is not automatically refunded. If we cannot deliver the review, we’ll refund the payment, subject to applicable law. You can leave checkout before paying; cancelling checkout does not submit the pitch for review.</p>
@@ -207,7 +241,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
                 }
               }
               })()}>{checkout.isPending ? 'Opening checkout…' : 'Continue to checkout'}</button>
-            <button type="button" className="dossier-button dossier-button-outline" disabled={checkout.isPending} onClick={() => setShowPaywall(false)}>Not now</button>
+            {offerSource !== 'paid' && <button type="button" className="dossier-button dossier-button-outline" disabled={checkout.isPending} onClick={closePaywall}>Not now</button>}
             {needsReselect && <Link href="/me/projects" className="underline">Open My projects</Link>}
           </div>
         </div>
