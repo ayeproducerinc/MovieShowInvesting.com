@@ -2,11 +2,16 @@ import { Router, type IRouter } from "express";
 import { db, filmmakersTable, getCompletedFilmmakerResult, getFilmmakerAccountProjectVisitor, projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { authenticateFilmmaker, authorizeFilmmakerVisitor, requireMatchingFilmmakerContext } from "../lib/filmmaker-auth";
-import { reconcileReviewCheckouts, startReviewCheckout } from "../lib/pitch-review-payments";
+import { reconcileReviewCheckouts, reviewCheckoutConfig, startReviewCheckout } from "../lib/pitch-review-payments";
 import { verifyPitchReviewProof } from "../lib/pitch-review-proof";
 
 const router: IRouter = Router();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+router.get("/filmmakers/review-checkout/config", async (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json(await reviewCheckoutConfig());
+});
 
 async function currentPitch(req: Parameters<typeof authorizeFilmmakerVisitor>[0], res: Parameters<typeof authorizeFilmmakerVisitor>[1]) {
   const cookieId = req.cookies?.msi_visitor_id;
@@ -52,6 +57,10 @@ async function currentPitch(req: Parameters<typeof authorizeFilmmakerVisitor>[0]
 
 router.post("/filmmakers/review-checkout", async (req, res): Promise<void> => {
   res.set("Cache-Control", "no-store");
+  if (!(await reviewCheckoutConfig()).enabled) {
+    res.status(503).json({ error: "We couldn't connect to review checkout. Your pitch is saved. Please try again later." });
+    return;
+  }
   const context = await currentPitch(req, res);
   if (!context) return;
   const { project, visitorId } = context;
@@ -79,8 +88,8 @@ router.post("/filmmakers/review-checkout", async (req, res): Promise<void> => {
     const url = await startReviewCheckout(project.id, visitorId);
     res.json({ url, already_submitted: false });
   } catch (error) {
-    req.log.error({ error }, "Could not create sandbox review checkout");
-    res.status(503).json({ error: "Test checkout is temporarily unavailable. Your free pitch is still saved." });
+    req.log.error({ error }, "Could not create review checkout");
+    res.status(503).json({ error: "Review checkout is unavailable. Your free pitch remains saved; do not pay again if you already completed checkout." });
   }
 });
 
@@ -91,7 +100,7 @@ router.get("/filmmakers/review-checkout/status", async (req, res): Promise<void>
   try {
     await reconcileReviewCheckouts(context.project.id);
   } catch (error) {
-    req.log.error({ error }, "Could not verify sandbox review payment");
+    req.log.error({ error }, "Could not verify review payment");
     res.status(503).json({ error: "We could not verify your payment yet. Please try again; do not pay twice." });
     return;
   }

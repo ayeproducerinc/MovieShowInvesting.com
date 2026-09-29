@@ -63,6 +63,7 @@ import type {
   Flow,
   FlowProgress,
   GetExploreParams,
+  GetPitchReviewCheckoutConfig200,
   GetPitchReviewCheckoutStatus200,
   HealthStatus,
   InvestorIntentClaimResult,
@@ -2611,6 +2612,83 @@ export const useUpdateFilmmakerShowcase = <TError = ErrorType<void>,
       return useMutation(getUpdateFilmmakerShowcaseMutationOptions(options));
     }
 
+export const getGetPitchReviewCheckoutConfigUrl = () => {
+
+
+
+
+  return `/api/filmmakers/review-checkout/config`
+}
+
+/**
+ * @summary Read payment environment and launch availability without exposing Stripe credentials
+ */
+export const getPitchReviewCheckoutConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetPitchReviewCheckoutConfig200> => {
+
+  return customFetch<GetPitchReviewCheckoutConfig200>(getGetPitchReviewCheckoutConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPitchReviewCheckoutConfigQueryKey = () => {
+    return [
+    `/api/filmmakers/review-checkout/config`
+    ] as const;
+    }
+
+
+export const getGetPitchReviewCheckoutConfigQueryOptions = <TData = Awaited<ReturnType<typeof getPitchReviewCheckoutConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPitchReviewCheckoutConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPitchReviewCheckoutConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPitchReviewCheckoutConfig>>> = ({ signal }) => getPitchReviewCheckoutConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPitchReviewCheckoutConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPitchReviewCheckoutConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getPitchReviewCheckoutConfig>>>
+export type GetPitchReviewCheckoutConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Read payment environment and launch availability without exposing Stripe credentials
+ */
+
+export function useGetPitchReviewCheckoutConfig<TData = Awaited<ReturnType<typeof getPitchReviewCheckoutConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPitchReviewCheckoutConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPitchReviewCheckoutConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getStartPitchReviewCheckoutUrl = () => {
 
 
@@ -2620,7 +2698,7 @@ export const getStartPitchReviewCheckoutUrl = () => {
 }
 
 /**
- * @summary Start a sandbox checkout for the current completed pitch
+ * @summary Start pitch-specific review checkout in the explicitly configured environment
  */
 export const startPitchReviewCheckout = async ( options?: Parameters<typeof customFetch>[1]): Promise<StartPitchReviewCheckout200> => {
 
@@ -2672,7 +2750,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     /**
- * @summary Start a sandbox checkout for the current completed pitch
+ * @summary Start pitch-specific review checkout in the explicitly configured environment
  */
 export const useStartPitchReviewCheckout = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startPitchReviewCheckout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -2694,7 +2772,7 @@ export const getGetPitchReviewCheckoutStatusUrl = () => {
 }
 
 /**
- * @summary Reconcile sandbox payment for the current pitch and read review status
+ * @summary Reconcile payment for the current pitch and read review status
  */
 export const getPitchReviewCheckoutStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetPitchReviewCheckoutStatus200> => {
 
@@ -2741,7 +2819,7 @@ export type GetPitchReviewCheckoutStatusQueryError = ErrorType<void>
 
 
 /**
- * @summary Reconcile sandbox payment for the current pitch and read review status
+ * @summary Reconcile payment for the current pitch and read review status
  */
 
 export function useGetPitchReviewCheckoutStatus<TData = Awaited<ReturnType<typeof getPitchReviewCheckoutStatus>>, TError = ErrorType<void>>(

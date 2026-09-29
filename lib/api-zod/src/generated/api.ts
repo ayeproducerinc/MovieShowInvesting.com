@@ -649,7 +649,16 @@ export const UpdateFilmmakerShowcaseResponse = zod.object({
 
 
 /**
- * @summary Start a sandbox checkout for the current completed pitch
+ * @summary Read payment environment and launch availability without exposing Stripe credentials
+ */
+export const GetPitchReviewCheckoutConfigResponse = zod.object({
+  "mode": zod.enum(['live', 'sandbox']),
+  "enabled": zod.boolean()
+})
+
+
+/**
+ * @summary Start pitch-specific review checkout in the explicitly configured environment
  */
 
 
@@ -666,7 +675,7 @@ export const StartPitchReviewCheckoutResponse = zod.object({
 
 
 /**
- * @summary Reconcile sandbox payment for the current pitch and read review status
+ * @summary Reconcile payment for the current pitch and read review status
  */
 
 

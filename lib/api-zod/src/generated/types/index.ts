@@ -74,6 +74,8 @@ export * from './flowProgress';
 export * from './flowProgressAnswers';
 export * from './getExploreParams';
 export * from './getExploreStage';
+export * from './getPitchReviewCheckoutConfig200';
+export * from './getPitchReviewCheckoutConfig200Mode';
 export * from './getPitchReviewCheckoutStatus200';
 export * from './healthStatus';
 export * from './investorAllocationInput';

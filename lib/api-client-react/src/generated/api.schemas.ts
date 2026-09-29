@@ -1059,6 +1059,19 @@ export type SearchLocationsParams = {
 query: string;
 };
 
+export type GetPitchReviewCheckoutConfig200Mode = typeof GetPitchReviewCheckoutConfig200Mode[keyof typeof GetPitchReviewCheckoutConfig200Mode];
+
+
+export const GetPitchReviewCheckoutConfig200Mode = {
+  live: 'live',
+  sandbox: 'sandbox',
+} as const;
+
+export type GetPitchReviewCheckoutConfig200 = {
+  mode: GetPitchReviewCheckoutConfig200Mode;
+  enabled: boolean;
+};
+
 export type StartPitchReviewCheckout200 = {
   /** @nullable */
   url: string | null;

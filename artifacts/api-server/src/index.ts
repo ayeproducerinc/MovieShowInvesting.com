@@ -23,5 +23,5 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
-  if (process.env.NODE_ENV !== "production") startReviewCheckoutReconciliation();
+  startReviewCheckoutReconciliation();
 });

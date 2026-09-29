@@ -22,12 +22,12 @@ export default function Pricing() {
           <p className="mt-6 leading-relaxed">Submit one film or show pitch for editorial review. Payment sends your pitch to our review queue. <strong>Approval is not guaranteed.</strong> If approved, we’ll list it in Explore’s public Pitch Collection, with no preset expiration date.</p>
           <p className="mt-4 leading-relaxed">Join the early filmmaker lineup as we build the Pitch Collection that investors will be able to browse when they join.</p>
           <p className="mt-4 text-sm">The review fee is not automatically refunded if we complete your review and decline the pitch. If we cannot deliver the review, we’ll refund it, subject to applicable law.</p>
-          <p className="mt-4 text-sm font-semibold">Test checkout only · no real charge</p>
+           <p className="mt-4 text-sm font-semibold">Complete your pitch, then continue to checkout for editorial review.</p>
           <Link href="/start/filmmaker?new=1" onClick={() => choosePitchReview(true)} className="dossier-button mt-8 inline-flex" data-testid="link-paid-pitch">Create your pitch <ArrowRight size={17}/></Link>
           <p className="mt-4 text-sm">Already have a pitch? <Link href="/me/projects?action=manage" className="underline">Open My projects</Link>.</p>
         </div>
       </div>
-      <p className="mt-8 text-sm">Choose the paid path to check out after finishing your pitch. If you start free, you can choose “Submit for review” on your confirmation screen later. Only confirmed payment sends your pitch to review.</p>
+        <p className="mt-8 text-sm">You can choose paid review after finishing your pitch. Starting free never obligates you to pay. Only a verified payment sends your pitch to review.</p>
     </div>
   </section>;
 }

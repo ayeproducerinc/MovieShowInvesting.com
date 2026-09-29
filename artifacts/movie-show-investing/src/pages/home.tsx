@@ -7,7 +7,7 @@ import './home.css';
 const filmmakerSteps = [
   ['Create your project.', 'Tell us what you’re making and what it may cost.'],
   ['Propose the terms.', 'Explore an illustrative payback target and explain what you have in mind.'],
-  ['Build interest.', 'Create a free, unlisted pitch and share its link. Choose the $49 test checkout to submit it for editorial review; only approved pitches enter public discovery.'],
+  ['Build interest.', 'Create a free, unlisted pitch and share its link. When available, choose $49 editorial review; only approved pitches enter public discovery.'],
 ];
 
 const investorSteps = [

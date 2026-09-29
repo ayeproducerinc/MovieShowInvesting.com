@@ -39,7 +39,7 @@ const metadata: Record<string, [string, string]> = {
   '/terms': ['Terms | Movie Show Investing', 'Terms for the current Movie Show Investing site and its non-binding features.'],
   '/disclaimers': ['Disclaimers | Movie Show Investing', 'Important context about non-binding interest, securities, and investment risk.'],
   '/explore': ['Explore projects | Movie Show Investing', 'Discover approved independent films and shows. Project profiles are not investment offers.'],
-  '/pricing': ['Pitch review pricing | Movie Show Investing', 'Create a free unlisted pitch or pay $49 once to submit it for editorial review in our test checkout.'],
+  '/pricing': ['Pitch review pricing | Movie Show Investing', 'Create a free unlisted pitch. When paid checkout is available, choose a $49 one-time editorial review.'],
   '/invest': ['Express interest | Movie Show Investing', 'Explore independent film projects and save non-binding investor interest. No money is collected.'],
   '/invest/done': ['Interest saved | Movie Show Investing', 'Your non-binding interest has been saved. No money has been collected.'],
   '/lineup': ['My saved lineup | Movie Show Investing', 'A private view of your saved, non-binding project interest. No money has been collected.'],

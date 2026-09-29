@@ -693,11 +693,27 @@ paths:
           description: Firebase verification is unavailable
         "409":
           description: Project context header is missing or does not match the current project
+  /filmmakers/review-checkout/config:
+    get:
+      operationId: getPitchReviewCheckoutConfig
+      tags: [filmmakers]
+      summary: Read payment environment and launch availability without exposing Stripe credentials
+      responses:
+        "200":
+          description: Live checkout stays disabled until owner approval and production configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mode, enabled]
+                properties:
+                  mode: { type: string, enum: [live, sandbox] }
+                  enabled: { type: boolean }
   /filmmakers/review-checkout:
     post:
       operationId: startPitchReviewCheckout
       tags: [filmmakers]
-      summary: Start a sandbox checkout for the current completed pitch
+      summary: Start pitch-specific review checkout in the explicitly configured environment
       security:
         - firebaseBearer: []
         - {}
@@ -713,7 +729,7 @@ paths:
           schema: { type: string }
       responses:
         "200":
-          description: Sandbox checkout URL, or already-submitted status
+          description: Stripe checkout URL, or already-submitted status
           content:
             application/json:
               schema:
@@ -725,12 +741,12 @@ paths:
         "400": { description: Visitor or completed pitch required }
         "401": { description: Sign-in required for an account-linked pitch }
         "409": { description: Project context changed or pitch ineligible }
-        "503": { description: Sandbox checkout is unavailable }
+        "503": { description: Checkout is gated or live Stripe verification unavailable; free pitch remains saved }
   /filmmakers/review-checkout/status:
     get:
       operationId: getPitchReviewCheckoutStatus
       tags: [filmmakers]
-      summary: Reconcile sandbox payment for the current pitch and read review status
+      summary: Reconcile payment for the current pitch and read review status
       security:
         - firebaseBearer: []
         - {}
