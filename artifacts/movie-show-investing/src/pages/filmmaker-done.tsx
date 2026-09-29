@@ -174,7 +174,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
           <p className="mt-5 leading-relaxed"><strong>$49 one time.</strong> This pays for editorial review of this pitch. Approval is not guaranteed. If approved, we’ll list it in the public Pitch Collection with no preset expiration date.</p>
            <p className="mt-3 text-sm">After we complete your review, a declined pitch is not automatically refunded. If we cannot deliver the review, we’ll refund the payment, subject to applicable law. You can leave checkout before paying; cancelling checkout does not submit the pitch for review.</p>
           <p className="mt-3 text-sm">We’re building the Pitch Collection that investors will be able to browse when they join.</p>
-           {!canCheckout && <p role="status" className="dossier-notice mt-4">{paymentNotice} Your pitch and share link remain saved.</p>}
+            {!canCheckout && <p role="status" className="dossier-notice mt-4">{paymentNotice}</p>}
           {unsavedDetails && <p role="alert" className="dossier-error mt-4">You have unsaved pitch details. Close this window and save them before checkout so they are included in your review.</p>}
           {checkoutError && <p role="alert" className="dossier-error mt-4">{checkoutError}</p>}
           <div className="mt-7 flex flex-wrap gap-3">
@@ -240,8 +240,8 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
   const checkoutUnavailableText = checkoutConfig.isLoading
     ? 'Checking editorial review checkout availability…'
     : checkoutConfig.isSuccess && checkoutConfig.data.mode !== 'live'
-      ? 'Editorial review checkout is not open here yet. Your free pitch and share link remain saved.'
-      : "We couldn't connect to checkout right now. Your pitch is saved. Please try again later.";
+      ? 'This workspace preview cannot accept real payments. Your free pitch and share link remain saved.'
+      : 'Live editorial review checkout is temporarily unavailable. Your free pitch and share link remain saved. Please try again later.';
   const data = result.data;
   const checkoutProof = data?.checkout_proof || getPitchReviewProof(data?.project_id ?? null);
   const reviewStatus = useGetPitchReviewCheckoutStatus({
