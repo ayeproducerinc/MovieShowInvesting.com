@@ -96,7 +96,7 @@ export default function FilmmakerProjects() {
           clearVisitorQueries();
           clearFilmmakerAction();
           await queryClient.invalidateQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
-          navigate('/start/filmmaker');
+          navigate(new URLSearchParams(window.location.search).get('new') === '1' ? '/start/filmmaker?new=1' : '/start/filmmaker');
         } else {
           if (initialAction === 'manage') clearFilmmakerAction();
         }

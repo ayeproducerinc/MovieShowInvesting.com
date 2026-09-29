@@ -48,7 +48,7 @@ function Choice({ selected, onClick, children, id, name, multiple = false, detai
 function Field({ label, id, value, onChange, required=false, type='text', placeholder='', multiline=false }: { label:string; id:string; value:string; onChange:(v:string)=>void; required?:boolean; type?:string; placeholder?:string; multiline?:boolean }) {
   return <div className="fm-field"><label htmlFor={id} className="fm-label">{label}{!required && <span className="fm-small"> · optional</span>}</label>
     {multiline ? <textarea id={id} data-testid={`input-${id}`} className="fm-input" value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} required={required} /> :
-      <input id={id} data-testid={`input-${id}`} className="fm-input" value={value} onChange={e=>onChange(e.target.value)} type={type} placeholder={placeholder} required={required} />}
+      <input id={id} data-testid={`input-${id}`} className="fm-input" value={value} onChange={e=>onChange(e.target.value)} type={type} autoComplete={type === 'email' ? 'email' : undefined} placeholder={placeholder} required={required} />}
   </div>;
 }
 function validUrl(value:string) { if (!value.trim()) return true; try { const u = new URL(value); return u.protocol === 'https:' || u.protocol === 'http:'; } catch { return false; } }
@@ -78,15 +78,16 @@ export default function Filmmaker() {
 
 function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identityId: string; signedInEmail: string | null; authLoading: boolean }) {
   const [, navigate] = useLocation();
+  const fromPricing = new URLSearchParams(window.location.search).get('new') === '1';
   const authReady = useFirebaseSessionReady();
   const completedResult = useGetFilmmakerResult({ query:{ queryKey:[...getGetFilmmakerResultQueryKey(),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
-  const completedDestination = () => new URLSearchParams(window.location.search).get('new') === '1' ? '/me/projects?action=start' : '/start/filmmaker/done';
+  const completedDestination = () => fromPricing ? '/me/projects?action=start&new=1' : '/start/filmmaker/done';
   useEffect(() => { if (completedResult.data?.completed) navigate(completedDestination()); }, [completedResult.data?.completed, navigate]);
   const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:[...getGetFlowProgressQueryKey('filmmaker'),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
   const submissionConfig = useGetFilmmakerSubmissionConfig({ query:{ queryKey:getGetFilmmakerSubmissionConfigQueryKey(), retry:false, refetchOnWindowFocus:true } });
   useEffect(() => {
-    if (identityId !== 'visitor' && authReady && !authLoading && completedResult.error?.status === 404 && progress.error?.status === 404) navigate('/me/projects');
-  }, [identityId, authReady, authLoading, completedResult.error, progress.error, navigate]);
+    if (identityId !== 'visitor' && authReady && !authLoading && completedResult.error?.status === 404 && progress.error?.status === 404) navigate(fromPricing ? '/me/projects?action=start&new=1' : '/me/projects');
+  }, [identityId, authReady, authLoading, completedResult.error, progress.error, navigate, fromPricing]);
   const group = useGetPriceGroup();
   const draftHeaders: Record<string, string> = progress.data?.draft_id ? { 'X-MSI-Draft-Id': String(progress.data.draft_id) } : {};
   const save = useSaveFlowProgress({ request: { headers: draftHeaders } });
@@ -94,6 +95,7 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
   const [a, setA] = useState<Answers>(initial);
   const [screen, setScreen] = useState(1);
   const [hydrated, setHydrated] = useState(false);
+  const [existingDraft, setExistingDraft] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [validation, setValidation] = useState('');
@@ -122,6 +124,7 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
     if (progress.data.completed) {
       navigate(completedDestination());
     } else {
+      setExistingDraft(fromPricing && (recoveredScreen > 1 || Boolean(recovered.stage || recovered.no_project_yet || recovered.title || recovered.name || recovered.email)));
       lastSaved.current = legacyStage ? '' : JSON.stringify({ screen:recoveredScreen, answers:recovered });
       setHydrated(true);
     }
@@ -169,14 +172,18 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
     return operation;
   }
   useEffect(() => {
-    if (!hydrated || authLoading) return;
+    if (!hydrated || authLoading || existingDraft) return;
     const snapshot = JSON.stringify({ screen, answers:a });
     if (snapshot === lastSaved.current) return;
     editTimer.current = window.setTimeout(() => { editTimer.current = null; void persist(screen, a).catch(() => undefined); }, 800);
     return () => { if (editTimer.current !== null) window.clearTimeout(editTimer.current); editTimer.current = null; };
     // Deliberately schedule only when answers/screen change; mutation objects are unstable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a, screen, hydrated, authLoading]);
+  }, [a, screen, hydrated, authLoading, existingDraft]);
+  useEffect(() => {
+    if (!hydrated || identityId === 'visitor' || !signedInEmail) return;
+    setA(current => current.email.trim() ? current : { ...current, email:signedInEmail });
+  }, [hydrated, identityId, signedInEmail]);
   const stage = a.stage ?? 'idea';
   const budgetOptions = examples(stage, a.format);
   const budget = Number.isSafeInteger(a.budget) && a.budget > 0 ? a.budget : 0;
@@ -318,7 +325,8 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
 
   if (authLoading || completedResult.isLoading || progress.isLoading || group.isLoading || completedResult.data?.completed || !hydrated && !progress.isError) return <section className="fm"><div className="page-wrap" style={{padding:'70px 0 140px'}} aria-label="Loading saved answers"><p className="fm-kicker">Opening your worksheet</p><div className="fm-skeleton" style={{maxWidth:440,height:75}}/><div className="fm-skeleton" style={{maxWidth:310}}/><div className="fm-skeleton" style={{maxWidth:600,height:190}}/></div></section>;
   if (completedResult.isError && completedResult.error?.status !== 404 || progress.isError && progress.error?.status !== 404 || group.isError || !group.data) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Connection interrupted</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>We can’t open your worksheet yet.</h1><p className="fm-small">Your previous answers and pricing group need to load before you continue. Please try again.</p><button type="button" data-testid="button-retry-loading" className="fm-primary" style={{marginTop:30}} onClick={()=>{ void completedResult.refetch(); void progress.refetch(); void group.refetch(); }}><RotateCcw size={17}/> Try again</button></div></section>;
-  if (identityId !== 'visitor' && progress.error?.status === 404) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Choose a project</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>Your draft isn’t selected.</h1><p className="fm-small">Open My projects to resume a saved draft or start another project. No project was changed.</p><Link href="/me/projects" data-testid="link-select-filmmaker-draft" className="fm-primary" style={{marginTop:30}}>My projects <ArrowRight size={17}/></Link></div></section>;
+   if (identityId !== 'visitor' && progress.error?.status === 404) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Choose a project</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>Your draft isn’t selected.</h1><p className="fm-small">Open My projects to resume a saved draft or start another project. No project was changed.</p><Link href={fromPricing ? '/me/projects?action=start&new=1' : '/me/projects'} data-testid="link-select-filmmaker-draft" className="fm-primary" style={{marginTop:30}}>My projects <ArrowRight size={17}/></Link></div></section>;
+   if (existingDraft && fromPricing) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Saved worksheet found</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>Your pitch is still here.</h1><p className="fm-small">You have an unfinished pitch in this browser. Opening the pricing page again will not erase it or start a second draft. Continue your saved pitch, or finish it before starting another.</p><button type="button" className="fm-primary" data-testid="button-resume-pricing-draft" style={{marginTop:30}} onClick={() => { setExistingDraft(false); navigate('/start/filmmaker'); }}>Continue saved pitch <ArrowRight size={17}/></button></div></section>;
   return <section className="fm"><div className="page-wrap">
     <div className="fm-top"><Link href="/" data-testid="link-flow-home" className="fm-kicker">Movie Show Investing / Filmmakers</Link><span className="fm-kicker" data-testid="text-progress">Step {screen} of 6</span></div>
     <div className="fm-progress" aria-label={`Step ${screen} of 6`}>{headings.map((heading,i)=><span key={heading} className={i<screen ? 'active' : ''} title={`Step ${i+1}: ${heading}`}/>)}</div>
