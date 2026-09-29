@@ -24,6 +24,4 @@ export interface QuestionInput {
      * @maxLength 3000
      */
   question: string;
-  /** @minLength 1 */
-  turnstile_token: string;
 }

@@ -7,11 +7,6 @@
  */
 
 export interface FilmmakerSubmissionConfig {
-  /** True if the form can submit, including when no Turnstile keys have been configured. */
+  /** True when the filmmaker form can submit. */
   available: boolean;
-  /**
-     * @minLength 1
-     * @nullable
-     */
-  turnstile_site_key: string | null;
 }

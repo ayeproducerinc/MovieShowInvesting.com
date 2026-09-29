@@ -28,7 +28,6 @@
 .q-divider { border:0; border-top:1px solid var(--q-line); margin:25px 0; }
 .q-private-note { display:flex; align-items:flex-start; gap:11px; font-size:12px; line-height:1.6; color:#596163; margin:24px 0 0; }
 .q-private-note svg { flex:none; color:var(--q-wine); }
-.q-turnstile { margin:17px 0 23px; min-height:66px; }
 .q-desk { background:#e9e3d8; border-top:1px solid #c9c0b2; padding:clamp(58px,7vw,100px) 0 110px; min-height:75dvh; }
 .q-desk__head { display:flex; justify-content:space-between; align-items:end; gap:25px; padding-bottom:25px; border-bottom:1px solid #bbb1a3; }
 .q-desk__head .q-title { margin-bottom:0; }

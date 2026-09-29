@@ -31,8 +31,6 @@ export interface LogoutSessionEnvelope {
 
 export interface QuestionConfig {
   available: boolean;
-  /** @nullable */
-  turnstile_site_key: string | null;
 }
 
 export interface QuestionInput {
@@ -53,8 +51,6 @@ export interface QuestionInput {
      * @maxLength 3000
      */
   question: string;
-  /** @minLength 1 */
-  turnstile_token: string;
 }
 
 export const QuestionSubmissionValue = {
@@ -231,12 +227,6 @@ export const FilmmakerSubmissionInputPaybackTerms = {
 export interface FilmmakerSubmissionInput {
   /** Leave blank. Bot-detection field; never stored with the submission. */
   website?: string;
-  /**
-     * Required only when Turnstile is configured; verified server-side and never stored.
-     * @minLength 1
-     * @maxLength 2048
-     */
-  turnstile_token?: string;
   no_project_yet: boolean;
   stage?: FilmmakerSubmissionInputStage;
   title?: string;
@@ -275,13 +265,8 @@ export interface FilmmakerSubmissionInput {
 }
 
 export interface FilmmakerSubmissionConfig {
-  /** True if the form can submit, including when no Turnstile keys have been configured. */
+  /** True when the filmmaker form can submit. */
   available: boolean;
-  /**
-     * @minLength 1
-     * @nullable
-     */
-  turnstile_site_key: string | null;
 }
 
 export interface LocationSuggestion {

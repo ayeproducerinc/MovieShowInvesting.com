@@ -18,14 +18,17 @@ import {
 } from "@workspace/api-zod";
 import { authenticateFilmmaker } from "../lib/filmmaker-auth";
 import { sendTransactionalEmail } from "../lib/mailjet";
-import { allowedTurnstileHostnames, getTurnstileConfig, verifyTurnstileToken } from "../lib/cloudflare-turnstile";
 
 const router: IRouter = Router();
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ASKER_LIMIT = 5;
 const ASKER_WINDOW_MS = 24 * 60 * 60 * 1000;
 const IP_LIMIT = 20;
-const ASK_TURNSTILE_ACTION = "ask_filmmaker";
+
+// The private question feature remains closed until its separate launch safeguards are approved.
+function questionsOpen(): boolean {
+  return false;
+}
 
 function digest(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -57,8 +60,6 @@ function configuredAppBaseUrl(): string | null {
 
 async function allowIpAttempt(ip: string): Promise<boolean> {
   const hashKey = process.env.QUESTION_IP_HASH_SECRET?.trim()
-    || process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY
-    || process.env.TURNSTILE_SECRET_KEY
     || process.env.DATABASE_URL;
   if (!hashKey) throw new Error("Question IP hashing is not configured.");
   const ipHash = createHmac("sha256", hashKey).update(ip).digest("hex");
@@ -227,23 +228,13 @@ async function sendReservedAnswer(
 }
 
 router.get("/question-config", (_req, res): void => {
-  const { siteKey, secretKey } = getTurnstileConfig();
-  const hasMailjet = Boolean(
-    process.env.MAILJET_API_KEY?.trim()
-    && process.env.MAILJET_SECRET_KEY?.trim()
-    && process.env.MAILJET_SENDER_EMAIL?.trim(),
-  );
-  const available = Boolean(siteKey && secretKey && allowedTurnstileHostnames().length && hasMailjet && configuredAppBaseUrl());
-  res.json(GetQuestionConfigResponse.parse({
-    available,
-    turnstile_site_key: available ? siteKey : null,
-  }));
+  res.json(GetQuestionConfigResponse.parse({ available: questionsOpen() }));
 });
 
 router.post("/projects/:slug/questions", async (req, res): Promise<void> => {
-  const turnstile = getTurnstileConfig();
-  if (!turnstile.siteKey || !turnstile.secretKey || !allowedTurnstileHostnames().length) {
-    res.status(503).json({ error: "Questions are unavailable until anti-bot protection is configured." });
+  // Private question delivery remains closed until a separate launch decision.
+  if (!questionsOpen()) {
+    res.status(503).json({ error: "Private questions are not available yet." });
     return;
   }
   const ip = req.ip || req.socket.remoteAddress || "unknown";
@@ -254,7 +245,7 @@ router.post("/projects/:slug/questions", async (req, res): Promise<void> => {
   const parsedParams = AskFilmmakerParams.safeParse(req.params);
   const parsedBody = AskFilmmakerBody.safeParse(req.body);
   if (!parsedParams.success || !parsedBody.success) {
-    res.status(400).json({ error: "Provide a valid first name, email, question, and Turnstile response." });
+    res.status(400).json({ error: "Provide a valid first name, email, and question." });
     return;
   }
   const input = {
@@ -268,11 +259,7 @@ router.post("/projects/:slug/questions", async (req, res): Promise<void> => {
     return;
   }
   if (!input.first_name || input.question.length < 5) {
-    res.status(400).json({ error: "Provide a valid first name, email, question, and Turnstile response." });
-    return;
-  }
-  if (!await verifyTurnstileToken(input.turnstile_token, { ip, action: ASK_TURNSTILE_ACTION })) {
-    res.status(403).json({ error: "The anti-bot verification could not be verified. Please try again." });
+    res.status(400).json({ error: "Provide a valid first name, email, and question." });
     return;
   }
 

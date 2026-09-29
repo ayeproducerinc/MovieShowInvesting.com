@@ -8,6 +8,4 @@
 
 export interface QuestionConfig {
   available: boolean;
-  /** @nullable */
-  turnstile_site_key: string | null;
 }

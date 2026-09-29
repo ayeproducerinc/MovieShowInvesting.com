@@ -23,20 +23,18 @@ import {
 } from "../lib/filmmaker-auth";
 import { recordTransactionalEmailStatus, sendTransactionalEmail } from "../lib/mailjet";
 import { reserveFilmmakerSubmissionAttempt } from "../lib/filmmaker-submission-limit";
-import { allowedTurnstileHostnames, getTurnstileConfig, verifyTurnstileToken } from "../lib/cloudflare-turnstile";
 import { issuePitchReviewProof } from "../lib/pitch-review-proof";
 
 const router: IRouter = Router();
 router.use(cookieParser());
 
 const VISITOR_COOKIE = "msi_visitor_id";
-const TURNSTILE_ACTION = "filmmaker_submission";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHOWCASE_FIELDS = new Set([
   "showcase_requested", "synopsis", "team_links", "money_use", "distribution_plan", "trailer_url",
 ]);
 const INPUT_FIELDS = new Set([
-  "website", "turnstile_token",
+  "website",
   "no_project_yet", "stage", "title", "format", "genre", "genre_other",
   "logline", "trailer_url", "pilot_url", "budget", "budget_from_example", "deal_answer",
   "offer_per100", "offer_other_text", "wants_lower", "payback_terms", "payback_terms_other",
@@ -100,13 +98,8 @@ function safeCalendlyUrl(value: string | undefined): string | null {
 }
 
 router.get("/filmmaker-submission-config", (_req, res): void => {
-  const config = getTurnstileConfig();
-  const configured = Boolean(config.siteKey || config.secretKey);
-  const turnstileReady = Boolean(config.siteKey && config.secretKey && allowedTurnstileHostnames().length);
-  const available = !configured || turnstileReady;
   res.json(GetFilmmakerSubmissionConfigResponse.parse({
-    available,
-    turnstile_site_key: turnstileReady ? config.siteKey : null,
+    available: true,
   }));
 });
 
@@ -122,18 +115,11 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid filmmaker submission." });
     return;
   }
-  const { website, turnstile_token: turnstileToken, ...data } = parsed.data;
+  const { website, ...data } = parsed.data;
   if (website?.trim()) {
     res.status(400).json({ error: "Invalid filmmaker submission." });
     return;
   }
-  const turnstileConfig = getTurnstileConfig();
-  const turnstileConfigured = Boolean(turnstileConfig.siteKey || turnstileConfig.secretKey);
-  if (turnstileConfigured && (!turnstileConfig.siteKey || !turnstileConfig.secretKey || !allowedTurnstileHostnames().length)) {
-    res.status(503).json({ error: "The verification service is not fully configured." });
-    return;
-  }
-
   const cookieId = req.cookies?.[VISITOR_COOKIE];
   if (typeof cookieId !== "string" || !UUID.test(cookieId)) {
     res.status(400).json({ error: "A recorded visitor cookie is required to submit." });
@@ -195,16 +181,6 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     req.log.error("Filmmaker submission rate limiter unavailable");
     res.status(503).json({ error: "Submission is temporarily unavailable. Please try again later." });
     return;
-  }
-
-  if (turnstileConfigured) {
-    if (!turnstileToken || !await verifyTurnstileToken(turnstileToken, {
-      ip: req.ip || req.socket.remoteAddress || undefined,
-      action: TURNSTILE_ACTION,
-    })) {
-      res.status(403).json({ error: "The anti-bot verification could not be verified. Please complete it again and retry." });
-      return;
-    }
   }
 
   try {

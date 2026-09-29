@@ -87,7 +87,7 @@ paths:
     get:
       operationId: getQuestionConfig
       tags: [questions]
-      summary: Public question form availability and Turnstile site key
+      summary: Public question form availability
       responses:
         "200":
           description: Current question form configuration
@@ -119,7 +119,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/QuestionSubmission"
         "400": { description: Invalid question }
-        "403": { description: Anti-bot challenge failed }
         "404": { description: Project unavailable }
         "429": { description: Question rate limit reached }
         "503": { description: Question delivery unavailable }
@@ -384,7 +383,7 @@ paths:
       operationId: submitFilmmaker
       tags: [filmmakers]
       summary: Submit the filmmaker flow
-      description: Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply; a single-use Turnstile response is required and verified server-side only when Turnstile is configured. A completed project receives a short-lived proof scoped only to its review checkout and status.
+      description: Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply. A completed project receives a short-lived proof scoped only to its review checkout and status.
       security:
         - firebaseBearer: []
         - {}
@@ -412,9 +411,9 @@ paths:
         "401":
           description: Verified sign-in required for an account-linked visitor
         "403":
-          description: Firebase UID does not own this visitor, or Turnstile verification failed, expired, or was already used
+          description: Firebase UID does not own this visitor
         "503":
-          description: Firebase verification, rate limiting, or a partially configured Turnstile check failed
+          description: Firebase verification or rate limiting is unavailable
         "409":
           description: Draft context header is missing or does not match the current draft
         "429":
@@ -423,10 +422,10 @@ paths:
     get:
       operationId: getFilmmakerSubmissionConfig
       tags: [filmmakers]
-      summary: Read filmmaker final-submission availability and optional Turnstile site key
+      summary: Read filmmaker final-submission availability
       responses:
         "200":
-          description: Submission is available without Turnstile; a partial Turnstile setup blocks submission rather than silently bypassing its check
+          description: Submission availability independent of any deferred challenge service
           content:
             application/json:
               schema:
@@ -1469,20 +1468,18 @@ components:
     QuestionConfig:
       type: object
       additionalProperties: false
-      required: [available, turnstile_site_key]
+      required: [available]
       properties:
         available: { type: boolean }
-        turnstile_site_key: { type: ["string", "null"] }
     QuestionInput:
       type: object
       additionalProperties: false
-      required: [first_name, email, question, turnstile_token]
+      required: [first_name, email, question]
       properties:
         website: { type: string, maxLength: 256, description: "Leave blank. Bot-detection field; never saved." }
         first_name: { type: string, minLength: 1, maxLength: 80 }
         email: { type: string, format: email, maxLength: 254 }
         question: { type: string, minLength: 5, maxLength: 3000 }
-        turnstile_token: { type: string, minLength: 1 }
     QuestionSubmission:
       type: object
       additionalProperties: false
@@ -1602,7 +1599,6 @@ components:
       required: [no_project_yet, name, email, city, favorite_genres, chat_opt_in]
       properties:
         website: { type: string, description: "Leave blank. Bot-detection field; never stored with the submission." }
-        turnstile_token: { type: string, minLength: 1, maxLength: 2048, description: "Required only when Turnstile is configured; verified server-side and never stored." }
         no_project_yet: { type: boolean }
         stage: { type: string, enum: [distribution, production, idea] }
         title: { type: string }
@@ -1640,10 +1636,9 @@ components:
         phone: { type: string }
     FilmmakerSubmissionConfig:
       type: object
-      required: [available, turnstile_site_key]
+      required: [available]
       properties:
-        available: { type: boolean, description: "True if the form can submit, including when no Turnstile keys have been configured." }
-        turnstile_site_key: { type: ["string", "null"], minLength: 1 }
+        available: { type: boolean, description: "True when the filmmaker form can submit." }
     LocationSearchPayload:
       type: object
       required: [locations]

@@ -453,7 +453,7 @@ export const getGetQuestionConfigUrl = () => {
 }
 
 /**
- * @summary Public question form availability and Turnstile site key
+ * @summary Public question form availability
  */
 export const getQuestionConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<QuestionConfig> => {
 
@@ -500,7 +500,7 @@ export type GetQuestionConfigQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Public question form availability and Turnstile site key
+ * @summary Public question form availability
  */
 
 export function useGetQuestionConfig<TData = Awaited<ReturnType<typeof getQuestionConfig>>, TError = ErrorType<unknown>>(
@@ -1611,7 +1611,7 @@ export const getSubmitFilmmakerUrl = () => {
 }
 
 /**
- * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply; a single-use Turnstile response is required and verified server-side only when Turnstile is configured. A completed project receives a short-lived proof scoped only to its review checkout and status.
+ * Unlinked guest submissions remain cookie-accessible. A visitor linked to Firebase UID requires a verified Bearer token matching that UID. Honeypot and rate limits always apply. A completed project receives a short-lived proof scoped only to its review checkout and status.
  * @summary Submit the filmmaker flow
  */
 export const submitFilmmaker = async (filmmakerSubmissionInput: FilmmakerSubmissionInput, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerSubmission> => {
@@ -1700,7 +1700,7 @@ export const getGetFilmmakerSubmissionConfigUrl = () => {
 }
 
 /**
- * @summary Read filmmaker final-submission availability and optional Turnstile site key
+ * @summary Read filmmaker final-submission availability
  */
 export const getFilmmakerSubmissionConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerSubmissionConfig> => {
 
@@ -1747,7 +1747,7 @@ export type GetFilmmakerSubmissionConfigQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Read filmmaker final-submission availability and optional Turnstile site key
+ * @summary Read filmmaker final-submission availability
  */
 
 export function useGetFilmmakerSubmissionConfig<TData = Awaited<ReturnType<typeof getFilmmakerSubmissionConfig>>, TError = ErrorType<unknown>>(
