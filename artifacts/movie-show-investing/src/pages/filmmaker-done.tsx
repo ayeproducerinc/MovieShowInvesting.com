@@ -31,7 +31,7 @@ type ShowcaseStatus = {
   refreshFailed?: boolean;
 };
 
-function ShowcaseForm({ result, onSaved, reviewStatus, checkoutEnabled, checkoutUnavailableText }: { result: FilmmakerResult; onSaved: (updated: ShowcaseStatus) => Promise<ShowcaseStatus>; reviewStatus?: { paid: boolean; pending: boolean; approved: boolean; declined: boolean }; checkoutEnabled: boolean; checkoutUnavailableText: string }) {
+function ShowcaseForm({ result, onSaved, reviewStatus, checkoutEnabled, checkoutUnavailableText, autoOpenReady }: { result: FilmmakerResult; onSaved: (updated: ShowcaseStatus) => Promise<ShowcaseStatus>; reviewStatus?: { paid: boolean; pending: boolean; approved: boolean; declined: boolean }; checkoutEnabled: boolean; checkoutUnavailableText: string; autoOpenReady: boolean }) {
   const update = useUpdateFilmmakerShowcase({ request: { headers: result.project_id ? { 'X-MSI-Project-Id': String(result.project_id) } : {} } });
   const checkoutProof = result.checkout_proof || getPitchReviewProof(result.project_id);
   const checkout = useStartPitchReviewCheckout({ request: { headers: result.project_id ? {
@@ -39,6 +39,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, checkoutEnabled, checkout
     ...(checkoutProof ? { 'X-MSI-Checkout-Proof': checkoutProof } : {}),
   } : {} } });
   const [showPaywall, setShowPaywall] = useState(false);
+  const paywallRef = useRef<HTMLDivElement>(null);
   const [checkoutError, setCheckoutError] = useState('');
   const [checking, setChecking] = useState(false);
   const [needsReselect, setNeedsReselect] = useState(false);
@@ -58,10 +59,15 @@ function ShowcaseForm({ result, onSaved, reviewStatus, checkoutEnabled, checkout
     || clean(distribution) !== (result.distribution_plan || null)
     || clean(trailer) !== (result.trailer_url || null);
   useEffect(() => {
-    if (checkoutEnabled && result.project_id && !result.showcase_requested && !reviewStatus?.paid && consumePitchReviewChoice(result.project_id)) {
+    if (autoOpenReady && checkoutEnabled && result.project_id && !result.showcase_requested
+      && !result.hidden && !reviewStatus?.paid && !reviewStatus?.pending
+      && consumePitchReviewChoice(result.project_id)) {
       setShowPaywall(true);
     }
-  }, [result.project_id, result.showcase_requested, reviewStatus?.paid, checkoutEnabled]);
+  }, [result.project_id, result.showcase_requested, result.hidden, reviewStatus?.paid, reviewStatus?.pending, checkoutEnabled, autoOpenReady]);
+  useEffect(() => {
+    if (showPaywall) paywallRef.current?.focus();
+  }, [showPaywall]);
   useEffect(() => {
     if (!trailerDirty.current) setTrailer(result.trailer_url || '');
   }, [result.trailer_url]);
@@ -152,7 +158,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, checkoutEnabled, checkout
         {checkoutEnabled ? <button type="button" className="dossier-button" data-testid="button-open-review-paywall" onClick={() => { setCheckoutError(''); setShowPaywall(true); }}>Submit for review <ArrowRight size={17}/></button>
             : <p role="status">{checkoutUnavailableText}</p>}
       </div>
-      {showPaywall && <div role="dialog" aria-modal="true" aria-label="Pitch review checkout" className="fixed inset-0 z-50 flex items-center justify-center bg-[#202936]/75 p-4">
+      {showPaywall && <div ref={paywallRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Pitch review checkout" className="fixed inset-0 z-50 flex items-center justify-center bg-[#202936]/75 p-4">
         <div className="w-full max-w-lg bg-[#f4f0e7] p-7 shadow-2xl md:p-10">
             <p className="dossier-kicker">Editorial review · $49 per pitch</p>
           <h2 className="serif mt-3 text-4xl">Submit your pitch for review</h2>
@@ -327,7 +333,7 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
           <div><dt>After both targets are satisfied</dt><dd>{stage === 'idea' ? 'you keep it all' : `You keep ${money(deal.filmmakerAfter)} of every $100`}</dd></div>
         </dl><p className="fm-small" style={{ marginTop: 18 }}>Illustrative terms for conversation only. The investor target and platform fee are separate amounts. This is not a return forecast or an offer to invest.</p></div><p className="dossier-notice">All available receipts after processing fees go into a pool allocated proportionally between the outstanding investor payback target and separate platform fee. Neither has payment priority. These are examples, not forecasts or guarantees. Actual receipts may differ, and the payback threshold may never be reached.</p></section>}
         {data.project_slug && !activeShowcaseStatus?.hidden && <ProjectShare slug={data.project_slug} title={data.title || 'Untitled project'} genre={data.genre} logline={data.logline} approved={activeShowcaseStatus?.approved ?? false} showcaseRequested={activeShowcaseStatus?.showcase_requested ?? false} />}
-         {data.project_slug && !activeShowcaseStatus?.hidden && <ShowcaseForm key={data.project_slug} result={{ ...data, approved: activeShowcaseStatus?.approved ?? data.approved, showcase_requested: activeShowcaseStatus?.showcase_requested ?? data.showcase_requested, hidden: activeShowcaseStatus?.hidden ?? data.hidden }} onSaved={refreshShowcaseStatus} reviewStatus={reviewStatus.data} checkoutEnabled={checkoutEnabled} checkoutUnavailableText={checkoutUnavailableText} />}
+         {data.project_slug && !activeShowcaseStatus?.hidden && <ShowcaseForm key={data.project_slug} result={{ ...data, approved: activeShowcaseStatus?.approved ?? data.approved, showcase_requested: activeShowcaseStatus?.showcase_requested ?? data.showcase_requested, hidden: activeShowcaseStatus?.hidden ?? data.hidden }} onSaved={refreshShowcaseStatus} reviewStatus={reviewStatus.data} checkoutEnabled={checkoutEnabled} checkoutUnavailableText={checkoutUnavailableText} autoOpenReady={reviewStatus.isSuccess && checkoutReturn === null} />}
         {data.project_slug && !activeShowcaseStatus?.hidden && <FilmmakerMedia result={data} onSaved={() => void refreshResult()} />}
       </div>
           <aside className="dossier-side">

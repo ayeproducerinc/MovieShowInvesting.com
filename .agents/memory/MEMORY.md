@@ -24,3 +24,4 @@
 - [Stripe sandbox account boundary](stripe-sandbox-account-boundary.md) — checkout and verification must use the same account; the owner chose the app-connected sandbox for pitch-review tests.
 - [Guest review checkout handoff](guest-review-checkout-handoff.md) — recover checkout with a short-lived pitch-scoped proof, never by exposing the HttpOnly visitor identity.
 - [Live review checkout copy](live-review-checkout-copy.md) — owner approved straightforward $49 review/refund terms, without repeated charge or test-environment disclaimers.
+- [Manual frontend build environment](manual-frontend-build-environment.md) — shell builds do not inherit managed workflow values; supply the required build-time environment explicitly.

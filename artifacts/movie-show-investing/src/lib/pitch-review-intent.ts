@@ -26,7 +26,8 @@ export function choosePitchReview(paid: boolean) {
 }
 
 export function recordPitchForReview(projectId: number | null) {
-  if (projectId && window.sessionStorage.getItem(KEY) === 'selected') {
+  // Offer review once after every completed pitch, including pitches started for free.
+  if (projectId) {
     window.sessionStorage.setItem(KEY, `project:${projectId}`);
   } else {
     window.sessionStorage.removeItem(KEY);
