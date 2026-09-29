@@ -72,13 +72,13 @@ export default function Filmmaker() {
   const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
   const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
-  return <FilmmakerWorksheet key={identityId} identityId={identityId} authLoading={replitAuth.isLoading} />;
+  const signedInEmail = replitAuth.user?.email ?? firebaseUser?.email ?? null;
+  return <FilmmakerWorksheet key={identityId} identityId={identityId} signedInEmail={signedInEmail} authLoading={replitAuth.isLoading} />;
 }
 
-function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; authLoading: boolean }) {
+function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identityId: string; signedInEmail: string | null; authLoading: boolean }) {
   const [, navigate] = useLocation();
   const authReady = useFirebaseSessionReady();
-  const user = useFirebaseUser();
   const completedResult = useGetFilmmakerResult({ query:{ queryKey:[...getGetFilmmakerResultQueryKey(),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
   const completedDestination = () => new URLSearchParams(window.location.search).get('new') === '1' ? '/me/projects?action=start' : '/start/filmmaker/done';
   useEffect(() => { if (completedResult.data?.completed) navigate(completedDestination()); }, [completedResult.data?.completed, navigate]);
@@ -95,6 +95,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
   const [screen, setScreen] = useState(1);
   const [hydrated, setHydrated] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const [validation, setValidation] = useState('');
   const [website, setWebsite] = useState('');
   const [saving, setSaving] = useState(false);
@@ -136,6 +137,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
   function change<K extends keyof Answers>(key:K, value:Answers[K]) {
     setA(current => ({ ...current, [key]:value }));
     setValidation('');
+    setSubmitError('');
   }
   function updateBudget(value:number, mode=a.budget_mode) {
     setA(current => ({
@@ -231,11 +233,19 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
     }
     const error = validateStep(6);
     if (error) { setValidation(error); return; }
+    if (identityId !== 'visitor' && signedInEmail && a.email.trim().toLowerCase() !== signedInEmail.trim().toLowerCase()) {
+      setValidation('Your project email must match your signed-in account email. Use the button beside the email field, or sign in with the account for this address.');
+      return;
+    }
     setValidation('');
-    setSaveError('');
+    setSubmitError('');
     if (editTimer.current !== null) window.clearTimeout(editTimer.current);
     try {
       await persist(6, a);
+    } catch {
+      return; // The save handler shows its own error and keeps the worksheet.
+    }
+    try {
       const submitted = await submit.mutateAsync({ data:{ ...payload(a), website } });
       recordPitchForReview(submitted.project_id);
       storePitchReviewProof(submitted.project_id, submitted.checkout_proof);
@@ -246,13 +256,17 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
       const responseBody = error && typeof error === 'object' && 'data' in error ? error.data : null;
       const responseMessage = responseBody && typeof responseBody === 'object' && 'error' in responseBody
         && typeof responseBody.error === 'string' ? responseBody.error : '';
-      setSaveError(status === 409 || status === 403 || status === 404
+      setSubmitError(status === 409 || status === 403 || status === 404
         ? responseMessage || 'This draft is no longer selected for this visit. Copy any unsaved answers, then open My projects to resume the draft or start another project.'
         : status === 429
           ? 'Too many submission attempts from this browser or network. Please try again later. Your worksheet is still saved.'
         : status === 503
           ? 'We could not complete secure submission. Your worksheet is saved; try again later.'
-        : 'We could not submit your information. Check your answers and try again. Nothing has been confirmed.');
+        : status === 400
+          ? responseMessage && responseMessage !== 'Invalid filmmaker submission.'
+            ? responseMessage
+            : 'The submission was not accepted. Review your project details and contact information, then select Send my answers again.'
+          : 'We could not submit your information. Your answers are saved; please try again. Nothing has been confirmed.');
     }
   }
   function selectStage(value:Stage) {
@@ -372,6 +386,9 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
           </div>
           <Field id="name" label="Your name" value={a.name} onChange={v=>change('name',v)} required/>
           <Field id="email" label="Email address" value={a.email} onChange={v=>change('email',v)} type="email" required/>
+          {identityId !== 'visitor' && signedInEmail && a.email.trim().toLowerCase() !== signedInEmail.trim().toLowerCase() && <div className="fm-note" role="status">
+            Your project email must match your signed-in email to submit. <button type="button" className="underline" data-testid="button-use-signed-in-email" onClick={()=>change('email',signedInEmail)}>Use my signed-in email</button>
+          </div>}
           <Field id="phone" label="Phone number" value={a.phone} onChange={v=>change('phone',v)} type="tel"/>
           <LocationPicker value={{ city:a.city, state:a.state, country:a.country, location_manual:a.location_manual }}
             onChange={location=>{ setA(current=>({...current,...location})); setValidation(''); }} />
@@ -385,6 +402,7 @@ function FilmmakerWorksheet({ identityId, authLoading }: { identityId: string; a
         </>}
         {validation && <p className="fm-error" data-testid="error-validation" role="alert">{validation}</p>}
         {saveError && <div className="fm-error" data-testid="error-save" role="alert">{saveError} {saveError.startsWith('This draft') ? <Link href="/me/projects" data-testid="link-reselect-draft">My projects</Link> : <button type="button" data-testid="button-retry-save" className="underline" onClick={()=>void persist(screenRef.current,answersRef.current).catch(()=>undefined)}>Retry save</button>}</div>}
+        {submitError && <div className="fm-error" data-testid="error-submit" role="alert">{submitError} {(submitError.includes('draft') || submitError.includes('visitor is linked')) && <Link href="/me/projects" className="underline">My projects</Link>}</div>}
         <div className="fm-steps">
           {screen>1 ? <button type="button" data-testid="button-back" className="fm-back" disabled={saving || submit.isPending} onClick={()=>void back()}><ArrowLeft size={17}/> Back</button> : <span className="fm-small">Your answers save as you go.</span>}
           {screen===1 && !a.stage ? <span className="fm-small">Choose a stage to continue</span> :
