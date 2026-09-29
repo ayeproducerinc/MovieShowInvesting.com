@@ -13,13 +13,24 @@ const connectors = new ReplitConnectors();
 const live = () => process.env.NODE_ENV === "production";
 const priceId = () => live() ? LIVE_PRICE : SANDBOX_PRICE;
 
+function safeCheckoutFailure(error: unknown): string {
+  if (error instanceof Error && (
+    error.message === "Connected Stripe account does not match the approved payment environment"
+    || error.message === "Review price does not match the approved one-time $49 offer"
+    || /^Stripe request failed \(\d{3}\)$/.test(error.message)
+    || error.message === "Checkout environment or reservation requires manual reconciliation"
+  )) return error.message;
+  return "Stripe connection or checkout could not be verified";
+}
+
 export async function reviewCheckoutConfig() {
   let enabled = false;
   try {
     await assertAccount();
     enabled = true;
-  } catch {
+  } catch (error) {
     // Never advertise checkout until the connected account and price are verified.
+    logger.warn({ reason: safeCheckoutFailure(error) }, "Pitch review checkout unavailable");
   }
   return { mode: live() ? "live" as const : "sandbox" as const, enabled };
 }
@@ -169,7 +180,7 @@ export async function reconcileReviewCheckouts(projectId?: number): Promise<void
       // Background reconciliation must not let one unresolved reservation
       // prevent an unrelated completed payment from reaching review.
       if (projectId != null) throw error;
-      logger.warn({ error, projectId: row.projectId }, "Review checkout needs individual reconciliation");
+      logger.warn({ reason: safeCheckoutFailure(error), projectId: row.projectId }, "Review checkout needs individual reconciliation");
     }
   }
 }

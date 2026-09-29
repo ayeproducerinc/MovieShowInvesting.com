@@ -31,7 +31,7 @@ type ShowcaseStatus = {
   refreshFailed?: boolean;
 };
 
-function ShowcaseForm({ result, onSaved, reviewStatus, checkoutEnabled, checkoutUnavailableText, autoOpenReady }: { result: FilmmakerResult; onSaved: (updated: ShowcaseStatus) => Promise<ShowcaseStatus>; reviewStatus?: { paid: boolean; pending: boolean; approved: boolean; declined: boolean }; checkoutEnabled: boolean; checkoutUnavailableText: string; autoOpenReady: boolean }) {
+function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checkoutEnabled, checkoutUnavailableText, autoOpenReady }: { result: FilmmakerResult; onSaved: (updated: ShowcaseStatus) => Promise<ShowcaseStatus>; reviewStatus?: { paid: boolean; pending: boolean; approved: boolean; declined: boolean }; reviewStatusState: 'checking' | 'verified' | 'unavailable'; checkoutEnabled: boolean; checkoutUnavailableText: string; autoOpenReady: boolean }) {
   const update = useUpdateFilmmakerShowcase({ request: { headers: result.project_id ? { 'X-MSI-Project-Id': String(result.project_id) } : {} } });
   const checkoutProof = result.checkout_proof || getPitchReviewProof(result.project_id);
   const checkout = useStartPitchReviewCheckout({ request: { headers: result.project_id ? {
@@ -53,18 +53,27 @@ function ShowcaseForm({ result, onSaved, reviewStatus, checkoutEnabled, checkout
   const [saved, setSaved] = useState(false);
   const [savedStatus, setSavedStatus] = useState<ShowcaseStatus | null>(null);
   const [approvalMayHavePaused, setApprovalMayHavePaused] = useState(false);
+  const canCheckout = checkoutEnabled && reviewStatusState === 'verified';
+  const paymentNotice = reviewStatusState === 'unavailable'
+    ? 'We could not verify whether this pitch has already been paid. Please try again later; do not pay again until its status can be checked.'
+    : reviewStatusState === 'checking'
+      ? 'Checking this pitch’s payment status before checkout is available…'
+      : checkoutUnavailableText;
   const unsavedDetails = clean(synopsis) !== (result.synopsis || null)
     || JSON.stringify(validLinks(links)) !== JSON.stringify(result.team_links)
     || clean(moneyUse) !== (result.money_use || null)
     || clean(distribution) !== (result.distribution_plan || null)
     || clean(trailer) !== (result.trailer_url || null);
   useEffect(() => {
-    if (autoOpenReady && checkoutEnabled && result.project_id && !result.showcase_requested
+    if (autoOpenReady && result.project_id && !result.showcase_requested
       && !result.hidden && !reviewStatus?.paid && !reviewStatus?.pending
       && consumePitchReviewChoice(result.project_id)) {
       setShowPaywall(true);
     }
-  }, [result.project_id, result.showcase_requested, result.hidden, reviewStatus?.paid, reviewStatus?.pending, checkoutEnabled, autoOpenReady]);
+  }, [result.project_id, result.showcase_requested, result.hidden, reviewStatus?.paid, reviewStatus?.pending, autoOpenReady]);
+  useEffect(() => {
+    if (result.showcase_requested || result.hidden || reviewStatus?.paid || reviewStatus?.pending) setShowPaywall(false);
+  }, [result.showcase_requested, result.hidden, reviewStatus?.paid, reviewStatus?.pending]);
   useEffect(() => {
     if (showPaywall) paywallRef.current?.focus();
   }, [showPaywall]);
@@ -128,7 +137,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, checkoutEnabled, checkout
       ? 'This project is approved for showcase listing. Saving changes to approved showcase content may pause approval and require another review before it is listed. Share a synopsis, not a full script.'
       : result.showcase_requested
         ? 'Your showcase review is pending; requesting review is not approval. The page remains accessible to anyone with its link. Share a synopsis, not a full script. You can revise these optional details later.'
-         : `Your project is free and unlisted. Save optional details here${checkoutEnabled ? ', then choose Submit for review when you are ready' : '.'} Saving details alone does not request review. Share a synopsis, not a full script.`}</p>
+         : 'Your project is free and unlisted. Save optional details here, then choose Submit for review when you are ready. Saving details alone does not request review. Share a synopsis, not a full script.'}</p>
     <form onSubmit={event => void submit(event)} style={{ marginTop: 30 }}>
       <div className="dossier-field"><label htmlFor="showcase-synopsis">Synopsis <small>· optional</small></label><textarea id="showcase-synopsis" data-testid="input-showcase-synopsis" maxLength={5000} value={synopsis} onChange={e => setSynopsis(e.target.value)} placeholder="The story beyond the logline" /></div>
       <div className="dossier-field"><label htmlFor="showcase-links">Team links <small>· optional, one full URL per line, up to 8</small></label><textarea id="showcase-links" data-testid="input-showcase-links" value={links} onChange={e => setLinks(e.target.value)} placeholder={'https://example.com/team'} /></div>
@@ -151,12 +160,12 @@ function ShowcaseForm({ result, onSaved, reviewStatus, checkoutEnabled, checkout
       </p>}
       <button type="submit" data-testid="button-save-showcase" className="dossier-button dossier-button-outline" disabled={checking || update.isPending || needsReselect} style={{ marginTop: 18 }}>{checking || update.isPending ? 'Saving details…' : 'Save pitch details'} <ArrowRight size={17}/></button>
     </form>
-    {!result.showcase_requested && !reviewStatus?.paid && !result.hidden && <>
+    {!result.showcase_requested && !reviewStatus?.paid && !reviewStatus?.pending && !result.hidden && <>
       <div className="dossier-notice" style={{ marginTop: 24 }}>
          <strong>Submit for editorial review · $49 once per pitch</strong>
         <p>The free unlisted page and share link remain yours. If approved, your pitch will join Explore’s public Pitch Collection with no preset expiration date. Investors will be able to browse when they join.</p>
-        {checkoutEnabled ? <button type="button" className="dossier-button" data-testid="button-open-review-paywall" onClick={() => { setCheckoutError(''); setShowPaywall(true); }}>Submit for review <ArrowRight size={17}/></button>
-            : <p role="status">{checkoutUnavailableText}</p>}
+         <button type="button" className="dossier-button" data-testid="button-open-review-paywall" onClick={() => { if (result.project_id) consumePitchReviewChoice(result.project_id); setCheckoutError(''); setShowPaywall(true); }}>Submit for review <ArrowRight size={17}/></button>
+         {!canCheckout && <p role="status">{paymentNotice}</p>}
       </div>
       {showPaywall && <div ref={paywallRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Pitch review checkout" className="fixed inset-0 z-50 flex items-center justify-center bg-[#202936]/75 p-4">
         <div className="w-full max-w-lg bg-[#f4f0e7] p-7 shadow-2xl md:p-10">
@@ -165,10 +174,11 @@ function ShowcaseForm({ result, onSaved, reviewStatus, checkoutEnabled, checkout
           <p className="mt-5 leading-relaxed"><strong>$49 one time.</strong> This pays for editorial review of this pitch. Approval is not guaranteed. If approved, we’ll list it in the public Pitch Collection with no preset expiration date.</p>
            <p className="mt-3 text-sm">After we complete your review, a declined pitch is not automatically refunded. If we cannot deliver the review, we’ll refund the payment, subject to applicable law. You can leave checkout before paying; cancelling checkout does not submit the pitch for review.</p>
           <p className="mt-3 text-sm">We’re building the Pitch Collection that investors will be able to browse when they join.</p>
+           {!canCheckout && <p role="status" className="dossier-notice mt-4">{paymentNotice} Your pitch and share link remain saved.</p>}
           {unsavedDetails && <p role="alert" className="dossier-error mt-4">You have unsaved pitch details. Close this window and save them before checkout so they are included in your review.</p>}
           {checkoutError && <p role="alert" className="dossier-error mt-4">{checkoutError}</p>}
           <div className="mt-7 flex flex-wrap gap-3">
-             <button type="button" className="dossier-button" disabled={!checkoutEnabled || checkout.isPending || needsReselect || unsavedDetails} data-testid="button-pay-review" onClick={() => void (async () => {
+             <button type="button" className="dossier-button" disabled={!canCheckout || checkout.isPending || needsReselect || unsavedDetails} data-testid="button-pay-review" onClick={() => void (async () => {
               setCheckoutError('');
               try {
                 let current: FilmmakerResult | null = null;
@@ -242,6 +252,9 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
     query: { queryKey: ['/api/filmmakers/review-checkout/status', identityId, data?.project_id], enabled: authReady && !authLoading && !!data?.project_id, refetchOnMount: 'always', refetchInterval: 20_000, retry: false },
   });
   const checkoutReturn = new URLSearchParams(window.location.search).get('review_checkout');
+  useEffect(() => {
+    if (checkoutReturn && data?.project_id) consumePitchReviewChoice(data.project_id);
+  }, [checkoutReturn, data?.project_id]);
   useEffect(() => {
     if (reviewStatus.data?.paid && !data?.showcase_requested) void result.refetch();
   }, [reviewStatus.data?.paid, data?.showcase_requested]);
@@ -333,7 +346,7 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
           <div><dt>After both targets are satisfied</dt><dd>{stage === 'idea' ? 'you keep it all' : `You keep ${money(deal.filmmakerAfter)} of every $100`}</dd></div>
         </dl><p className="fm-small" style={{ marginTop: 18 }}>Illustrative terms for conversation only. The investor target and platform fee are separate amounts. This is not a return forecast or an offer to invest.</p></div><p className="dossier-notice">All available receipts after processing fees go into a pool allocated proportionally between the outstanding investor payback target and separate platform fee. Neither has payment priority. These are examples, not forecasts or guarantees. Actual receipts may differ, and the payback threshold may never be reached.</p></section>}
         {data.project_slug && !activeShowcaseStatus?.hidden && <ProjectShare slug={data.project_slug} title={data.title || 'Untitled project'} genre={data.genre} logline={data.logline} approved={activeShowcaseStatus?.approved ?? false} showcaseRequested={activeShowcaseStatus?.showcase_requested ?? false} />}
-         {data.project_slug && !activeShowcaseStatus?.hidden && <ShowcaseForm key={data.project_slug} result={{ ...data, approved: activeShowcaseStatus?.approved ?? data.approved, showcase_requested: activeShowcaseStatus?.showcase_requested ?? data.showcase_requested, hidden: activeShowcaseStatus?.hidden ?? data.hidden }} onSaved={refreshShowcaseStatus} reviewStatus={reviewStatus.data} checkoutEnabled={checkoutEnabled} checkoutUnavailableText={checkoutUnavailableText} autoOpenReady={reviewStatus.isSuccess && checkoutReturn === null} />}
+         {data.project_slug && !activeShowcaseStatus?.hidden && <ShowcaseForm key={data.project_slug} result={{ ...data, approved: activeShowcaseStatus?.approved ?? data.approved, showcase_requested: activeShowcaseStatus?.showcase_requested ?? data.showcase_requested, hidden: activeShowcaseStatus?.hidden ?? data.hidden }} onSaved={refreshShowcaseStatus} reviewStatus={reviewStatus.data} reviewStatusState={reviewStatus.isSuccess ? 'verified' : reviewStatus.isError ? 'unavailable' : 'checking'} checkoutEnabled={checkoutEnabled} checkoutUnavailableText={checkoutUnavailableText} autoOpenReady={(reviewStatus.isSuccess || reviewStatus.isError) && checkoutReturn === null} />}
         {data.project_slug && !activeShowcaseStatus?.hidden && <FilmmakerMedia result={data} onSaved={() => void refreshResult()} />}
       </div>
           <aside className="dossier-side">
@@ -342,7 +355,7 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
                 <span className="dossier-kicker">Where things stand</span>
                 <div className="dossier-value" data-testid="status-project-review">{activeShowcaseStatus?.hidden ? 'Hidden.' : activeShowcaseStatus?.approved && activeShowcaseStatus.showcase_requested ? 'Approved for listing.' : reviewStatus.data?.declined ? 'Review completed.' : activeShowcaseStatus?.showcase_requested ? 'Review pending.' : 'Unlisted.'}</div>
                 <p>{activeShowcaseStatus?.hidden ? 'This project is hidden and its page is unavailable to viewers, including people with its link. Contact us if you believe this is an error.' : activeShowcaseStatus?.approved && activeShowcaseStatus.showcase_requested ? 'Showcase review is approved. This project is eligible for discovery while it remains approved and not hidden.' : reviewStatus.data?.declined ? 'Your pitch was not approved. Your free unlisted page remains available.' : activeShowcaseStatus?.showcase_requested ? 'Your showcase review request is pending. The page is accessible to anyone with its link but is not listed for discovery.' : 'Your project page is accessible to anyone with its link but is not listed for discovery. No showcase review has been requested.'}</p>
-                <p className="dossier-line">Filmmakers are here first. Investor signup and pledges open later, after approved projects are available. No investment money is collected here. {checkoutEnabled ? 'Editorial review costs $49 per pitch.' : 'Your free pitch remains saved while editorial review checkout is unavailable.'}</p>
+                 <p className="dossier-line">Filmmakers are here first. Investor signup and pledges open later, after approved projects are available. No investment money is collected here. Editorial review is optional and costs $49 once per pitch. {!checkoutEnabled && 'Checkout is currently unavailable; your free pitch remains saved.'}</p>
               </div>
               <div className="dossier-actions" style={{ marginTop: 22 }}>
                 <Link href="/me/projects?action=start" onClick={() => setFilmmakerAction('start')} data-testid="link-start-another-project" className="dossier-button">Start another project <ArrowRight size={17}/></Link>
