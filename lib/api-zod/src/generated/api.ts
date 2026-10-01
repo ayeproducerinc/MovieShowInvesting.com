@@ -518,9 +518,16 @@ export const VerifyFilmmakerPhoneResponse = zod.object({
 
 
 /**
- * Requires the current visitor cookie. A completed legacy submission can only be claimed if its stored email matches the verified account email and it is not linked to another UID. A non-empty unlinked guest draft cannot be claimed while a different active draft exists for the account; the guest cookie and answers are preserved on conflict.
+ * Requires the current visitor cookie. An unfinished draft claim requires X-MSI-Draft-Id to match the current locked filmmaker flow_progress row. A completed legacy submission can still be claimed without that header if its stored email matches the verified account email and it is not linked to another account. A non-empty unlinked guest draft cannot be claimed while a different active draft exists for the account; the guest cookie and answers are preserved on conflict.
  * @summary Link the current visitor draft or legacy submission to a verified account
  */
+
+
+
+export const ClaimFilmmakerProjectHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1).optional().describe('Required when claiming an unfinished filmmaker draft; omitted for legacy completed-submission claims.')
+})
+
 
 
 
@@ -635,6 +642,423 @@ export const UpdateFilmmakerShowcaseResponse = zod.object({
   "money_use": zod.string().nullable(),
   "distribution_plan": zod.string().nullable(),
   "trailer_url": zod.string().nullable()
+})
+
+
+/**
+ * @summary Read the current filmmaker draft's separately persisted optional materials
+ */
+
+
+
+export const GetFilmmakerDraftMaterialsHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1)
+})
+
+export const getFilmmakerDraftMaterialsResponseTrailerUrlMax = 2048;
+
+export const getFilmmakerDraftMaterialsResponsePitchDeckNameMax = 200;
+
+
+
+export const GetFilmmakerDraftMaterialsResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(getFilmmakerDraftMaterialsResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(getFilmmakerDraftMaterialsResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * @summary Persist optional draft synopsis or trailer link independently of autosaved flow answers
+ */
+
+
+
+export const UpdateFilmmakerDraftMaterialsHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1)
+})
+
+export const updateFilmmakerDraftMaterialsBodySynopsisMax = 20000;
+
+export const updateFilmmakerDraftMaterialsBodyTrailerUrlMax = 2048;
+
+
+
+export const UpdateFilmmakerDraftMaterialsBody = zod.object({
+  "synopsis": zod.string().max(updateFilmmakerDraftMaterialsBodySynopsisMax).nullish(),
+  "trailer_url": zod.string().max(updateFilmmakerDraftMaterialsBodyTrailerUrlMax).nullish()
+})
+
+export const updateFilmmakerDraftMaterialsResponseTrailerUrlMax = 2048;
+
+export const updateFilmmakerDraftMaterialsResponsePitchDeckNameMax = 200;
+
+
+
+export const UpdateFilmmakerDraftMaterialsResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(updateFilmmakerDraftMaterialsResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(updateFilmmakerDraftMaterialsResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * @summary Bounded upload of a poster or share image for a current filmmaker draft
+ */
+export const UploadFilmmakerDraftImageQueryParams = zod.object({
+  "kind": zod.enum(['poster', 'share'])
+})
+
+
+export const uploadFilmmakerDraftImageHeaderXMSIFilenameMax = 200;
+
+export const uploadFilmmakerDraftImageHeaderContentLengthMax = 10485760;
+
+
+
+export const UploadFilmmakerDraftImageHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1),
+  "X-MSI-Filename": zod.string().min(1).max(uploadFilmmakerDraftImageHeaderXMSIFilenameMax),
+  "Content-Length": zod.number().int().min(1).max(uploadFilmmakerDraftImageHeaderContentLengthMax)
+})
+
+export const uploadFilmmakerDraftImageResponseTrailerUrlMax = 2048;
+
+export const uploadFilmmakerDraftImageResponsePitchDeckNameMax = 200;
+
+
+
+export const UploadFilmmakerDraftImageResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(uploadFilmmakerDraftImageResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(uploadFilmmakerDraftImageResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * @summary Server-bounded streaming upload of a trailer to the Movie Show Investing Bunny Stream collection
+ */
+
+export const uploadFilmmakerDraftTrailerHeaderXMSIFilenameMax = 200;
+
+export const uploadFilmmakerDraftTrailerHeaderContentLengthMax = 524288000;
+
+
+
+export const UploadFilmmakerDraftTrailerHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1),
+  "X-MSI-Filename": zod.string().min(1).max(uploadFilmmakerDraftTrailerHeaderXMSIFilenameMax),
+  "Content-Length": zod.number().int().min(1).max(uploadFilmmakerDraftTrailerHeaderContentLengthMax)
+})
+
+export const uploadFilmmakerDraftTrailerResponseTrailerUrlMax = 2048;
+
+export const uploadFilmmakerDraftTrailerResponsePitchDeckNameMax = 200;
+
+
+
+export const UploadFilmmakerDraftTrailerResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(uploadFilmmakerDraftTrailerResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(uploadFilmmakerDraftTrailerResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * @summary Fetch the current draft's PDF deck through an authenticated Bunny storage gateway
+ */
+
+
+
+export const GetFilmmakerDraftPitchDeckHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1)
+})
+
+export const GetFilmmakerDraftPitchDeckResponse = zod.unknown()
+
+
+/**
+ * @summary Upload one PDF pitch deck, bounded to 20 MB and validated by PDF magic bytes
+ */
+
+export const uploadFilmmakerDraftPitchDeckHeaderXMSIFilenameMax = 200;
+
+export const uploadFilmmakerDraftPitchDeckHeaderContentLengthMax = 20971520;
+
+
+
+export const UploadFilmmakerDraftPitchDeckHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1),
+  "X-MSI-Filename": zod.string().min(1).max(uploadFilmmakerDraftPitchDeckHeaderXMSIFilenameMax),
+  "Content-Length": zod.number().int().min(1).max(uploadFilmmakerDraftPitchDeckHeaderContentLengthMax)
+})
+
+export const uploadFilmmakerDraftPitchDeckResponseTrailerUrlMax = 2048;
+
+export const uploadFilmmakerDraftPitchDeckResponsePitchDeckNameMax = 200;
+
+
+
+export const UploadFilmmakerDraftPitchDeckResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(uploadFilmmakerDraftPitchDeckResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(uploadFilmmakerDraftPitchDeckResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * @summary Remove one optional item from the current draft
+ */
+export const DeleteFilmmakerDraftMaterialParams = zod.object({
+  "kind": zod.enum(['poster', 'share', 'trailer', 'pitch-deck'])
+})
+
+
+
+
+export const DeleteFilmmakerDraftMaterialHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1)
+})
+
+export const deleteFilmmakerDraftMaterialResponseTrailerUrlMax = 2048;
+
+export const deleteFilmmakerDraftMaterialResponsePitchDeckNameMax = 200;
+
+
+
+export const DeleteFilmmakerDraftMaterialResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(deleteFilmmakerDraftMaterialResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(deleteFilmmakerDraftMaterialResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * @summary Read materials for an account-owned completed project
+ */
+
+
+
+export const GetFilmmakerProjectMaterialsHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1)
+})
+
+export const getFilmmakerProjectMaterialsResponseTrailerUrlMax = 2048;
+
+export const getFilmmakerProjectMaterialsResponsePitchDeckNameMax = 200;
+
+
+
+export const GetFilmmakerProjectMaterialsResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(getFilmmakerProjectMaterialsResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(getFilmmakerProjectMaterialsResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * Changes to approved pitch content return the project to review and remove its approval until reviewed again.
+ * @summary Update optional materials on an account-owned completed project
+ */
+
+
+
+export const UpdateFilmmakerProjectMaterialsHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1)
+})
+
+export const updateFilmmakerProjectMaterialsBodySynopsisMax = 20000;
+
+export const updateFilmmakerProjectMaterialsBodyTrailerUrlMax = 2048;
+
+
+
+export const UpdateFilmmakerProjectMaterialsBody = zod.object({
+  "synopsis": zod.string().max(updateFilmmakerProjectMaterialsBodySynopsisMax).nullish(),
+  "trailer_url": zod.string().max(updateFilmmakerProjectMaterialsBodyTrailerUrlMax).nullish()
+})
+
+export const updateFilmmakerProjectMaterialsResponseTrailerUrlMax = 2048;
+
+export const updateFilmmakerProjectMaterialsResponsePitchDeckNameMax = 200;
+
+
+
+export const UpdateFilmmakerProjectMaterialsResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(updateFilmmakerProjectMaterialsResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(updateFilmmakerProjectMaterialsResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * Replacing approved content pauses approval until the changed pitch is reviewed again.
+ * @summary Upload a poster or share image for an account-owned project
+ */
+export const UploadFilmmakerProjectImageQueryParams = zod.object({
+  "kind": zod.enum(['poster', 'share'])
+})
+
+
+export const uploadFilmmakerProjectImageHeaderXMSIFilenameMax = 200;
+
+export const uploadFilmmakerProjectImageHeaderContentLengthMax = 10485760;
+
+
+
+export const UploadFilmmakerProjectImageHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1),
+  "X-MSI-Filename": zod.string().min(1).max(uploadFilmmakerProjectImageHeaderXMSIFilenameMax),
+  "Content-Length": zod.number().int().min(1).max(uploadFilmmakerProjectImageHeaderContentLengthMax)
+})
+
+export const uploadFilmmakerProjectImageResponseTrailerUrlMax = 2048;
+
+export const uploadFilmmakerProjectImageResponsePitchDeckNameMax = 200;
+
+
+
+export const UploadFilmmakerProjectImageResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(uploadFilmmakerProjectImageResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(uploadFilmmakerProjectImageResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * Replacing approved content pauses approval until the changed pitch is reviewed again.
+ * @summary Server-bounded streaming upload of a trailer for an account-owned project
+ */
+
+export const uploadFilmmakerProjectTrailerHeaderXMSIFilenameMax = 200;
+
+export const uploadFilmmakerProjectTrailerHeaderContentLengthMax = 524288000;
+
+
+
+export const UploadFilmmakerProjectTrailerHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1),
+  "X-MSI-Filename": zod.string().min(1).max(uploadFilmmakerProjectTrailerHeaderXMSIFilenameMax),
+  "Content-Length": zod.number().int().min(1).max(uploadFilmmakerProjectTrailerHeaderContentLengthMax)
+})
+
+export const uploadFilmmakerProjectTrailerResponseTrailerUrlMax = 2048;
+
+export const uploadFilmmakerProjectTrailerResponsePitchDeckNameMax = 200;
+
+
+
+export const UploadFilmmakerProjectTrailerResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(uploadFilmmakerProjectTrailerResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(uploadFilmmakerProjectTrailerResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * @summary Fetch a project deck through an authenticated owner or administrator Bunny storage gateway
+ */
+
+
+
+export const GetFilmmakerProjectPitchDeckQueryParams = zod.object({
+  "project_id": zod.coerce.number().int().min(1)
+})
+
+export const GetFilmmakerProjectPitchDeckResponse = zod.unknown()
+
+
+/**
+ * Replacing approved content pauses approval until the changed pitch is reviewed again.
+ * @summary Upload a PDF pitch deck (maximum 20 MB) to an account-owned project
+ */
+
+export const uploadFilmmakerProjectPitchDeckHeaderXMSIFilenameMax = 200;
+
+export const uploadFilmmakerProjectPitchDeckHeaderContentLengthMax = 20971520;
+
+
+
+export const UploadFilmmakerProjectPitchDeckHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1),
+  "X-MSI-Filename": zod.string().min(1).max(uploadFilmmakerProjectPitchDeckHeaderXMSIFilenameMax),
+  "Content-Length": zod.number().int().min(1).max(uploadFilmmakerProjectPitchDeckHeaderContentLengthMax)
+})
+
+export const uploadFilmmakerProjectPitchDeckResponseTrailerUrlMax = 2048;
+
+export const uploadFilmmakerProjectPitchDeckResponsePitchDeckNameMax = 200;
+
+
+
+export const UploadFilmmakerProjectPitchDeckResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(uploadFilmmakerProjectPitchDeckResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(uploadFilmmakerProjectPitchDeckResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * Removing approved content pauses approval until the changed pitch is reviewed again.
+ * @summary Remove a selected optional material from an account-owned project
+ */
+export const DeleteFilmmakerProjectMaterialParams = zod.object({
+  "kind": zod.enum(['poster', 'share', 'trailer', 'pitch-deck'])
+})
+
+
+
+
+export const DeleteFilmmakerProjectMaterialHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1)
+})
+
+export const deleteFilmmakerProjectMaterialResponseTrailerUrlMax = 2048;
+
+export const deleteFilmmakerProjectMaterialResponsePitchDeckNameMax = 200;
+
+
+
+export const DeleteFilmmakerProjectMaterialResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(deleteFilmmakerProjectMaterialResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(deleteFilmmakerProjectMaterialResponsePitchDeckNameMax).nullable()
 })
 
 
@@ -794,6 +1218,8 @@ export const GetPublicProjectResponse = zod.object({
   "trailer_url": zod.string().url().nullable(),
   "trailer_thumbnail_url": zod.string().url().nullable(),
   "poster_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('App-routed public deck link available only while project eligibility holds'),
+  "pitch_deck_name": zod.string().nullable(),
   "confirmed_pledge_total": zod.number().min(getPublicProjectResponseConfirmedPledgeTotalMin),
   "approved": zod.boolean(),
   "showcase_requested": zod.boolean(),
@@ -816,6 +1242,23 @@ export const GetProjectShareMetadataParams = zod.object({
 })
 
 export const GetProjectShareMetadataResponse = zod.unknown()
+
+
+/**
+ * The current approval, requested-listing, not-hidden, and valid-stage conditions are rechecked on every request. The Bunny URL is never returned or redirected to.
+ * @summary Fetch an eligible listed project's PDF deck through the app gateway
+ */
+export const getPublicProjectPitchDeckPathSlugMax = 120;
+
+
+export const getPublicProjectPitchDeckPathSlugRegExp = new RegExp('^[a-z0-9-]+$');
+
+
+export const GetPublicProjectPitchDeckParams = zod.object({
+  "slug": zod.coerce.string().min(1).max(getPublicProjectPitchDeckPathSlugMax).regex(getPublicProjectPitchDeckPathSlugRegExp)
+})
+
+export const GetPublicProjectPitchDeckResponse = zod.unknown()
 
 
 /**
@@ -846,6 +1289,8 @@ export const GetExploreResponse = zod.object({
   "genre": zod.string().nullable(),
   "stage": zod.string().nullable(),
   "poster_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable(),
+  "pitch_deck_name": zod.string().nullable(),
   "offer_per_100": zod.number().int().min(getExploreResponseProjectsItemOfferPer100Min).nullable(),
   "confirmed_pledge_total": zod.number().min(getExploreResponseProjectsItemConfirmedPledgeTotalMin),
   "is_owner": zod.boolean().describe('True when the request has verified provider-qualified account ownership or the original project visitor cookie')
@@ -894,6 +1339,8 @@ export const MatchInvestorResponse = zod.object({
   "genre": zod.string().nullable(),
   "stage": zod.string().nullable(),
   "poster_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable(),
+  "pitch_deck_name": zod.string().nullable(),
   "offer_per_100": zod.number().int().min(matchInvestorResponseProjectsItemOfferPer100Min).nullable(),
   "confirmed_pledge_total": zod.number().min(matchInvestorResponseProjectsItemConfirmedPledgeTotalMin),
   "is_owner": zod.boolean().describe('True when the request has verified provider-qualified account ownership or the original project visitor cookie')
@@ -1370,6 +1817,58 @@ export const ReviewAdminProjectResponse = zod.object({
   "id": zod.number().int(),
   "approved": zod.boolean(),
   "hidden": zod.boolean()
+})
+
+
+/**
+ * Existing admin table rows and selection IDs remain unchanged; this endpoint is loaded by the selected project's Details action.
+ * @summary Read the selected complete submitted pitch and all current attachments for admin review
+ */
+
+
+
+export const GetAdminProjectReviewParams = zod.object({
+  "projectId": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const GetAdminProjectReviewResponse = zod.object({
+  "project": zod.object({
+  "id": zod.number().int().min(1),
+  "title": zod.string().nullable(),
+  "format": zod.string().nullable(),
+  "genre": zod.string().nullable(),
+  "stage": zod.string().nullable(),
+  "stage_other": zod.string().nullable(),
+  "logline": zod.string().nullable(),
+  "budget": zod.number().int().nullable(),
+  "budget_from_example": zod.boolean().nullable(),
+  "deal_answer": zod.string().nullable(),
+  "offer_per100": zod.number().int().nullable(),
+  "offer_other_text": zod.string().nullable(),
+  "wants_lower": zod.boolean().nullable(),
+  "payback_terms": zod.string().nullable(),
+  "payback_terms_other": zod.string().nullable(),
+  "funding_sources": zod.array(zod.string()),
+  "funding_other": zod.string().nullable(),
+  "reached_goal": zod.boolean().nullable(),
+  "funding_experience": zod.string().nullable()
+}),
+  "filmmaker": zod.record(zod.string(), zod.unknown()).nullable(),
+  "answers": zod.record(zod.string(), zod.unknown()),
+  "materials": zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().nullable(),
+  "pilot_url": zod.string().nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable(),
+  "pitch_deck_name": zod.string().nullable(),
+  "pitch_deck_status": zod.enum(['available', 'missing', 'unavailable']),
+  "trailer_thumbnail_url": zod.string().url().nullable()
+})
 })
 
 

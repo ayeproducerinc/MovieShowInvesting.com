@@ -21,6 +21,10 @@ export interface ExploreProject {
   stage: string | null;
   /** @nullable */
   poster_url: string | null;
+  /** @nullable */
+  pitch_deck_url: string | null;
+  /** @nullable */
+  pitch_deck_name: string | null;
   /**
      * @minimum 125
      * @nullable

@@ -7,14 +7,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetAdminMeQueryKey, getGetAdminTableQueryKey, getGetFirebaseConfigQueryKey, getGetAdminConversationsQueryKey,
   leaveFilmmakerAccount, setAuthTokenGetter, useGetAdminMe, useGetAdminTable, useGetFirebaseConfig,
-  useReviewAdminProject, useReviewAdminMessage,
+  useGetAdminProjectReview, useReviewAdminProject, useReviewAdminMessage,
   type AdminSection, type AdminTable,
 } from '@workspace/api-client-react';
-import { ArrowDownToLine, ArrowRight, Clapperboard, LockKeyhole, LogOut, ShieldAlert } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, ArrowUpRight, Clapperboard, Eye, FileText, LockKeyhole, LogOut, ShieldAlert, X } from 'lucide-react';
 import { AdminConversations } from '@/components/admin-conversations';
 import { useAuth } from '@workspace/replit-auth-web';
 import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-web';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
+import { customFetch } from '../../../../lib/api-client-react/src/custom-fetch';
 
 const SECTIONS: { id: AdminSection; label: string; description: string }[] = [
   { id: 'summary', label: 'Summary', description: 'A consolidated view of activity recorded across the site.' },
@@ -174,6 +175,224 @@ function ReviewActions({ section, row, columns, onResult }: {
   </div>;
 }
 
+type AdminReviewAnswer = string | number | boolean | string[] | null;
+type AdminPitchReviewResponse = {
+  project: {
+    id: number;
+    title?: string | null;
+    format?: string | null;
+    genre?: string | null;
+    genre_other?: string | null;
+    stage?: string | null;
+    stage_other?: string | null;
+    logline?: string | null;
+    team_links?: string[] | null;
+    money_use?: string | null;
+    distribution_plan?: string | null;
+    pilot_url?: string | null;
+    short_pilot_url?: string | null;
+    budget?: number | null;
+    budget_from_example?: boolean | null;
+    deal_answer?: string | null;
+    offer_per100?: number | null;
+    offer_other_text?: string | null;
+    wants_lower?: boolean | null;
+    payback_terms?: string | null;
+    payback_terms_other?: string | null;
+    funding_sources?: string[] | null;
+    funding_other?: string | null;
+    reached_goal?: boolean | null;
+    funding_experience?: string | null;
+  };
+  filmmaker: {
+    [key: string]: unknown;
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    city?: string | null;
+    state?: string | null;
+    country?: string | null;
+    favorite_genres?: string[] | null;
+    chat_opt_in?: boolean | null;
+  };
+  materials: {
+    synopsis?: string | null;
+    trailer_url?: string | null;
+    pilot_url?: string | null;
+    short_pilot_url?: string | null;
+    uploaded_video_url?: string | null;
+    trailer_thumbnail_url?: string | null;
+    poster_url?: string | null;
+    share_image_url?: string | null;
+    pitch_deck_url?: string | null;
+    pitch_deck_name?: string | null;
+    pitch_deck_status?: string | null;
+  };
+  answers: Record<string, AdminReviewAnswer>;
+};
+
+function safeAdminMediaUrl(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value, window.location.origin);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+  } catch { return null; }
+}
+
+function AdminImageAttachment({ label, value }: { label: string; value: string | null | undefined }) {
+  const [failed, setFailed] = useState(false);
+  const url = safeAdminMediaUrl(value);
+  if (!url) return <div className="admin-detail-attachment"><strong>{label}</strong><p>{value ? 'Attachment URL is unavailable or invalid.' : 'No file attached.'}</p></div>;
+  return <div className="admin-detail-attachment">
+    <strong>{label}</strong>
+    {failed ? <p role="status">Preview unavailable. Open the image directly to check it.</p> : <img src={url} alt={`${label} attachment`} onError={() => setFailed(true)} style={{ display: 'block', maxWidth: '100%', maxHeight: 360, objectFit: 'contain', margin: '12px 0' }}/>}
+    <a href={url} target="_blank" rel="noopener noreferrer">Open {label.toLowerCase()} <ArrowUpRight size={13} style={{ display: 'inline' }}/></a>
+  </div>;
+}
+
+function AdminLinkAttachment({ label, value }: { label: string; value: string | null | undefined }) {
+  const url = safeAdminMediaUrl(value);
+  return <div className="admin-detail-attachment">
+    <strong>{label}</strong>
+    {url
+      ? <a href={url} target="_blank" rel="noopener noreferrer">Open {label.toLowerCase()} <ArrowUpRight size={13} style={{ display: 'inline' }}/></a>
+      : <p>{value ? `${label} attachment is unavailable or invalid.` : `No ${label.toLowerCase()} attached.`}</p>}
+  </div>;
+}
+
+function adminDeckPath(value: string) {
+  const url = new URL(value, window.location.origin);
+  if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/')) {
+    throw new Error('The protected deck URL is not an application API route.');
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+function AdminPitchReview({ projectId }: { projectId: number }) {
+  const [open, setOpen] = useState(false);
+  const [deckError, setDeckError] = useState('');
+  const [openingDeck, setOpeningDeck] = useState(false);
+  const details = useGetAdminProjectReview(projectId, {
+    query: {
+      queryKey: ['admin-project-pitch-details', projectId],
+      enabled: open,
+      retry: false,
+    },
+  });
+
+  async function viewDeck() {
+    const deckUrl = details.data?.materials.pitch_deck_url;
+    if (!deckUrl || openingDeck) return;
+    setDeckError('');
+    const tab = window.open('about:blank', '_blank');
+    if (!tab) {
+      setDeckError('Your browser blocked the pitch deck tab. Allow pop-ups for this site and try again.');
+      return;
+    }
+    setOpeningDeck(true);
+    tab.document.title = 'Loading protected pitch deck…';
+    try {
+      const blob = await customFetch<Blob>(adminDeckPath(deckUrl), { responseType: 'blob' });
+      if (!blob.size) throw new Error('The deck response was empty.');
+      const objectUrl = URL.createObjectURL(blob);
+      tab.location.href = objectUrl;
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5 * 60_000);
+    } catch {
+      tab.close();
+      setDeckError('The protected pitch deck could not be loaded. Your administrator access may have expired; refresh this review and try again.');
+    } finally {
+      setOpeningDeck(false);
+    }
+  }
+
+  // Generated schema catches up with this admin-only payload as the contract is regenerated.
+  const data = details.data as unknown as AdminPitchReviewResponse | undefined;
+  const project = data?.project;
+  const filmmaker = data?.filmmaker;
+  const materials = data?.materials;
+  const answerRows: [string, unknown][] = project ? [
+    ['Title', project.title], ['Format', project.format], ['Genre', project.genre_other || project.genre],
+    ['Stage', project.stage_other ? `${project.stage || 'Other'} — ${project.stage_other}` : project.stage],
+    ['Logline', project.logline], ['Team links', project.team_links],
+    ['How the money would be used', project.money_use], ['Distribution plan', project.distribution_plan],
+    ['Budget', project.budget == null ? null : `${project.budget_from_example ? 'Illustrative example' : 'Submitted'} · ${project.budget}`],
+    ['Deal answer', project.deal_answer], ['Offer per $100', project.offer_per100],
+    ['Other offer terms', project.offer_other_text], ['Wants lower offer', project.wants_lower],
+    ['Payback terms', project.payback_terms_other || project.payback_terms],
+    ['Funding sources', project.funding_sources], ['Other funding source', project.funding_other],
+    ['Reached funding goal', project.reached_goal], ['Funding experience', project.funding_experience],
+  ] : [];
+  const adminAnswerRows = Object.entries(data?.answers ?? {});
+  const filmmakerAdditionalRows = Object.entries(filmmaker ?? {}).filter(([key]) =>
+    !['name', 'email', 'phone', 'city', 'state', 'country', 'favorite_genres', 'chat_opt_in'].includes(key)
+  );
+
+  return <>
+    <button type="button" className="admin-button secondary" data-testid={`button-open-pitch-review-${projectId}`} onClick={() => setOpen(true)}><Eye size={14}/> Review pitch</button>
+    {open && <div role="dialog" aria-modal="true" aria-label={`Pitch review ${projectId}`} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#18202b]/80 p-3 md:p-8" data-testid={`dialog-pitch-review-${projectId}`}>
+      <div className="my-auto w-full max-w-5xl bg-[#f7f4ed] p-5 shadow-2xl md:p-9">
+        <div className="flex items-start justify-between gap-5">
+          <div><p className="admin-overline admin-mono">Authorized pitch review / {projectId}</p><h2 className="admin-page-title">{project?.title || 'Submitted pitch details'}</h2><p>Private administration view. These details and attachments are only loaded after server authorization.</p></div>
+          <button type="button" className="admin-button secondary" aria-label="Close pitch review" data-testid={`button-close-pitch-review-${projectId}`} onClick={() => setOpen(false)}><X size={17}/></button>
+        </div>
+        {details.isPending && <Skeleton compact/>}
+        {details.isError && <Notice icon={<ShieldAlert size={20}/>} title="Submitted pitch details unavailable" action="Try again" onAction={() => void details.refetch()}>The protected review record could not be retrieved. No details are being shown until the authenticated request succeeds.</Notice>}
+        {data && <>
+          <section className="mt-7">
+            <h3 className="admin-overline admin-mono">Submitted answers</h3>
+            <dl className="grid gap-4 md:grid-cols-2">
+              {answerRows.map(([label, value]) => {
+                if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
+                const display = Array.isArray(value) ? value.join('\n') : typeof value === 'boolean' ? value ? 'Yes' : 'No' : String(value);
+                return <div key={label} className="border-b border-[#c8c0b5] py-3"><dt className="admin-mono text-xs uppercase tracking-wider">{label}</dt><dd className="mt-2 whitespace-pre-wrap break-words">{display}</dd></div>;
+              })}
+            </dl>
+          </section>
+          <section className="mt-8">
+            <h3 className="admin-overline admin-mono">Filmmaker contact details</h3>
+            <dl className="grid gap-4 md:grid-cols-2">
+              {([['Name', filmmaker?.name], ['Email', filmmaker?.email], ['Phone', filmmaker?.phone], ['City', filmmaker?.city], ['State / region', filmmaker?.state], ['Country', filmmaker?.country], ['Favorite genres', filmmaker?.favorite_genres], ['Chat opt-in', filmmaker?.chat_opt_in]] as [string, AdminReviewAnswer | undefined][]).map(([label, value]) => {
+                if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
+                return <div key={label} className="border-b border-[#c8c0b5] py-3"><dt className="admin-mono text-xs uppercase tracking-wider">{label}</dt><dd className="mt-2 whitespace-pre-wrap break-words">{Array.isArray(value) ? value.join(', ') : typeof value === 'boolean' ? value ? 'Yes' : 'No' : String(value)}</dd></div>;
+              })}
+            </dl>
+          </section>
+          {adminAnswerRows.length > 0 && <section className="mt-8">
+            <h3 className="admin-overline admin-mono">Additional submitted answers</h3>
+            <dl className="grid gap-4 md:grid-cols-2">
+              {adminAnswerRows.map(([key, value]) => <div key={key} className="border-b border-[#c8c0b5] py-3"><dt className="admin-mono text-xs uppercase tracking-wider">{key.replace(/_/g, ' ')}</dt><dd className="mt-2 whitespace-pre-wrap break-words">{Array.isArray(value) ? value.join(', ') : value == null ? 'Not provided' : typeof value === 'boolean' ? value ? 'Yes' : 'No' : String(value)}</dd></div>)}
+            </dl>
+          </section>}
+          {filmmakerAdditionalRows.length > 0 && <section className="mt-8">
+            <h3 className="admin-overline admin-mono">Additional filmmaker details</h3>
+            <dl className="grid gap-4 md:grid-cols-2">
+              {filmmakerAdditionalRows.map(([key, value]) => <div key={key} className="border-b border-[#c8c0b5] py-3"><dt className="admin-mono text-xs uppercase tracking-wider">{key.replace(/_/g, ' ')}</dt><dd className="mt-2 whitespace-pre-wrap break-words">{typeof value === 'string' ? value : JSON.stringify(value)}</dd></div>)}
+            </dl>
+          </section>}
+          <section className="mt-8">
+            <h3 className="admin-overline admin-mono">Submitted attachments</h3>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="admin-detail-attachment"><strong>Full synopsis</strong><p className="whitespace-pre-wrap">{materials?.synopsis || 'No synopsis provided.'}</p></div>
+              <AdminImageAttachment label="Poster" value={materials?.poster_url}/>
+              <AdminImageAttachment label="Share image" value={materials?.share_image_url}/>
+              <AdminLinkAttachment label="Trailer" value={materials?.trailer_url}/>
+              <AdminLinkAttachment label="Uploaded video" value={materials?.uploaded_video_url}/>
+              <AdminLinkAttachment label="Short-pilot link" value={materials?.pilot_url || materials?.short_pilot_url || project?.pilot_url || project?.short_pilot_url || null}/>
+              <div className="admin-detail-attachment">
+                <strong>Pitch deck</strong>
+                {materials?.pitch_deck_url
+                  ? <><p>{materials.pitch_deck_name || 'Pitch deck PDF'}{materials.pitch_deck_status ? ` · ${materials.pitch_deck_status}` : ''}</p><button type="button" className="admin-button secondary" data-testid={`button-view-admin-pitch-deck-${projectId}`} disabled={openingDeck} onClick={() => void viewDeck()}><FileText size={14}/>{openingDeck ? 'Loading protected PDF…' : 'View pitch deck'}</button>{deckError && <p role="alert" className="admin-feedback">{deckError}</p>}</>
+                  : <p>{materials?.pitch_deck_status ? `Pitch deck unavailable · ${materials.pitch_deck_status}` : 'No pitch deck attached.'}</p>}
+              </div>
+              <AdminImageAttachment label="Trailer preview image" value={materials?.trailer_thumbnail_url}/>
+            </div>
+          </section>
+        </>}
+      </div>
+    </div>}
+  </>;
+}
+
 function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; userId: string }) {
   const [result, setResult] = useState<{ message: string; failed: boolean } | null>(null);
   const { data, isPending, isError, error, refetch, isFetching } = useGetAdminTable(section.id, {
@@ -191,7 +410,7 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
       {error?.status === 403 ? 'Access to this data was denied. Your account may no longer have administrator access.' : 'The connection to this section failed. Your other sections are still available.'}
     </Notice> : data?.rows.length ? <div className="admin-table-wrap">
       <table className="admin-table" data-testid={`table-${section.id}`}>
-        <thead><tr>{data.columns.map((column, i) => <th scope="col" key={`${column}-${i}`}>{column}</th>)}{(section.id === 'queues' || section.id === 'messages') && <th scope="col">Actions</th>}</tr></thead>
+        <thead><tr>{data.columns.map((column, i) => <th scope="col" key={`${column}-${i}`}>{column}</th>)}{(section.id === 'queues' || section.id === 'messages') && <th scope="col">Actions</th>}{section.id === 'queues' && <th scope="col">Pitch review</th>}</tr></thead>
         <tbody>{data.rows.map((row, i) => <tr key={`${row[row.length - 1] ?? ''}-${i}`} data-testid={`row-${section.id}-${i}`}>
           {data.columns.map((column, j) => {
             const value = row[j] ?? '';
@@ -200,6 +419,9 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
             return <td key={j}>{isShowcaseQueue ? 'Showcase request' : isWaitingShowcase ? 'Awaiting review' : value}</td>;
           })}
           {(section.id === 'queues' || section.id === 'messages') && <td><ReviewActions section={section.id} row={row} columns={data.columns} onResult={(message, failed = false) => setResult({ message, failed })} /></td>}
+          {section.id === 'queues' && <td>{row[columnIndex(data.columns, /^queue$/i)]?.trim().toLowerCase() === 'approval' && numericId(row[columnIndex(data.columns, /^project id$/i)]) !== null
+            ? <AdminPitchReview projectId={numericId(row[columnIndex(data.columns, /^project id$/i)])!}/>
+            : <span className="admin-action-na">—</span>}</td>}
         </tr>)}</tbody>
       </table>
     </div> : <Notice icon={<Clapperboard size={20} />} title="Nothing recorded here yet">

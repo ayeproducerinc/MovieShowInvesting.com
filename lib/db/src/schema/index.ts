@@ -33,5 +33,6 @@ export * from "./email-log";
 export * from "./filmmaker-account-visitors";
 export * from "./question-ip-attempts";
 export * from "./filmmaker-submission-attempts";
+export * from "./filmmaker-draft-materials";
 export * from "./conversations";
 export * from "./auth";

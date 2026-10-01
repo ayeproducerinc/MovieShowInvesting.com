@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowUpRight, RotateCcw } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import { getGetCurrentInvestorIntentQueryKey, getGetPublicProjectQueryKey, useGetCurrentInvestorIntent, useGetPublicProject } from '@workspace/api-client-react';
+import type { PublicProject } from '@workspace/api-client-react';
 import { useAuth } from '@workspace/replit-auth-web';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { ProjectShare } from '@/components/project-share';
@@ -10,6 +11,7 @@ import { ProjectConversationEntry } from '@/components/project-conversation-entr
 import { money } from './filmmaker-calculator';
 
 const securitiesNotice = "Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.";
+type PublicProjectWithPitchDeck = PublicProject & { pitch_deck_url?: string | null; pitch_deck_name?: string | null };
 function safeUrl(value: string | null | undefined) {
   if (!value) return null;
   try { const parsed = new URL(value); return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : null; }
@@ -43,7 +45,7 @@ export default function Project() {
     refetchOnWindowFocus: true,
     retry: (count, error) => error.status !== 404 && count < 2,
   } });
-  const data = project.data;
+  const data = project.data as PublicProjectWithPitchDeck | undefined;
   const current = useGetCurrentInvestorIntent({ query: {
     queryKey: [...getGetCurrentInvestorIntentQueryKey(), identityId],
     enabled: authReady && !!data?.approved && !!data?.showcase_requested && !data.is_owner,
@@ -93,11 +95,13 @@ export default function Project() {
   const intent = current.data?.intent;
   const previousHere = current.data?.history.some(entry => entry.allocations.some(row => row.project_id === data.id));
   const target = `/invest?project=${encodeURIComponent(data.slug)}`;
+  const pitchDeckUrl = eligible ? safeUrl(data.pitch_deck_url) : null;
   return <section className="dossier"><div className="page-wrap">
     <SecuritiesNotice/>
     <div className="dossier-head"><Link href="/" className="dossier-kicker" data-testid="link-project-brand">Movie Show Investing / Projects</Link><span className="dossier-kicker">{data.approved && data.showcase_requested ? 'Showcase approved' : 'Unlisted / shared by link'}</span></div>
     <div className="dossier-hero"><p className="dossier-kicker">{labels || 'Independent project'} / Prelaunch</p><h1 className="dossier-title" data-testid="text-project-title">{data.title}<em>.</em></h1>{data.is_owner && <p className="dossier-status" data-testid="badge-owned-project">Your project · This is how visitors see its public page.</p>}{data.logline && <p className="dossier-lead" data-testid="text-project-logline">{data.logline}</p>}
       {data.is_owner && <div style={{marginTop:24}}><Link href="/me/projects" className="dossier-button" data-testid="link-project-manage">Manage project <ArrowUpRight size={16}/></Link></div>}
+      {pitchDeckUrl && <div style={{ marginTop: 16 }}><a href={pitchDeckUrl} target="_blank" rel="noopener noreferrer" className="dossier-button dossier-button-outline" data-testid="link-project-pitch-deck">View pitch deck <ArrowUpRight size={16}/></a><p className="dossier-status">{data.pitch_deck_name || 'Pitch deck'} · Publicly viewable while this project remains eligible for Explore.</p></div>}
       {eligible && <div style={{marginTop: 28}} data-testid="project-interest-action">
         {data.is_owner ? <p className="dossier-status">You can manage this project, but you can’t pledge interest in your own project.</p> :
           current.isPending || current.isFetching ? <p role="status">Checking your saved interest…</p> :

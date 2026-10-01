@@ -1,4 +1,5 @@
 - [Firebase Auth config semantics](firebase-auth-config-semantics.md) — a missing passwordRequired field in the Admin API can mean false, not a failed passwordless update.
+- [Firebase runtime web config](firebase-runtime-web-config.md) — auth tests must use the app's effective browser configuration; an existing environment key may differ.
 - [Firebase email-link quota](firebase-email-link-quota.md) — auth/quota-exceeded can block sign-in even with valid provider and domains; don't bypass email ownership.
 - [Firebase email-link handoff](firebase-email-link-handoff.md) — keep admin sign-in in the existing tab; embedded previews may partition storage, so retain the secure fallback.
 - [Guest confirmation lifetime](guest-confirmation-lifetime.md) — an immediate guest confirmation survives refresh, but a return after leaving the page or tab requires sign-in.
@@ -26,3 +27,4 @@
 - [Live review checkout copy](live-review-checkout-copy.md) — owner approved straightforward $49 review/refund terms, without repeated charge or test-environment disclaimers.
 - [Pay after pitch](pay-after-pitch.md) — both pricing choices finish a pitch before checkout; a verified payment alone submits it for editorial review.
 - [Manual frontend build environment](manual-frontend-build-environment.md) — shell builds do not inherit managed workflow values; supply the required build-time environment explicitly.
+- [Fixture cleanup evidence](fixture-cleanup-evidence.md) — remove temporary credentials separately; keep restricted unresolved asset evidence until remote deletion is verified.

@@ -4,7 +4,7 @@ import { RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import {
   claimFilmmakerProject, getGetFilmmakerProjectsQueryKey,
-  getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey,
+  getFlowProgress, getGetFilmmakerResultQueryKey, getGetFlowProgressQueryKey,
   getGetPriceGroupQueryKey, getPriceGroup,
   useGetFilmmakerProjects,
   useResumeFilmmakerProject, useSelectFilmmakerProject,
@@ -25,7 +25,18 @@ import { useAuth } from '@workspace/replit-auth-web';
 
 function accountError(error: unknown): string {
   if (error && typeof error === 'object' && 'status' in error) {
-    if (error.status === 409) return 'This browser has an earlier submission or an unfinished worksheet that cannot be switched away from yet. Finish that worksheet here before managing another project.';
+    const response = 'data' in error ? error.data : null;
+    const responseError = response && typeof response === 'object' && 'error' in response && typeof response.error === 'string'
+      ? response.error : '';
+    const responseCode = response && typeof response === 'object' && 'code' in response && typeof response.code === 'string'
+      ? response.code : '';
+    if (error.status === 409 && responseCode === 'unlinked_browser_draft') {
+      return responseError || 'Keep this original browser draft. Connect it here before switching projects. If this account has another unfinished pitch, finish that pitch in another browser or device first, then return here to connect this guest draft.';
+    }
+    if (error.status === 409 && responseError.toLowerCase().includes('unfinished guest draft')) {
+      return `${responseError} Keep this original browser draft; connect it here before switching projects. If this account has another unfinished pitch, finish that pitch in another browser or device first, then return here to connect this guest draft.`;
+    }
+    if (error.status === 409) return responseError || 'This browser has an earlier submission or an unfinished worksheet that cannot be switched away from yet. Finish that worksheet here before managing another project.';
     if (error.status === 403) return 'This browser’s current worksheet belongs to a different account. Sign in with the Google account associated with that submission. Your other projects have not changed.';
     if (error.status === 401) return 'Your sign-in has expired. Sign in again to manage your projects.';
   }
@@ -86,7 +97,16 @@ export default function FilmmakerProjects() {
       const linkAndContinue = async () => {
         // Serialize visitor-cookie changes and a one-time action across tabs.
         await getPriceGroup();
-        await claimFilmmakerProject();
+        let draftId: number | null = null;
+        try {
+          const currentProgress = await getFlowProgress('filmmaker');
+          if (!currentProgress.completed) draftId = currentProgress.draft_id ?? null;
+        } catch (error) {
+          if (!error || typeof error !== 'object' || !('status' in error) || error.status !== 404) throw error;
+        }
+        await claimFilmmakerProject({
+          headers: draftId ? { 'X-MSI-Draft-Id': String(draftId) } : {},
+        });
         if (user && !ssoUser) await synchronizeFilmmakerPhone(user);
         await queryClient.invalidateQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
         const requestedStart = hasPendingStartAction()
@@ -164,7 +184,7 @@ export default function FilmmakerProjects() {
   }));
   return <>
     {claimError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{claimError} <Link href="/start/filmmaker">Open this browser’s worksheet</Link> · <button type="button" onClick={() => void linkCurrentVisit()}>Try linking again</button></div>}
-    {actionError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{actionError}</div>}
+    {actionError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{actionError} {actionError.includes('Keep this original browser draft') && <Link href="/start/filmmaker">Open this browser’s worksheet</Link>}</div>}
     <ProjectHubView
       email={ssoUser?.email ?? auth.user?.email ?? ''}
       initiallyOpen={initialAction === 'manage'}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ArrowRight, RotateCcw } from 'lucide-react';
 import { Link } from 'wouter';
 import { getGetExploreQueryKey, useGetExplore } from '@workspace/api-client-react';
-import type { GetExploreStage } from '@workspace/api-client-react';
+import type { ExploreProject, GetExploreStage } from '@workspace/api-client-react';
 import { useAuth } from '@workspace/replit-auth-web';
 import { InvestorProjectCard } from '@/components/investor-project-card';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
@@ -11,6 +11,7 @@ import '../investor.css';
 const stages = [['','All stages'],['distribution','Distribution'],['production','Production'],['idea','Idea']] as const;
 const genres = ['','Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Other'];
 const securitiesNotice = "Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.";
+type ExploreProjectWithPitchDeck = ExploreProject & { pitch_deck_url?: string | null; pitch_deck_name?: string | null };
 
 export default function Explore() {
   const replitAuth = useAuth();
@@ -43,7 +44,7 @@ export default function Explore() {
       </div>
       {!authReady || projects.isPending ? <div className="inv-projects" aria-label="Loading projects">{[1,2,3].map(i=><div key={i} className="inv-skeleton" style={{height:185}}/>)}</div> :
       projects.isError ? <div className="inv-state"><p className="inv-kicker">Connection interrupted</p><h1>The collection couldn’t load.</h1><p>Try again to see the latest approved projects.</p><button className="inv-button" data-testid="button-retry-explore" onClick={()=>void projects.refetch()}><RotateCcw size={16}/> Try again</button></div> :
-      projects.data?.projects.length ? <div className="inv-projects">{projects.data.projects.map(project=><InvestorProjectCard key={project.id} project={project}/>)}</div> :
+       projects.data?.projects.length ? <div className="inv-projects">{projects.data.projects.map(project=><InvestorProjectCard key={project.id} project={project as ExploreProjectWithPitchDeck} showPitchDeck/>)}</div> :
       <div className="inv-state"><p className="inv-kicker">Nothing in this frame</p><h1>No projects found.</h1><p>{stage || genre || search ? 'Try a different search or clear the filters.' : 'The collection is still taking shape. Check back when approved projects are ready.'}</p>{(stage || genre || search) && <button className="inv-button secondary" data-testid="button-clear-explore" onClick={()=>{setStage('');setGenre('');setSearch('');setSort('');}}>Clear filters</button>}</div>}
     </div>
   </section>;

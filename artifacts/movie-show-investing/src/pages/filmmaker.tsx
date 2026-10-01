@@ -1,12 +1,23 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
+import { useQueryClient } from '@tanstack/react-query';
 import { recordPitchForReview, storePitchReviewProof } from '@/lib/pitch-review-intent';
-import { getGetFilmmakerResultQueryKey, getGetFilmmakerSubmissionConfigQueryKey, getGetFlowProgressQueryKey, useGetFilmmakerResult, useGetFilmmakerSubmissionConfig, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
+import { getGetFilmmakerResultQueryKey, getGetFilmmakerSubmissionConfigQueryKey, getGetFlowProgressQueryKey, useClaimFilmmakerProject, useGetFilmmakerResult, useGetFilmmakerSubmissionConfig, useGetFlowProgress, useGetPriceGroup, useSaveFlowProgress, useSubmitFilmmaker } from '@workspace/api-client-react';
 import type { FilmmakerSubmissionInput } from '@workspace/api-client-react';
-import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
+import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
+import { GoogleSignInButton } from '@/components/google-sign-in-button';
+import { DraftPitchMaterials, type DraftPitchMaterialsHandle } from '@/components/draft-pitch-materials';
 import { useAuth } from '@workspace/replit-auth-web';
-import { showGuestConfirmation } from '@/lib/filmmaker-confirmation';
+import {
+  clearFilmmakerAuthHandoff,
+  isFilmmakerDraftLinked,
+  registerFilmmakerAuthPreparationProvider,
+  readFilmmakerAuthHandoff,
+  rememberFilmmakerDraftLinked,
+  waitForFilmmakerAuthHandoff,
+  type FilmmakerAuthHandoff,
+} from '@/lib/filmmaker-auth-handoff';
 import { LocationPicker } from '../components/location-picker';
 import { calculateDeal, examples, money, phase, restoreWorksheet, standardOffer, validListedOffer, type Format, type Stage } from './filmmaker-calculator';
 
@@ -58,7 +69,7 @@ function payload(a:Answers):FilmmakerSubmissionInput {
   return {
     ...contact, stage:a.stage ?? undefined,
     title:a.title.trim(), format:a.format, genre:a.genre || undefined, genre_other:a.genre === 'Other' ? a.genre_other.trim() : undefined,
-    logline:a.logline.trim(), trailer_url:a.trailer_url.trim() || undefined, pilot_url:a.stage === 'production' ? a.pilot_url.trim() || undefined : undefined,
+    logline:a.logline.trim(), pilot_url:a.stage === 'production' ? a.pilot_url.trim() || undefined : undefined,
     budget:a.budget, budget_from_example:a.budget_mode === 'example', deal_answer:a.deal_answer ?? undefined,
     offer_per100:a.wants_lower ? 125 : a.offer_per100 ?? undefined, offer_other_text:a.offer_choice === 'other' ? a.offer_other_text.trim() : undefined,
     wants_lower:a.wants_lower, payback_terms:a.payback_terms ?? undefined, payback_terms_other:a.payback_terms === 'other' ? a.payback_terms_other.trim() : undefined,
@@ -72,32 +83,47 @@ export default function Filmmaker() {
   const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
   const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
+  const identityKey = replitAuth.user ? `replit:${replitAuth.user.id}` : firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
   const signedInEmail = replitAuth.user?.email ?? firebaseUser?.email ?? null;
-  return <FilmmakerWorksheet key={identityId} identityId={identityId} signedInEmail={signedInEmail} authLoading={replitAuth.isLoading} />;
+  return <FilmmakerWorksheet key={identityKey} identityId={identityId} identityKey={identityKey} signedInEmail={signedInEmail} authLoading={replitAuth.isLoading} />;
 }
 
-function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identityId: string; signedInEmail: string | null; authLoading: boolean }) {
+function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoading }: { identityId: string; identityKey: string; signedInEmail: string | null; authLoading: boolean }) {
   const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
   const fromPricing = new URLSearchParams(window.location.search).get('new') === '1';
   const authReady = useFirebaseSessionReady();
   const completedResult = useGetFilmmakerResult({ query:{ queryKey:[...getGetFilmmakerResultQueryKey(),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
   const completedDestination = () => fromPricing ? '/me/projects?action=start&new=1' : '/start/filmmaker/done';
-  useEffect(() => { if (completedResult.data?.completed) navigate(completedDestination()); }, [completedResult.data?.completed, navigate]);
+  const [handoffError, setHandoffError] = useState('');
+  const [pendingHandoff, setPendingHandoff] = useState<FilmmakerAuthHandoff | null>(readFilmmakerAuthHandoff);
+  useEffect(() => { if (completedResult.data?.completed && !pendingHandoff) navigate(completedDestination()); }, [completedResult.data?.completed, navigate, pendingHandoff]);
   const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:[...getGetFlowProgressQueryKey('filmmaker'),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
   const submissionConfig = useGetFilmmakerSubmissionConfig({ query:{ queryKey:getGetFilmmakerSubmissionConfigQueryKey(), retry:false, refetchOnWindowFocus:true } });
   useEffect(() => {
-    if (identityId !== 'visitor' && authReady && !authLoading && completedResult.error?.status === 404 && progress.error?.status === 404) navigate(fromPricing ? '/me/projects?action=start&new=1' : '/me/projects');
-  }, [identityId, authReady, authLoading, completedResult.error, progress.error, navigate, fromPricing]);
+    if (identityId !== 'visitor' && authReady && !authLoading && !pendingHandoff && !handoffError
+      && completedResult.error?.status === 404 && progress.error?.status === 404) {
+      navigate(fromPricing ? '/me/projects?action=start&new=1' : '/me/projects');
+    }
+  }, [identityId, authReady, authLoading, pendingHandoff, handoffError, completedResult.error, progress.error, navigate, fromPricing]);
   const group = useGetPriceGroup();
   const draftHeaders: Record<string, string> = progress.data?.draft_id ? { 'X-MSI-Draft-Id': String(progress.data.draft_id) } : {};
   const save = useSaveFlowProgress({ request: { headers: draftHeaders } });
   const submit = useSubmitFilmmaker({ request: { headers: draftHeaders } });
+  const claimDraftId = pendingHandoff?.draftId ?? progress.data?.draft_id;
+  const claim = useClaimFilmmakerProject({
+    request: { headers: claimDraftId ? { 'X-MSI-Draft-Id': String(claimDraftId) } : {} },
+  });
   const [a, setA] = useState<Answers>(initial);
   const [screen, setScreen] = useState(1);
   const [hydrated, setHydrated] = useState(false);
   const [existingDraft, setExistingDraft] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [submitError, setSubmitError] = useState('');
+  const [linkedDraftId, setLinkedDraftId] = useState<number | null>(null);
+  const [connectingDraft, setConnectingDraft] = useState(false);
+  const [materialsBusy, setMaterialsBusy] = useState(false);
+  const [materialsError, setMaterialsError] = useState('');
   const [validation, setValidation] = useState('');
   const [website, setWebsite] = useState('');
   const [saving, setSaving] = useState(false);
@@ -106,9 +132,18 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
   const answersRef = useRef(a);
   const lastSaved = useRef('');
   const initialized = useRef(false);
+  const autoClaimStarted = useRef<number | null>(null);
   const editTimer = useRef<number | null>(null);
+  const materialsRef = useRef<DraftPitchMaterialsHandle | null>(null);
+  const progressDraftIdRef = useRef<number | null>(progress.data?.draft_id ?? null);
+  const savingRef = useRef(saving);
+  const materialsBusyRef = useRef(materialsBusy);
+  const prepareHandoffRef = useRef<(draftId:number)=>Promise<boolean>>(async()=>false);
   answersRef.current = a;
   screenRef.current = screen;
+  progressDraftIdRef.current = progress.data?.draft_id ?? null;
+  savingRef.current = saving;
+  materialsBusyRef.current = materialsBusy;
 
   useEffect(() => {
     if (!progress.data || initialized.current) return;
@@ -121,14 +156,22 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
     const recoveredScreen = legacyStage ? 1 : restoredScreen;
     setA(recovered);
     setScreen(recoveredScreen);
-    if (progress.data.completed) {
+    if (progress.data.completed && !pendingHandoff) {
       navigate(completedDestination());
     } else {
-      setExistingDraft(fromPricing && (recoveredScreen > 1 || Boolean(recovered.stage || recovered.no_project_yet || recovered.title || recovered.name || recovered.email)));
+      setExistingDraft(fromPricing && !pendingHandoff && (recoveredScreen > 1 || Boolean(recovered.stage || recovered.no_project_yet || recovered.title || recovered.name || recovered.email)));
       lastSaved.current = legacyStage ? '' : JSON.stringify({ screen:recoveredScreen, answers:recovered });
       setHydrated(true);
     }
-  }, [progress.data, navigate]);
+  }, [progress.data, navigate, pendingHandoff]);
+  useEffect(() => {
+    const draftId = progress.data?.draft_id;
+    if (!draftId || identityId === 'visitor') {
+      setLinkedDraftId(null);
+      return;
+    }
+    setLinkedDraftId(isFilmmakerDraftLinked(identityKey, draftId) ? draftId : null);
+  }, [identityId, identityKey, progress.data?.draft_id]);
   useEffect(() => {
     // An untouched visitor has no progress row. The API deliberately returns 404.
     if (identityId === 'visitor' && progress.isError && progress.error?.status === 404 && !initialized.current) {
@@ -136,6 +179,68 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
       setHydrated(true);
     }
   }, [identityId, progress.isError, progress.error]);
+  useEffect(() => {
+    if (!pendingHandoff || identityId === 'visitor' || authLoading || !authReady) return;
+    let active = true;
+    const connectPreparedDraft = async () => {
+      if (!pendingHandoff.prepared) {
+        const prepared = await waitForFilmmakerAuthHandoff(pendingHandoff.draftId);
+        if (!active) return;
+        if (prepared) {
+          setPendingHandoff(readFilmmakerAuthHandoff());
+        } else {
+          clearFilmmakerAuthHandoff();
+          setPendingHandoff(null);
+          setHandoffError('We could not finish saving the exact browser draft before sign-in completed. Your draft remains in this browser; retry the secure account connection before submitting.');
+        }
+        return;
+      }
+      if (progress.isLoading || autoClaimStarted.current === pendingHandoff.draftId) return;
+      autoClaimStarted.current = pendingHandoff.draftId;
+      const refreshed = progress.data?.draft_id === pendingHandoff.draftId && !progress.error
+        ? progress
+        : await progress.refetch();
+      if (!active) return;
+      const draftId = refreshed.data?.draft_id;
+      if (!draftId) {
+        clearFilmmakerAuthHandoff();
+        setPendingHandoff(null);
+        setHandoffError('We could not verify the exact browser draft you prepared for sign-in. No draft was linked. Open My projects to resume an account draft or return to the browser that still has the saved answers.');
+        return;
+      }
+      if (pendingHandoff.draftId !== draftId) {
+        clearFilmmakerAuthHandoff();
+        setPendingHandoff(null);
+        setHandoffError('The selected draft changed while you were signing in, so we did not link another draft. Open My projects and select the intended worksheet.');
+        return;
+      }
+      setConnectingDraft(true);
+      setHandoffError('');
+      try {
+        await claim.mutateAsync();
+        rememberFilmmakerDraftLinked(identityKey, draftId);
+        setLinkedDraftId(draftId);
+        clearFilmmakerAuthHandoff();
+        setPendingHandoff(null);
+      } catch (error) {
+        const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
+        const response = error && typeof error === 'object' && 'data' in error ? error.data : null;
+        const detail = response && typeof response === 'object' && 'error' in response && typeof response.error === 'string'
+          ? response.error : '';
+        setHandoffError(status === 409
+          ? `${detail || 'This draft could not be linked to this account.'} Keep this original browser draft; connect it here before switching projects. If this account has another unfinished pitch, finish that pitch in another browser or device first, then return here to connect this guest draft. Your answers remain saved; no draft was overwritten.`
+          : status === 403 || status === 404
+          ? `${detail || 'This draft could not be linked to this account.'} Your answers remain saved. Open My projects to resolve any existing account-draft conflict; no draft was overwritten.`
+          : 'We could not securely link this draft. Your answers remain saved; check your connection and try again.');
+        clearFilmmakerAuthHandoff();
+        setPendingHandoff(null);
+      } finally {
+        setConnectingDraft(false);
+      }
+    };
+    void connectPreparedDraft();
+    return () => { active = false; };
+  }, [pendingHandoff, identityId, identityKey, authLoading, authReady, progress.data?.draft_id, progress.error, progress.isLoading, claim]);
 
   function change<K extends keyof Answers>(key:K, value:Answers[K]) {
     setA(current => ({ ...current, [key]:value }));
@@ -154,22 +259,120 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
   function persist(nextScreen:number, answers:Answers) {
     const serialized = JSON.stringify({ screen:nextScreen, answers });
     setSaving(true);
-    const operation = queue.current.catch(() => undefined).then(() =>
-      save.mutateAsync({ data:{ flow:'filmmaker', last_screen:nextScreen, answers } })
-    );
+    const operation = queue.current.catch(() => undefined).then(async () => {
+      await save.mutateAsync({ data:{ flow:'filmmaker', last_screen:nextScreen, answers } });
+      if (!progress.data?.draft_id) {
+        const refreshed = await progress.refetch();
+        if (!refreshed.data?.draft_id) {
+          throw new Error('The saved worksheet has no confirmed draft identifier yet.');
+        }
+      }
+    });
     queue.current = operation;
     operation.then(() => {
       lastSaved.current = serialized;
       setSaveError('');
     }).catch((error: unknown) => {
       const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
-      setSaveError(status === 409 || status === 403 || status === 404
+      setSaveError(error instanceof Error && error.message.includes('draft identifier')
+        ? 'Your answers were saved, but we could not confirm the draft needed for optional materials. Try saving again before continuing.'
+        : status === 409 || status === 403 || status === 404
         ? 'This draft is no longer selected for this visit. Copy any unsaved answers, then open My projects to resume the draft or start another project.'
         : 'Your changes could not be saved. Please try again.');
     }).finally(() => {
       if (queue.current === operation) setSaving(false);
     });
     return operation;
+  }
+  async function flushMaterials():Promise<boolean> {
+    if (materialsBusy) {
+      setMaterialsError('Wait for the current file upload to finish before leaving this step.');
+      return false;
+    }
+    try {
+      await materialsRef.current?.flush();
+      return true;
+    } catch {
+      setMaterialsError('Your optional pitch details could not be saved yet. Retry the save or remove the unfinished optional change before continuing.');
+      return false;
+    }
+  }
+  function onMaterialsBusyChange(busy:boolean) {
+    materialsBusyRef.current = busy;
+    setMaterialsBusy(busy);
+  }
+  async function prepareForAccountHandoff(draftId:number):Promise<boolean> {
+    setPendingHandoff({ draftId, startedAt:Date.now(), prepared:false });
+    setHandoffError('');
+    for (let attempt=0; attempt<4; attempt++) {
+      const currentScreen = screenRef.current;
+      const currentAnswers = answersRef.current;
+      if (currentScreen === 2 && !currentAnswers.no_project_yet) {
+        if (materialsBusyRef.current || !await flushMaterials()) return false;
+      }
+      const snapshot = JSON.stringify({ screen:currentScreen, answers:currentAnswers });
+      try {
+        await persist(currentScreen, currentAnswers);
+        const refreshed = await progress.refetch();
+        if (refreshed.data?.draft_id !== draftId) return false;
+        if (snapshot === JSON.stringify({ screen:screenRef.current, answers:answersRef.current })) {
+          return true;
+        }
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+  prepareHandoffRef.current = prepareForAccountHandoff;
+  useEffect(() => {
+    if (identityId !== 'visitor') return;
+    return registerFilmmakerAuthPreparationProvider({
+      getDraftId:()=>progressDraftIdRef.current,
+      canPrepare:()=>{
+        const draftId = progressDraftIdRef.current;
+        return Boolean(draftId && !savingRef.current && !materialsBusyRef.current
+          && lastSaved.current === JSON.stringify({ screen:screenRef.current, answers:answersRef.current }));
+      },
+      canSignInWithoutDraft:()=>Boolean(!progressDraftIdRef.current && progress.error?.status === 404
+        && screenRef.current === 1 && lastSaved.current === ''
+        && JSON.stringify(answersRef.current) === JSON.stringify(initial)),
+      prepare:draftId=>prepareHandoffRef.current(draftId),
+    });
+  }, [identityId, progress.data?.draft_id, progress.error, progress.isError, saving, materialsBusy, screen, a]);
+  async function connectCurrentDraft() {
+    let draftId = progress.data?.draft_id;
+    if (connectingDraft) return;
+    if (!draftId) {
+      const refreshed = await progress.refetch();
+      draftId = refreshed.data?.draft_id;
+      if (draftId) {
+        setHandoffError('We confirmed the saved draft identifier. Select Connect draft to my account again to securely link this exact draft.');
+        return;
+      }
+      setHandoffError('We could not confirm the current draft. Your answers remain saved; refresh the worksheet before linking it.');
+      return;
+    }
+    if (screen === 2 && !await flushMaterials()) return;
+    setConnectingDraft(true);
+    setHandoffError('');
+    try {
+      await persist(screen, a);
+      await claim.mutateAsync();
+      rememberFilmmakerDraftLinked(identityKey, draftId);
+      setLinkedDraftId(draftId);
+      setHandoffError('');
+    } catch (error) {
+      const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
+      const response = error && typeof error === 'object' && 'data' in error ? error.data : null;
+      const detail = response && typeof response === 'object' && 'error' in response && typeof response.error === 'string'
+        ? response.error : '';
+      setHandoffError(status === 409 || status === 403 || status === 404
+        ? `${detail || 'This draft could not be linked to this account.'} Your answers remain saved. Open My projects to resolve any existing account-draft conflict; no draft was overwritten.`
+        : 'We could not securely link this draft. Your answers remain saved; check your connection and try again.');
+    } finally {
+      setConnectingDraft(false);
+    }
   }
   useEffect(() => {
     if (!hydrated || authLoading || existingDraft) return;
@@ -198,7 +401,7 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
     if (step === 1 && !a.stage) return 'Choose a project stage to continue.';
     if (step === 2 && !a.no_project_yet) {
       if (!a.title.trim() || !a.genre || !a.logline.trim() || (a.genre === 'Other' && !a.genre_other.trim())) return 'Add a title, genre and logline to continue.';
-      if (!validUrl(a.trailer_url) || !validUrl(a.pilot_url)) return 'Use a full http:// or https:// link for your video URLs.';
+      if (!validUrl(a.pilot_url)) return 'Use a full http:// or https:// link for your video URL.';
     }
     if (step === 3 && (!budgetValid || !a.deal_answer)) return 'Choose a positive whole-dollar budget and tell us how the example deal feels.';
     if (step === 4 && (!a.offer_choice || !validListedOffer(a.offer_per100) || (a.offer_choice === 'other' && !a.wants_lower && (!a.offer_other_text.trim() || otherOfferError)) || !a.payback_terms || (a.payback_terms === 'other' && !a.payback_terms_other.trim()))) return 'Choose an offer of at least $125 per $100 and answer the payback question.';
@@ -211,6 +414,7 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
     if (error) { setValidation(error); return; }
     setValidation('');
     if (editTimer.current !== null) window.clearTimeout(editTimer.current);
+    if (screen === 2 && !await flushMaterials()) return;
     try {
       await persist(next, updated);
       setScreen(next);
@@ -221,6 +425,7 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
     const next = a.no_project_yet && screen === 6 ? 2 : Math.max(1, screen - 1);
     setValidation('');
     if (editTimer.current !== null) window.clearTimeout(editTimer.current);
+    if (screen === 2 && !await flushMaterials()) return;
     try { await persist(next, a); setScreen(next); window.scrollTo({ top:0, behavior:'smooth' }); } catch { /* stay here */ }
   }
   async function editBudget() {
@@ -233,6 +438,18 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
     } catch { /* stay here */ }
   }
   async function finish() {
+    const currentDraftId = progress.data?.draft_id;
+    if (!currentDraftId) {
+      const refreshed = await progress.refetch();
+      setHandoffError(refreshed.data?.draft_id
+        ? 'We refreshed the exact draft identifier. Select Send my answers again to submit the linked draft.'
+        : 'We could not confirm the saved draft identifier, so nothing was submitted. Retry after refreshing the worksheet.');
+      return;
+    }
+    if (identityId === 'visitor' || connectingDraft || linkedDraftId !== currentDraftId) {
+      setHandoffError('Connect this saved draft to your verified account before sending the final submission.');
+      return;
+    }
     if (submit.isPending) return;
     if (!submissionConfig.data?.available) {
       setValidation('We could not prepare the final submission. Your answers are saved. Try “Check again” below.');
@@ -247,6 +464,7 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
     setValidation('');
     setSubmitError('');
     if (editTimer.current !== null) window.clearTimeout(editTimer.current);
+    if (!await flushMaterials()) return;
     try {
       await persist(6, a);
     } catch {
@@ -256,7 +474,6 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
       const submitted = await submit.mutateAsync({ data:{ ...payload(a), website } });
       recordPitchForReview(submitted.project_id);
       storePitchReviewProof(submitted.project_id, submitted.checkout_proof);
-      if (identityId === 'visitor') showGuestConfirmation();
       navigate('/start/filmmaker/done');
     } catch (error) {
       const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
@@ -284,7 +501,9 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
     if (editTimer.current !== null) window.clearTimeout(editTimer.current);
     void persist(2, next).then(() => { setScreen(2); window.scrollTo({ top:0, behavior:'smooth' }); }).catch(() => undefined);
   }
-  function chooseNoProject(checked:boolean) {
+  async function chooseNoProject(checked:boolean) {
+    if (checked && materialsBusy) return;
+    if (checked) await flushMaterials();
     const next = { ...a, no_project_yet:checked };
     setA(next);
     setValidation('');
@@ -325,7 +544,8 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
 
   if (authLoading || completedResult.isLoading || progress.isLoading || group.isLoading || completedResult.data?.completed || !hydrated && !progress.isError) return <section className="fm"><div className="page-wrap" style={{padding:'70px 0 140px'}} aria-label="Loading saved answers"><p className="fm-kicker">Opening your worksheet</p><div className="fm-skeleton" style={{maxWidth:440,height:75}}/><div className="fm-skeleton" style={{maxWidth:310}}/><div className="fm-skeleton" style={{maxWidth:600,height:190}}/></div></section>;
   if (completedResult.isError && completedResult.error?.status !== 404 || progress.isError && progress.error?.status !== 404 || group.isError || !group.data) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Connection interrupted</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>We can’t open your worksheet yet.</h1><p className="fm-small">Your previous answers and pricing group need to load before you continue. Please try again.</p><button type="button" data-testid="button-retry-loading" className="fm-primary" style={{marginTop:30}} onClick={()=>{ void completedResult.refetch(); void progress.refetch(); void group.refetch(); }}><RotateCcw size={17}/> Try again</button></div></section>;
-   if (identityId !== 'visitor' && progress.error?.status === 404) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Choose a project</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>Your draft isn’t selected.</h1><p className="fm-small">Open My projects to resume a saved draft or start another project. No project was changed.</p><Link href={fromPricing ? '/me/projects?action=start&new=1' : '/me/projects'} data-testid="link-select-filmmaker-draft" className="fm-primary" style={{marginTop:30}}>My projects <ArrowRight size={17}/></Link></div></section>;
+    if (identityId !== 'visitor' && progress.error?.status === 404 && handoffError) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Draft not connected</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>Your original draft is still safe.</h1><p className="fm-error" role="alert">{handoffError}</p><Link href="/me/projects" data-testid="link-filmmaker-handoff-recovery" className="fm-primary" style={{marginTop:30}}>Open My projects <ArrowRight size={17}/></Link></div></section>;
+    if (identityId !== 'visitor' && progress.error?.status === 404) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Choose a project</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>Your draft isn’t selected.</h1><p className="fm-small">Open My projects to resume a saved draft or start another project. No project was changed.</p><Link href={fromPricing ? '/me/projects?action=start&new=1' : '/me/projects'} data-testid="link-select-filmmaker-draft" className="fm-primary" style={{marginTop:30}}>My projects <ArrowRight size={17}/></Link></div></section>;
    if (existingDraft && fromPricing) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Saved worksheet found</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>Your pitch is still here.</h1><p className="fm-small">You have an unfinished pitch in this browser. Opening the pricing page again will not erase it or start a second draft. Continue your saved pitch, or finish it before starting another.</p><button type="button" className="fm-primary" data-testid="button-resume-pricing-draft" style={{marginTop:30}} onClick={() => { setExistingDraft(false); navigate('/start/filmmaker'); }}>Continue saved pitch <ArrowRight size={17}/></button></div></section>;
   return <section className="fm"><div className="page-wrap">
     <div className="fm-top"><Link href="/" data-testid="link-flow-home" className="fm-kicker">Movie Show Investing / Filmmakers</Link><span className="fm-kicker" data-testid="text-progress">Step {screen} of 6</span></div>
@@ -338,14 +558,20 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
           <Choice id="stage-production" name="project-stage" selected={a.stage==='production'} onClick={()=>selectStage('production')} detail="A short or pilot you want to make next.">Short or pilot I want to develop</Choice>
           <Choice id="stage-idea" name="project-stage" selected={a.stage==='idea'} onClick={()=>selectStage('idea')} detail="The story is taking shape.">Script or idea</Choice>
         </div></>}
-         {screen === 2 && <><label className="fm-check fm-section"><input type="checkbox" data-testid="checkbox-no-project" checked={a.no_project_yet} disabled={saving} onChange={e=>chooseNoProject(e.target.checked)}/><span><strong>I don’t have a project yet. I want to participate in the future.</strong><small style={{display:'block',color:'#666',marginTop:5}}>Skip the project and deal questions. We’ll only ask how to reach you.</small></span></label>
+         {screen === 2 && <><label className="fm-check fm-section"><input type="checkbox" data-testid="checkbox-no-project" checked={a.no_project_yet} disabled={saving || materialsBusy} onChange={e=>void chooseNoProject(e.target.checked)}/><span><strong>I don’t have a project yet. I want to participate in the future.</strong><small style={{display:'block',color:'#666',marginTop:5}}>Skip the project and deal questions. We’ll only ask how to reach you.</small></span></label>
           {!a.no_project_yet && <>
             <Field id="project-title" label="Working title" value={a.title} onChange={v=>change('title',v)} required placeholder="Even a working title is fine"/>
               <div className="fm-field"><p className="fm-label">Format</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{(['movie','show'] as const).map(value=><Choice id={`format-${value}`} name="project-format" key={value} selected={a.format===value} onClick={()=>setA(current=>{ const nextBudget=current.budget_mode==='example' ? examples(stage,value)[0] : current.budget; return {...current,format:value,budget:nextBudget,deal_answer:current.budget===nextBudget?current.deal_answer:null}; })}>{value==='movie'?'Movie':'Show'}</Choice>)}</div></div>
              <div className="fm-field"><p className="fm-label">Genre</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>{genres.map(g=><Choice id={`genre-${g}`} name="project-genre" key={g} selected={a.genre===g} onClick={()=>change('genre',g)}>{g}</Choice>)}</div></div>
             {a.genre==='Other' && <Field id="genre-other" label="Describe your genre" value={a.genre_other} onChange={v=>change('genre_other',v)} required/>}
             <Field id="logline" label="Logline" value={a.logline} onChange={v=>change('logline',v)} required multiline placeholder="The story, in a sentence or two"/>
-            <Field id="trailer-url" label="Trailer URL" value={a.trailer_url} onChange={v=>change('trailer_url',v)} type="url" placeholder="https://"/>
+             <DraftPitchMaterials
+               ref={materialsRef}
+               draftId={progress.data?.draft_id ?? null}
+               onBusyChange={onMaterialsBusyChange}
+               onErrorChange={error=>setMaterialsError(error ?? '')}
+             />
+             {materialsError && <p className="fm-error" role="alert" data-testid="error-draft-materials">{materialsError}</p>}
             {a.stage==='production' && <Field id="pilot-url" label="Short or pilot URL" value={a.pilot_url} onChange={v=>change('pilot_url',v)} type="url" placeholder="https://"/>}
           </>}
         </>}
@@ -387,6 +613,12 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
              : <div className="fm-note" role="status" style={{marginTop:18}}>No past funding experience needed. We’ll skip the goal and experience questions.</div>}
         </>}
         {screen === 6 && <>{a.no_project_yet && <div className="fm-note">You’re joining the conversation without a project. We won’t ask for a budget or deal terms.</div>}
+           {identityId === 'visitor'
+             ? <div className="fm-note" role="note" data-testid="text-filmmaker-sign-in-required"><strong>Sign in is required before we can receive and keep your final answers.</strong> Your worksheet saves in this browser as you go. Continue with Google opens a secure popup; we’ll finish saving this exact draft before linking it. You can cancel and return here any time. Account/email verification is not legal identity verification or KYC.</div>
+             : <div className="fm-note" role="status" data-testid="text-filmmaker-account-status"><strong>Signed in as {signedInEmail || 'your verified account'}.</strong> This verifies your account email; it is not legal identity verification or KYC. {linkedDraftId === progress.data?.draft_id ? 'This worksheet is securely linked to this account.' : 'Connect this browser draft to your account before final submission.'}</div>}
+           {handoffError && <div className="fm-error" role="alert" data-testid="error-filmmaker-handoff">{handoffError} <Link href="/me/projects" className="underline" data-testid="link-filmmaker-handoff-projects">My projects</Link></div>}
+           {identityId !== 'visitor' && pendingHandoff && connectingDraft && <p className="fm-small" role="status">Verifying your account and securely connecting this exact saved draft before submission…</p>}
+           {identityId !== 'visitor' && linkedDraftId === progress.data?.draft_id && <p className="fm-small" role="status" data-testid="status-filmmaker-draft-linked">Draft connected to {signedInEmail || 'your verified account'}. Your saved answers are ready for final submission.</p>}
           <div className="absolute -left-[10000px] h-px w-px overflow-hidden" aria-hidden="true">
             <label htmlFor="filmmaker-website">Leave this field blank</label>
             <input id="filmmaker-website" name="website" type="text" autoComplete="off" tabIndex={-1}
@@ -409,14 +641,27 @@ function FilmmakerWorksheet({ identityId, signedInEmail, authLoading }: { identi
               : null}
         </>}
         {validation && <p className="fm-error" data-testid="error-validation" role="alert">{validation}</p>}
+        {materialsError && screen !== 2 && <p className="fm-error" data-testid="status-omitted-material-save" role="status">An optional pitch material was not saved: {materialsError} You can continue without it and add it later from your project page.</p>}
+        {handoffError && screen !== 6 && <div className="fm-error" role="alert" data-testid="error-filmmaker-handoff">{handoffError} <Link href="/me/projects" className="underline">My projects</Link></div>}
         {saveError && <div className="fm-error" data-testid="error-save" role="alert">{saveError} {saveError.startsWith('This draft') ? <Link href="/me/projects" data-testid="link-reselect-draft">My projects</Link> : <button type="button" data-testid="button-retry-save" className="underline" onClick={()=>void persist(screenRef.current,answersRef.current).catch(()=>undefined)}>Retry save</button>}</div>}
         {submitError && <div className="fm-error" data-testid="error-submit" role="alert">{submitError} {(submitError.includes('draft') || submitError.includes('visitor is linked')) && <Link href="/me/projects" className="underline">My projects</Link>}</div>}
         <div className="fm-steps">
-          {screen>1 ? <button type="button" data-testid="button-back" className="fm-back" disabled={saving || submit.isPending} onClick={()=>void back()}><ArrowLeft size={17}/> Back</button> : <span className="fm-small">Your answers save as you go.</span>}
+          {screen>1 ? <button type="button" data-testid="button-back" className="fm-back" disabled={saving || submit.isPending || screen===2 && materialsBusy || connectingDraft} onClick={()=>void back()}><ArrowLeft size={17}/> Back</button> : <span className="fm-small">Your answers save as you go.</span>}
           {screen===1 && !a.stage ? <span className="fm-small">Choose a stage to continue</span> :
-             <button type="button" data-testid={screen===6?'button-submit-filmmaker':'button-continue'} className="fm-primary" disabled={saving || submit.isPending || screen===6 && (submissionConfig.isLoading || submissionConfig.isError || !submissionConfig.data?.available) || screen===4 && (otherOfferError || !a.offer_choice || !validListedOffer(a.offer_per100))} onClick={()=>screen===6 ? void finish() : void advance(a.no_project_yet && screen===2 ? 6 : screen+1)}>
-               {submit.isPending ? 'Submitting…' : saving ? 'Saving…' : screen===6 ? 'Send my answers' : 'Continue'} {!submit.isPending && <ArrowRight size={17}/>}
-            </button>}
+             screen===6 && identityId==='visitor'
+               ? <GoogleSignInButton
+                   auth={getInitializedAuth()}
+                   queryClient={queryClient}
+                   className="fm-primary"
+                   testId="button-filmmaker-google-sign-in"
+                   label="Continue with Google"
+                   disabled={saving || connectingDraft || materialsBusy}
+                 />
+               : screen===6 && linkedDraftId !== progress.data?.draft_id
+                   ? <button type="button" data-testid="button-connect-filmmaker-draft" className="fm-primary" disabled={saving || connectingDraft || submit.isPending || Boolean(pendingHandoff)} onClick={()=>void connectCurrentDraft()}>{connectingDraft ? 'Connecting your draft…' : 'Connect draft to my account'} {!connectingDraft && <ArrowRight size={17}/>}</button>
+                   : <button type="button" data-testid={screen===6?'button-submit-filmmaker':'button-continue'} className="fm-primary" disabled={saving || submit.isPending || connectingDraft || screen===6 && (submissionConfig.isLoading || submissionConfig.isError || !submissionConfig.data?.available) || screen===2 && materialsBusy || screen===4 && (otherOfferError || !a.offer_choice || !validListedOffer(a.offer_per100))} onClick={()=>screen===6 ? void finish() : void advance(a.no_project_yet && screen===2 ? 6 : screen+1)}>
+                       {submit.isPending ? 'Submitting…' : saving ? 'Saving…' : screen===6 ? 'Send my answers' : 'Continue'} {!submit.isPending && <ArrowRight size={17}/>}
+                     </button>}
         </div>
         <p className="fm-status" role="status" data-testid="status-save" style={{marginTop:15}}>{saveError ? 'Changes not saved' : saving ? 'Saving your answers…' : lastSaved.current === JSON.stringify({screen,answers:a}) ? 'All changes saved' : 'Changes save automatically'}</p>
       </div>

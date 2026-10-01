@@ -1,7 +1,12 @@
 import { Router, type IRouter } from "express";
 import { db, filmmakersTable, getCompletedFilmmakerResult, getFilmmakerAccountProjectVisitor, projectsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { authenticateFilmmaker, authorizeFilmmakerVisitor, requireMatchingFilmmakerContext } from "../lib/filmmaker-auth";
+import {
+  authenticateFilmmaker,
+  authorizeFilmmakerVisitor,
+  requireMatchingFilmmakerContext,
+  type FilmmakerIdentity,
+} from "../lib/filmmaker-auth";
 import { reconcileReviewCheckouts, reviewCheckoutConfig, startReviewCheckout } from "../lib/pitch-review-payments";
 import { verifyPitchReviewProof } from "../lib/pitch-review-proof";
 
@@ -55,13 +60,49 @@ async function currentPitch(req: Parameters<typeof authorizeFilmmakerVisitor>[0]
   return { visitorId, project: result.project };
 }
 
+async function currentAccountPitch(
+  req: Parameters<typeof authorizeFilmmakerVisitor>[0],
+  res: Parameters<typeof authorizeFilmmakerVisitor>[1],
+  identity: FilmmakerIdentity,
+) {
+  const projectHeader = req.get("X-MSI-Project-Id");
+  const projectId = projectHeader && /^[1-9]\d*$/.test(projectHeader) ? Number(projectHeader) : null;
+  if (!projectId || !Number.isSafeInteger(projectId)) {
+    res.status(400).json({ error: "Select a completed, account-owned pitch from My projects before starting checkout." });
+    return null;
+  }
+
+  const visitorId = await getFilmmakerAccountProjectVisitor(identity.uid, projectId, identity.provider);
+  if (!visitorId) {
+    res.status(403).json({ error: "This pitch is not linked to the verified account. Sign in and securely claim this older guest pitch from its original browser before starting checkout." });
+    return null;
+  }
+  const access = await authorizeFilmmakerVisitor(req, res, visitorId);
+  if (!access.allowed || !access.identity
+    || access.identity.provider !== identity.provider || access.identity.uid !== identity.uid) return null;
+  if (!requireMatchingFilmmakerContext(req, res, "X-MSI-Project-Id", projectId, "project")) return null;
+
+  const result = await getCompletedFilmmakerResult(visitorId);
+  if (!result?.project) {
+    res.status(404).json({ error: "No completed pitch is selected." });
+    return null;
+  }
+  if (result.project.id !== projectId) {
+    res.status(409).json({ error: "The selected pitch changed. Open My projects and select it again." });
+    return null;
+  }
+  return { visitorId, project: result.project };
+}
+
 router.post("/filmmakers/review-checkout", async (req, res): Promise<void> => {
   res.set("Cache-Control", "no-store");
+  const identity = await authenticateFilmmaker(req, res, true);
+  if (!identity) return;
   if (!(await reviewCheckoutConfig()).enabled) {
     res.status(503).json({ error: "We couldn't connect to review checkout. Your pitch is saved. Please try again later." });
     return;
   }
-  const context = await currentPitch(req, res);
+  const context = await currentAccountPitch(req, res, identity);
   if (!context) return;
   const { project, visitorId } = context;
   if (project.hidden || !project.slug) {

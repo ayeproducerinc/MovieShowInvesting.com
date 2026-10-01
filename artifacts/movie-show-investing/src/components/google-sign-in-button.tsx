@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import type { Auth } from 'firebase/auth';
 import { SiGoogle } from 'react-icons/si';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
 import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-web';
 import { signInWithGoogle } from '@/lib/google-sign-in';
+import { canPrepareRegisteredFilmmakerHandoff, clearFilmmakerAuthHandoff, prepareRegisteredFilmmakerHandoff, subscribeFilmmakerAuthPreparation } from '@/lib/filmmaker-auth-handoff';
 
 type Props = {
   auth: Auth | null;
@@ -13,15 +14,22 @@ type Props = {
   disabled?: boolean;
   testId?: string;
   label?: string;
+  onBeforeSignIn?: () => boolean | void;
+  onSignInError?: (message: string) => void;
 };
 
 export function GoogleSignInButton({
   auth, queryClient, className, disabled = false,
-  testId = 'button-continue-google', label,
+  testId = 'button-continue-google', label, onBeforeSignIn, onSignInError,
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [firebaseSignedIn, setFirebaseSignedIn] = useState(() => Boolean(auth?.currentUser));
+  const filmmakerHandoffReady = useSyncExternalStore(
+    subscribeFilmmakerAuthPreparation,
+    canPrepareRegisteredFilmmakerHandoff,
+    () => true,
+  );
 
   useEffect(() => {
     if (!auth) {
@@ -37,26 +45,53 @@ export function GoogleSignInButton({
     if (busy || disabled) return;
     setFeedback('');
     if (!auth) {
-      setFeedback('Google sign-in is not ready yet. Check the connection and try again.');
+      const message = 'Google sign-in is not ready yet. Check the connection and try again.';
+      setFeedback(message);
+      onSignInError?.(message);
       return;
     }
     if (auth.currentUser) {
       setFirebaseSignedIn(true);
-      setFeedback('You are already signed in. Sign out before signing in again.');
+      const message = 'You are already signed in. Sign out before signing in again.';
+      setFeedback(message);
+      onSignInError?.(message);
+      return;
+    }
+
+    let preparation: boolean | void | Promise<boolean> | null;
+    try {
+      preparation = onBeforeSignIn ? onBeforeSignIn() : prepareRegisteredFilmmakerHandoff();
+      if (preparation === false) {
+        const message = 'We could not prepare this saved work for sign-in. Your answers are still saved; try again.';
+        setFeedback(message);
+        onSignInError?.(message);
+        return;
+      }
+    } catch {
+      const message = 'We could not prepare this saved work for sign-in. Your answers are still saved; try again.';
+      setFeedback(message);
+      onSignInError?.(message);
       return;
     }
 
     setBusy(true);
     setAuthTokenGetter(null);
     queryClient.clear();
+    const signIn = signInWithGoogle(auth);
     try {
-      const result = await signInWithGoogle(auth);
+      const [result, prepared] = await Promise.all([signIn, Promise.resolve(preparation)]);
+      if (prepared === false) {
+        throw new Error('Your latest worksheet changes could not be saved before account linking. You are signed in, but the original browser draft has not been linked. Return to the worksheet and retry.');
+      }
       setFirebaseSignedIn(Boolean(result.user));
       if (!isReplitAuthActive() && !isReplitAuthLoading()) {
         setAuthTokenGetter(() => auth.currentUser?.getIdToken() ?? null);
       }
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Google sign-in could not be completed. Please try again.');
+      const message = error instanceof Error ? error.message : 'Google sign-in could not be completed. Please try again.';
+      setFeedback(message);
+      if (!onBeforeSignIn && preparation && typeof preparation === 'object') clearFilmmakerAuthHandoff();
+      onSignInError?.(message);
     } finally {
       setBusy(false);
     }
@@ -68,7 +103,7 @@ export function GoogleSignInButton({
     <button
       type="button"
       className={className}
-      disabled={disabled || busy}
+      disabled={disabled || busy || !onBeforeSignIn && !filmmakerHandoffReady}
       onClick={() => void begin()}
       data-testid={testId}
     >

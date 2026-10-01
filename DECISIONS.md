@@ -68,6 +68,10 @@ These product rules are locked for the MVP. Change them only when the owner expl
 - The admin area uses a server-verified allowlist, not a separate admin password. Firebase admin access requires the verified configured email. Replit admin access additionally requires an explicitly provisioned, immutable provider subject; email match alone never grants admin access. The previously supplied admin password is unused.
 - Use Replit Secrets for credentials and environment-specific configuration; never put secret values in source files or ask the user to paste them into chat.
 - Save flow progress as the user proceeds so funnel drop-off and pricing answers can be analyzed.
+- New investor worksheet/profile entry requires sign-in before step 1. New filmmaker pitches may begin as guest drafts, but require sign-in and account linkage on the final step before final submission or optional editorial-review checkout. Sign-in is account/email verification, not formal KYC or a signature confirming investor interest.
+- Optional synopsis, trailer links/uploads, posters, share images, and a single uploaded pitch deck belong on the filmmaker title/logline step behind checkbox-revealed controls. Materials must persist with the draft through refresh and sign-in and attach to the correct submitted project; hiding a control must not silently delete saved material.
+- The owner wants pitch decks publicly viewable from eligible approved Explore listings and their project pages, and all pitch answers/attachments available to authorized admin review. Tell filmmakers that approved decks will be public before uploading. Draft/hidden/ineligible decks are not exposed through the public document route, and replacing approved content follows the existing re-review rules.
+- This onboarding change prevents new guest submissions from being stranded; it does not add recovery for older guest submissions when their original browser proof is gone.
 
 ## Open decisions — do not guess
 

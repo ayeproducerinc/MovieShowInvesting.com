@@ -24,6 +24,7 @@ import type {
   AdminMessageReview,
   AdminMessageReviewInput,
   AdminProjectReview,
+  AdminProjectReviewDetail,
   AdminProjectReviewInput,
   AdminSection,
   AdminTable,
@@ -46,6 +47,8 @@ import type {
   FilmmakerImageUpload,
   FilmmakerInterestAlert,
   FilmmakerInterestAlerts,
+  FilmmakerMaterialSnapshot,
+  FilmmakerMaterialTextUpdate,
   FilmmakerMediaConfig,
   FilmmakerPhoneVerification,
   FilmmakerProjectClaim,
@@ -63,6 +66,7 @@ import type {
   Flow,
   FlowProgress,
   GetExploreParams,
+  GetFilmmakerProjectPitchDeckParams,
   GetPitchReviewCheckoutConfig200,
   GetPitchReviewCheckoutStatus200,
   HealthStatus,
@@ -93,7 +97,9 @@ import type {
   SearchLocationsParams,
   SiteStats,
   StartPitchReviewCheckout200,
+  UploadFilmmakerDraftImageParams,
   UploadFilmmakerImageParams,
+  UploadFilmmakerProjectImageParams,
   Visit,
   VisitInput
 } from './api.schemas';
@@ -2159,7 +2165,7 @@ export const getClaimFilmmakerProjectUrl = () => {
 }
 
 /**
- * Requires the current visitor cookie. A completed legacy submission can only be claimed if its stored email matches the verified account email and it is not linked to another UID. A non-empty unlinked guest draft cannot be claimed while a different active draft exists for the account; the guest cookie and answers are preserved on conflict.
+ * Requires the current visitor cookie. An unfinished draft claim requires X-MSI-Draft-Id to match the current locked filmmaker flow_progress row. A completed legacy submission can still be claimed without that header if its stored email matches the verified account email and it is not linked to another account. A non-empty unlinked guest draft cannot be claimed while a different active draft exists for the account; the guest cookie and answers are preserved on conflict.
  * @summary Link the current visitor draft or legacy submission to a verified account
  */
 export const claimFilmmakerProject = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerProjectClaim> => {
@@ -2610,6 +2616,1194 @@ export const useUpdateFilmmakerShowcase = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateFilmmakerShowcaseMutationOptions(options));
+    }
+
+export const getGetFilmmakerDraftMaterialsUrl = () => {
+
+
+
+
+  return `/api/filmmakers/draft-materials`
+}
+
+/**
+ * @summary Read the current filmmaker draft's separately persisted optional materials
+ */
+export const getFilmmakerDraftMaterials = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+  return customFetch<FilmmakerMaterialSnapshot>(getGetFilmmakerDraftMaterialsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFilmmakerDraftMaterialsQueryKey = () => {
+    return [
+    `/api/filmmakers/draft-materials`
+    ] as const;
+    }
+
+
+export const getGetFilmmakerDraftMaterialsQueryOptions = <TData = Awaited<ReturnType<typeof getFilmmakerDraftMaterials>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerDraftMaterials>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFilmmakerDraftMaterialsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFilmmakerDraftMaterials>>> = ({ signal }) => getFilmmakerDraftMaterials({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerDraftMaterials>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFilmmakerDraftMaterialsQueryResult = NonNullable<Awaited<ReturnType<typeof getFilmmakerDraftMaterials>>>
+export type GetFilmmakerDraftMaterialsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read the current filmmaker draft's separately persisted optional materials
+ */
+
+export function useGetFilmmakerDraftMaterials<TData = Awaited<ReturnType<typeof getFilmmakerDraftMaterials>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerDraftMaterials>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFilmmakerDraftMaterialsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateFilmmakerDraftMaterialsUrl = () => {
+
+
+
+
+  return `/api/filmmakers/draft-materials`
+}
+
+/**
+ * @summary Persist optional draft synopsis or trailer link independently of autosaved flow answers
+ */
+export const updateFilmmakerDraftMaterials = async (filmmakerMaterialTextUpdate: FilmmakerMaterialTextUpdate, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerMaterialSnapshot>(getUpdateFilmmakerDraftMaterialsUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(filmmakerMaterialTextUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateFilmmakerDraftMaterialsMutationKey = () => ['updateFilmmakerDraftMaterials'] as const;
+
+export const getUpdateFilmmakerDraftMaterialsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFilmmakerDraftMaterials>>, TError,UpdateFilmmakerDraftMaterialsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateFilmmakerDraftMaterials>>, TError,UpdateFilmmakerDraftMaterialsMutationVariables, TContext> => {
+
+const mutationKey = getUpdateFilmmakerDraftMaterialsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateFilmmakerDraftMaterials>>, UpdateFilmmakerDraftMaterialsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateFilmmakerDraftMaterials(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateFilmmakerDraftMaterialsMutationResult = NonNullable<Awaited<ReturnType<typeof updateFilmmakerDraftMaterials>>>
+    export type UpdateFilmmakerDraftMaterialsMutationBody = BodyType<FilmmakerMaterialTextUpdate>
+    export type UpdateFilmmakerDraftMaterialsMutationError = ErrorType<void>
+    export type UpdateFilmmakerDraftMaterialsMutationVariables = {data: BodyType<FilmmakerMaterialTextUpdate>}
+
+    /**
+ * @summary Persist optional draft synopsis or trailer link independently of autosaved flow answers
+ */
+export const useUpdateFilmmakerDraftMaterials = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFilmmakerDraftMaterials>>, TError,UpdateFilmmakerDraftMaterialsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateFilmmakerDraftMaterials>>,
+        TError,
+        UpdateFilmmakerDraftMaterialsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateFilmmakerDraftMaterialsMutationOptions(options));
+    }
+
+export const getUploadFilmmakerDraftImageUrl = (params: UploadFilmmakerDraftImageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/filmmakers/draft-materials/images?${stringifiedParams}` : `/api/filmmakers/draft-materials/images`
+}
+
+/**
+ * @summary Bounded upload of a poster or share image for a current filmmaker draft
+ */
+export const uploadFilmmakerDraftImage = async (uploadFilmmakerDraftImageBody: Blob,
+    params: UploadFilmmakerDraftImageParams, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerMaterialSnapshot>(getUploadFilmmakerDraftImageUrl(params),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'image/jpeg', ...getHeaders(options?.headers) },
+    body: uploadFilmmakerDraftImageBody
+  }
+);}
+
+
+
+
+
+export const getUploadFilmmakerDraftImageMutationKey = () => ['uploadFilmmakerDraftImage'] as const;
+
+export const getUploadFilmmakerDraftImageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftImage>>, TError,UploadFilmmakerDraftImageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftImage>>, TError,UploadFilmmakerDraftImageMutationVariables, TContext> => {
+
+const mutationKey = getUploadFilmmakerDraftImageMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadFilmmakerDraftImage>>, UploadFilmmakerDraftImageMutationVariables> = (props) => {
+          const {data,params} = props ?? {};
+
+          return  uploadFilmmakerDraftImage(data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadFilmmakerDraftImageMutationResult = NonNullable<Awaited<ReturnType<typeof uploadFilmmakerDraftImage>>>
+    export type UploadFilmmakerDraftImageMutationBody = BodyType<Blob>
+    export type UploadFilmmakerDraftImageMutationError = ErrorType<void>
+    export type UploadFilmmakerDraftImageMutationVariables = {data: BodyType<Blob>;params: UploadFilmmakerDraftImageParams}
+
+    /**
+ * @summary Bounded upload of a poster or share image for a current filmmaker draft
+ */
+export const useUploadFilmmakerDraftImage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftImage>>, TError,UploadFilmmakerDraftImageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadFilmmakerDraftImage>>,
+        TError,
+        UploadFilmmakerDraftImageMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadFilmmakerDraftImageMutationOptions(options));
+    }
+
+export const getUploadFilmmakerDraftTrailerUrl = () => {
+
+
+
+
+  return `/api/filmmakers/draft-materials/trailer`
+}
+
+/**
+ * @summary Server-bounded streaming upload of a trailer to the Movie Show Investing Bunny Stream collection
+ */
+export const uploadFilmmakerDraftTrailer = async (uploadFilmmakerDraftTrailerBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerMaterialSnapshot>(getUploadFilmmakerDraftTrailerUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'video/mp4', ...getHeaders(options?.headers) },
+    body: uploadFilmmakerDraftTrailerBody
+  }
+);}
+
+
+
+
+
+export const getUploadFilmmakerDraftTrailerMutationKey = () => ['uploadFilmmakerDraftTrailer'] as const;
+
+export const getUploadFilmmakerDraftTrailerMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftTrailer>>, TError,UploadFilmmakerDraftTrailerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftTrailer>>, TError,UploadFilmmakerDraftTrailerMutationVariables, TContext> => {
+
+const mutationKey = getUploadFilmmakerDraftTrailerMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadFilmmakerDraftTrailer>>, UploadFilmmakerDraftTrailerMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadFilmmakerDraftTrailer(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadFilmmakerDraftTrailerMutationResult = NonNullable<Awaited<ReturnType<typeof uploadFilmmakerDraftTrailer>>>
+    export type UploadFilmmakerDraftTrailerMutationBody = BodyType<Blob>
+    export type UploadFilmmakerDraftTrailerMutationError = ErrorType<void>
+    export type UploadFilmmakerDraftTrailerMutationVariables = {data: BodyType<Blob>}
+
+    /**
+ * @summary Server-bounded streaming upload of a trailer to the Movie Show Investing Bunny Stream collection
+ */
+export const useUploadFilmmakerDraftTrailer = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftTrailer>>, TError,UploadFilmmakerDraftTrailerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadFilmmakerDraftTrailer>>,
+        TError,
+        UploadFilmmakerDraftTrailerMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadFilmmakerDraftTrailerMutationOptions(options));
+    }
+
+export const getGetFilmmakerDraftPitchDeckUrl = () => {
+
+
+
+
+  return `/api/filmmakers/draft-materials/pitch-deck`
+}
+
+/**
+ * @summary Fetch the current draft's PDF deck through an authenticated Bunny storage gateway
+ */
+export const getFilmmakerDraftPitchDeck = async ( options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetFilmmakerDraftPitchDeckUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFilmmakerDraftPitchDeckQueryKey = () => {
+    return [
+    `/api/filmmakers/draft-materials/pitch-deck`
+    ] as const;
+    }
+
+
+export const getGetFilmmakerDraftPitchDeckQueryOptions = <TData = Awaited<ReturnType<typeof getFilmmakerDraftPitchDeck>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerDraftPitchDeck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFilmmakerDraftPitchDeckQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFilmmakerDraftPitchDeck>>> = ({ signal }) => getFilmmakerDraftPitchDeck({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerDraftPitchDeck>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFilmmakerDraftPitchDeckQueryResult = NonNullable<Awaited<ReturnType<typeof getFilmmakerDraftPitchDeck>>>
+export type GetFilmmakerDraftPitchDeckQueryError = ErrorType<void>
+
+
+/**
+ * @summary Fetch the current draft's PDF deck through an authenticated Bunny storage gateway
+ */
+
+export function useGetFilmmakerDraftPitchDeck<TData = Awaited<ReturnType<typeof getFilmmakerDraftPitchDeck>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerDraftPitchDeck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFilmmakerDraftPitchDeckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUploadFilmmakerDraftPitchDeckUrl = () => {
+
+
+
+
+  return `/api/filmmakers/draft-materials/pitch-deck`
+}
+
+/**
+ * @summary Upload one PDF pitch deck, bounded to 20 MB and validated by PDF magic bytes
+ */
+export const uploadFilmmakerDraftPitchDeck = async (uploadFilmmakerDraftPitchDeckBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerMaterialSnapshot>(getUploadFilmmakerDraftPitchDeckUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/pdf', ...getHeaders(options?.headers) },
+    body: uploadFilmmakerDraftPitchDeckBody
+  }
+);}
+
+
+
+
+
+export const getUploadFilmmakerDraftPitchDeckMutationKey = () => ['uploadFilmmakerDraftPitchDeck'] as const;
+
+export const getUploadFilmmakerDraftPitchDeckMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftPitchDeck>>, TError,UploadFilmmakerDraftPitchDeckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftPitchDeck>>, TError,UploadFilmmakerDraftPitchDeckMutationVariables, TContext> => {
+
+const mutationKey = getUploadFilmmakerDraftPitchDeckMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadFilmmakerDraftPitchDeck>>, UploadFilmmakerDraftPitchDeckMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadFilmmakerDraftPitchDeck(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadFilmmakerDraftPitchDeckMutationResult = NonNullable<Awaited<ReturnType<typeof uploadFilmmakerDraftPitchDeck>>>
+    export type UploadFilmmakerDraftPitchDeckMutationBody = BodyType<Blob>
+    export type UploadFilmmakerDraftPitchDeckMutationError = ErrorType<void>
+    export type UploadFilmmakerDraftPitchDeckMutationVariables = {data: BodyType<Blob>}
+
+    /**
+ * @summary Upload one PDF pitch deck, bounded to 20 MB and validated by PDF magic bytes
+ */
+export const useUploadFilmmakerDraftPitchDeck = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftPitchDeck>>, TError,UploadFilmmakerDraftPitchDeckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadFilmmakerDraftPitchDeck>>,
+        TError,
+        UploadFilmmakerDraftPitchDeckMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadFilmmakerDraftPitchDeckMutationOptions(options));
+    }
+
+export const getDeleteFilmmakerDraftMaterialUrl = (kind: 'poster' | 'share' | 'trailer' | 'pitch-deck',) => {
+
+
+
+
+  return `/api/filmmakers/draft-materials/${kind}`
+}
+
+/**
+ * @summary Remove one optional item from the current draft
+ */
+export const deleteFilmmakerDraftMaterial = async (kind: 'poster' | 'share' | 'trailer' | 'pitch-deck', options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+  return customFetch<FilmmakerMaterialSnapshot>(getDeleteFilmmakerDraftMaterialUrl(kind),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteFilmmakerDraftMaterialMutationKey = () => ['deleteFilmmakerDraftMaterial'] as const;
+
+export const getDeleteFilmmakerDraftMaterialMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFilmmakerDraftMaterial>>, TError,DeleteFilmmakerDraftMaterialMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteFilmmakerDraftMaterial>>, TError,DeleteFilmmakerDraftMaterialMutationVariables, TContext> => {
+
+const mutationKey = getDeleteFilmmakerDraftMaterialMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteFilmmakerDraftMaterial>>, DeleteFilmmakerDraftMaterialMutationVariables> = (props) => {
+          const {kind} = props ?? {};
+
+          return  deleteFilmmakerDraftMaterial(kind,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteFilmmakerDraftMaterialMutationResult = NonNullable<Awaited<ReturnType<typeof deleteFilmmakerDraftMaterial>>>
+
+    export type DeleteFilmmakerDraftMaterialMutationError = ErrorType<void>
+    export type DeleteFilmmakerDraftMaterialMutationVariables = {kind: 'poster' | 'share' | 'trailer' | 'pitch-deck'}
+
+    /**
+ * @summary Remove one optional item from the current draft
+ */
+export const useDeleteFilmmakerDraftMaterial = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFilmmakerDraftMaterial>>, TError,DeleteFilmmakerDraftMaterialMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteFilmmakerDraftMaterial>>,
+        TError,
+        DeleteFilmmakerDraftMaterialMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteFilmmakerDraftMaterialMutationOptions(options));
+    }
+
+export const getGetFilmmakerProjectMaterialsUrl = () => {
+
+
+
+
+  return `/api/filmmakers/project-materials`
+}
+
+/**
+ * @summary Read materials for an account-owned completed project
+ */
+export const getFilmmakerProjectMaterials = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+  return customFetch<FilmmakerMaterialSnapshot>(getGetFilmmakerProjectMaterialsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFilmmakerProjectMaterialsQueryKey = () => {
+    return [
+    `/api/filmmakers/project-materials`
+    ] as const;
+    }
+
+
+export const getGetFilmmakerProjectMaterialsQueryOptions = <TData = Awaited<ReturnType<typeof getFilmmakerProjectMaterials>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectMaterials>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFilmmakerProjectMaterialsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFilmmakerProjectMaterials>>> = ({ signal }) => getFilmmakerProjectMaterials({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectMaterials>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFilmmakerProjectMaterialsQueryResult = NonNullable<Awaited<ReturnType<typeof getFilmmakerProjectMaterials>>>
+export type GetFilmmakerProjectMaterialsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read materials for an account-owned completed project
+ */
+
+export function useGetFilmmakerProjectMaterials<TData = Awaited<ReturnType<typeof getFilmmakerProjectMaterials>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectMaterials>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFilmmakerProjectMaterialsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateFilmmakerProjectMaterialsUrl = () => {
+
+
+
+
+  return `/api/filmmakers/project-materials`
+}
+
+/**
+ * Changes to approved pitch content return the project to review and remove its approval until reviewed again.
+ * @summary Update optional materials on an account-owned completed project
+ */
+export const updateFilmmakerProjectMaterials = async (filmmakerMaterialTextUpdate: FilmmakerMaterialTextUpdate, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerMaterialSnapshot>(getUpdateFilmmakerProjectMaterialsUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(filmmakerMaterialTextUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateFilmmakerProjectMaterialsMutationKey = () => ['updateFilmmakerProjectMaterials'] as const;
+
+export const getUpdateFilmmakerProjectMaterialsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFilmmakerProjectMaterials>>, TError,UpdateFilmmakerProjectMaterialsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateFilmmakerProjectMaterials>>, TError,UpdateFilmmakerProjectMaterialsMutationVariables, TContext> => {
+
+const mutationKey = getUpdateFilmmakerProjectMaterialsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateFilmmakerProjectMaterials>>, UpdateFilmmakerProjectMaterialsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateFilmmakerProjectMaterials(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateFilmmakerProjectMaterialsMutationResult = NonNullable<Awaited<ReturnType<typeof updateFilmmakerProjectMaterials>>>
+    export type UpdateFilmmakerProjectMaterialsMutationBody = BodyType<FilmmakerMaterialTextUpdate>
+    export type UpdateFilmmakerProjectMaterialsMutationError = ErrorType<void>
+    export type UpdateFilmmakerProjectMaterialsMutationVariables = {data: BodyType<FilmmakerMaterialTextUpdate>}
+
+    /**
+ * @summary Update optional materials on an account-owned completed project
+ */
+export const useUpdateFilmmakerProjectMaterials = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFilmmakerProjectMaterials>>, TError,UpdateFilmmakerProjectMaterialsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateFilmmakerProjectMaterials>>,
+        TError,
+        UpdateFilmmakerProjectMaterialsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateFilmmakerProjectMaterialsMutationOptions(options));
+    }
+
+export const getUploadFilmmakerProjectImageUrl = (params: UploadFilmmakerProjectImageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/filmmakers/project-materials/images?${stringifiedParams}` : `/api/filmmakers/project-materials/images`
+}
+
+/**
+ * Replacing approved content pauses approval until the changed pitch is reviewed again.
+ * @summary Upload a poster or share image for an account-owned project
+ */
+export const uploadFilmmakerProjectImage = async (uploadFilmmakerProjectImageBody: Blob,
+    params: UploadFilmmakerProjectImageParams, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerMaterialSnapshot>(getUploadFilmmakerProjectImageUrl(params),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'image/jpeg', ...getHeaders(options?.headers) },
+    body: uploadFilmmakerProjectImageBody
+  }
+);}
+
+
+
+
+
+export const getUploadFilmmakerProjectImageMutationKey = () => ['uploadFilmmakerProjectImage'] as const;
+
+export const getUploadFilmmakerProjectImageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectImage>>, TError,UploadFilmmakerProjectImageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectImage>>, TError,UploadFilmmakerProjectImageMutationVariables, TContext> => {
+
+const mutationKey = getUploadFilmmakerProjectImageMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadFilmmakerProjectImage>>, UploadFilmmakerProjectImageMutationVariables> = (props) => {
+          const {data,params} = props ?? {};
+
+          return  uploadFilmmakerProjectImage(data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadFilmmakerProjectImageMutationResult = NonNullable<Awaited<ReturnType<typeof uploadFilmmakerProjectImage>>>
+    export type UploadFilmmakerProjectImageMutationBody = BodyType<Blob>
+    export type UploadFilmmakerProjectImageMutationError = ErrorType<void>
+    export type UploadFilmmakerProjectImageMutationVariables = {data: BodyType<Blob>;params: UploadFilmmakerProjectImageParams}
+
+    /**
+ * @summary Upload a poster or share image for an account-owned project
+ */
+export const useUploadFilmmakerProjectImage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectImage>>, TError,UploadFilmmakerProjectImageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadFilmmakerProjectImage>>,
+        TError,
+        UploadFilmmakerProjectImageMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadFilmmakerProjectImageMutationOptions(options));
+    }
+
+export const getUploadFilmmakerProjectTrailerUrl = () => {
+
+
+
+
+  return `/api/filmmakers/project-materials/trailer`
+}
+
+/**
+ * Replacing approved content pauses approval until the changed pitch is reviewed again.
+ * @summary Server-bounded streaming upload of a trailer for an account-owned project
+ */
+export const uploadFilmmakerProjectTrailer = async (uploadFilmmakerProjectTrailerBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerMaterialSnapshot>(getUploadFilmmakerProjectTrailerUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'video/mp4', ...getHeaders(options?.headers) },
+    body: uploadFilmmakerProjectTrailerBody
+  }
+);}
+
+
+
+
+
+export const getUploadFilmmakerProjectTrailerMutationKey = () => ['uploadFilmmakerProjectTrailer'] as const;
+
+export const getUploadFilmmakerProjectTrailerMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectTrailer>>, TError,UploadFilmmakerProjectTrailerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectTrailer>>, TError,UploadFilmmakerProjectTrailerMutationVariables, TContext> => {
+
+const mutationKey = getUploadFilmmakerProjectTrailerMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadFilmmakerProjectTrailer>>, UploadFilmmakerProjectTrailerMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadFilmmakerProjectTrailer(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadFilmmakerProjectTrailerMutationResult = NonNullable<Awaited<ReturnType<typeof uploadFilmmakerProjectTrailer>>>
+    export type UploadFilmmakerProjectTrailerMutationBody = BodyType<Blob>
+    export type UploadFilmmakerProjectTrailerMutationError = ErrorType<void>
+    export type UploadFilmmakerProjectTrailerMutationVariables = {data: BodyType<Blob>}
+
+    /**
+ * @summary Server-bounded streaming upload of a trailer for an account-owned project
+ */
+export const useUploadFilmmakerProjectTrailer = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectTrailer>>, TError,UploadFilmmakerProjectTrailerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadFilmmakerProjectTrailer>>,
+        TError,
+        UploadFilmmakerProjectTrailerMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadFilmmakerProjectTrailerMutationOptions(options));
+    }
+
+export const getGetFilmmakerProjectPitchDeckUrl = (params: GetFilmmakerProjectPitchDeckParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/filmmakers/project-materials/pitch-deck?${stringifiedParams}` : `/api/filmmakers/project-materials/pitch-deck`
+}
+
+/**
+ * @summary Fetch a project deck through an authenticated owner or administrator Bunny storage gateway
+ */
+export const getFilmmakerProjectPitchDeck = async (params: GetFilmmakerProjectPitchDeckParams, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetFilmmakerProjectPitchDeckUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFilmmakerProjectPitchDeckQueryKey = (params?: GetFilmmakerProjectPitchDeckParams,) => {
+    return [
+    `/api/filmmakers/project-materials/pitch-deck`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetFilmmakerProjectPitchDeckQueryOptions = <TData = Awaited<ReturnType<typeof getFilmmakerProjectPitchDeck>>, TError = ErrorType<void>>(params: GetFilmmakerProjectPitchDeckParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectPitchDeck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFilmmakerProjectPitchDeckQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFilmmakerProjectPitchDeck>>> = ({ signal }) => getFilmmakerProjectPitchDeck(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectPitchDeck>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFilmmakerProjectPitchDeckQueryResult = NonNullable<Awaited<ReturnType<typeof getFilmmakerProjectPitchDeck>>>
+export type GetFilmmakerProjectPitchDeckQueryError = ErrorType<void>
+
+
+/**
+ * @summary Fetch a project deck through an authenticated owner or administrator Bunny storage gateway
+ */
+
+export function useGetFilmmakerProjectPitchDeck<TData = Awaited<ReturnType<typeof getFilmmakerProjectPitchDeck>>, TError = ErrorType<void>>(
+ params: GetFilmmakerProjectPitchDeckParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectPitchDeck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFilmmakerProjectPitchDeckQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUploadFilmmakerProjectPitchDeckUrl = () => {
+
+
+
+
+  return `/api/filmmakers/project-materials/pitch-deck`
+}
+
+/**
+ * Replacing approved content pauses approval until the changed pitch is reviewed again.
+ * @summary Upload a PDF pitch deck (maximum 20 MB) to an account-owned project
+ */
+export const uploadFilmmakerProjectPitchDeck = async (uploadFilmmakerProjectPitchDeckBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerMaterialSnapshot>(getUploadFilmmakerProjectPitchDeckUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/pdf', ...getHeaders(options?.headers) },
+    body: uploadFilmmakerProjectPitchDeckBody
+  }
+);}
+
+
+
+
+
+export const getUploadFilmmakerProjectPitchDeckMutationKey = () => ['uploadFilmmakerProjectPitchDeck'] as const;
+
+export const getUploadFilmmakerProjectPitchDeckMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectPitchDeck>>, TError,UploadFilmmakerProjectPitchDeckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectPitchDeck>>, TError,UploadFilmmakerProjectPitchDeckMutationVariables, TContext> => {
+
+const mutationKey = getUploadFilmmakerProjectPitchDeckMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadFilmmakerProjectPitchDeck>>, UploadFilmmakerProjectPitchDeckMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadFilmmakerProjectPitchDeck(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadFilmmakerProjectPitchDeckMutationResult = NonNullable<Awaited<ReturnType<typeof uploadFilmmakerProjectPitchDeck>>>
+    export type UploadFilmmakerProjectPitchDeckMutationBody = BodyType<Blob>
+    export type UploadFilmmakerProjectPitchDeckMutationError = ErrorType<void>
+    export type UploadFilmmakerProjectPitchDeckMutationVariables = {data: BodyType<Blob>}
+
+    /**
+ * @summary Upload a PDF pitch deck (maximum 20 MB) to an account-owned project
+ */
+export const useUploadFilmmakerProjectPitchDeck = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectPitchDeck>>, TError,UploadFilmmakerProjectPitchDeckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadFilmmakerProjectPitchDeck>>,
+        TError,
+        UploadFilmmakerProjectPitchDeckMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadFilmmakerProjectPitchDeckMutationOptions(options));
+    }
+
+export const getDeleteFilmmakerProjectMaterialUrl = (kind: 'poster' | 'share' | 'trailer' | 'pitch-deck',) => {
+
+
+
+
+  return `/api/filmmakers/project-materials/${kind}`
+}
+
+/**
+ * Removing approved content pauses approval until the changed pitch is reviewed again.
+ * @summary Remove a selected optional material from an account-owned project
+ */
+export const deleteFilmmakerProjectMaterial = async (kind: 'poster' | 'share' | 'trailer' | 'pitch-deck', options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+  return customFetch<FilmmakerMaterialSnapshot>(getDeleteFilmmakerProjectMaterialUrl(kind),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteFilmmakerProjectMaterialMutationKey = () => ['deleteFilmmakerProjectMaterial'] as const;
+
+export const getDeleteFilmmakerProjectMaterialMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFilmmakerProjectMaterial>>, TError,DeleteFilmmakerProjectMaterialMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteFilmmakerProjectMaterial>>, TError,DeleteFilmmakerProjectMaterialMutationVariables, TContext> => {
+
+const mutationKey = getDeleteFilmmakerProjectMaterialMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteFilmmakerProjectMaterial>>, DeleteFilmmakerProjectMaterialMutationVariables> = (props) => {
+          const {kind} = props ?? {};
+
+          return  deleteFilmmakerProjectMaterial(kind,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteFilmmakerProjectMaterialMutationResult = NonNullable<Awaited<ReturnType<typeof deleteFilmmakerProjectMaterial>>>
+
+    export type DeleteFilmmakerProjectMaterialMutationError = ErrorType<void>
+    export type DeleteFilmmakerProjectMaterialMutationVariables = {kind: 'poster' | 'share' | 'trailer' | 'pitch-deck'}
+
+    /**
+ * @summary Remove a selected optional material from an account-owned project
+ */
+export const useDeleteFilmmakerProjectMaterial = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFilmmakerProjectMaterial>>, TError,DeleteFilmmakerProjectMaterialMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteFilmmakerProjectMaterial>>,
+        TError,
+        DeleteFilmmakerProjectMaterialMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteFilmmakerProjectMaterialMutationOptions(options));
     }
 
 export const getGetPitchReviewCheckoutConfigUrl = () => {
@@ -3328,6 +4522,84 @@ export function useGetProjectShareMetadata<TData = Awaited<ReturnType<typeof get
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetProjectShareMetadataQueryOptions(slug,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPublicProjectPitchDeckUrl = (slug: string,) => {
+
+
+
+
+  return `/api/projects/${slug}/pitch-deck`
+}
+
+/**
+ * The current approval, requested-listing, not-hidden, and valid-stage conditions are rechecked on every request. The Bunny URL is never returned or redirected to.
+ * @summary Fetch an eligible listed project's PDF deck through the app gateway
+ */
+export const getPublicProjectPitchDeck = async (slug: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetPublicProjectPitchDeckUrl(slug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicProjectPitchDeckQueryKey = (slug: string,) => {
+    return [
+    `/api/projects/${slug}/pitch-deck`
+    ] as const;
+    }
+
+
+export const getGetPublicProjectPitchDeckQueryOptions = <TData = Awaited<ReturnType<typeof getPublicProjectPitchDeck>>, TError = ErrorType<void>>(slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicProjectPitchDeck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicProjectPitchDeckQueryKey(slug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicProjectPitchDeck>>> = ({ signal }) => getPublicProjectPitchDeck(slug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: slug !== null && slug !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicProjectPitchDeck>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicProjectPitchDeckQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicProjectPitchDeck>>>
+export type GetPublicProjectPitchDeckQueryError = ErrorType<void>
+
+
+/**
+ * @summary Fetch an eligible listed project's PDF deck through the app gateway
+ */
+
+export function useGetPublicProjectPitchDeck<TData = Awaited<ReturnType<typeof getPublicProjectPitchDeck>>, TError = ErrorType<void>>(
+ slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicProjectPitchDeck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicProjectPitchDeckQueryOptions(slug,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -4815,6 +6087,84 @@ export const useReviewAdminProject = <TError = ErrorType<void>,
       > => {
       return useMutation(getReviewAdminProjectMutationOptions(options));
     }
+
+export const getGetAdminProjectReviewUrl = (projectId: number,) => {
+
+
+
+
+  return `/api/admin/projects/${projectId}/review`
+}
+
+/**
+ * Existing admin table rows and selection IDs remain unchanged; this endpoint is loaded by the selected project's Details action.
+ * @summary Read the selected complete submitted pitch and all current attachments for admin review
+ */
+export const getAdminProjectReview = async (projectId: number, options?: Parameters<typeof customFetch>[1]): Promise<AdminProjectReviewDetail> => {
+
+  return customFetch<AdminProjectReviewDetail>(getGetAdminProjectReviewUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminProjectReviewQueryKey = (projectId: number,) => {
+    return [
+    `/api/admin/projects/${projectId}/review`
+    ] as const;
+    }
+
+
+export const getGetAdminProjectReviewQueryOptions = <TData = Awaited<ReturnType<typeof getAdminProjectReview>>, TError = ErrorType<void>>(projectId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminProjectReview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminProjectReviewQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminProjectReview>>> = ({ signal }) => getAdminProjectReview(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminProjectReview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminProjectReviewQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminProjectReview>>>
+export type GetAdminProjectReviewQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read the selected complete submitted pitch and all current attachments for admin review
+ */
+
+export function useGetAdminProjectReview<TData = Awaited<ReturnType<typeof getAdminProjectReview>>, TError = ErrorType<void>>(
+ projectId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminProjectReview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminProjectReviewQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getReviewAdminMessageUrl = (messageId: number,) => {
 

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import {
   db,
   emailLogTable,
+  getAdminFilmmakerPitch,
   filmmakersTable,
   flowProgressTable,
   investorMinimumsTable,
@@ -18,15 +19,19 @@ import {
   GetAdminMeResponse,
   GetAdminTableParams,
   GetAdminTableResponse,
+  GetAdminProjectReviewParams,
   ReviewAdminMessageBody,
   ReviewAdminMessageParams,
   ReviewAdminMessageResponse,
   ReviewAdminProjectBody,
   ReviewAdminProjectParams,
   ReviewAdminProjectResponse,
+  GetAdminProjectReviewResponse,
 } from "@workspace/api-zod";
 import { authorizeAdminIdentity } from "../lib/admin-auth";
 import { reconcileReviewCheckouts } from "../lib/pitch-review-payments";
+import { checkFilmmakerPitchDeckStatus } from "./filmmaker-draft-materials";
+import { trailerThumbnail } from "./projects";
 
 const router: IRouter = Router();
 type Section = "summary" | "pledges" | "location" | "funnels" | "market" | "price-test" | "queues" | "messages" | "channels" | "email-log";
@@ -61,6 +66,17 @@ function buildTable(section: Section, columns: string[], rows: unknown[][]): Adm
     rows: rows.map((row) => row.map(text)),
     total: rows.length,
   };
+}
+
+function safeAdminWebUrl(value: string | null | undefined): string | null {
+  if (!value || value.length > 2048) return null;
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) && Boolean(url.hostname)
+      && !url.username && !url.password ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 async function getAdminTable(section: Section): Promise<AdminTable> {
@@ -390,6 +406,122 @@ router.patch("/admin/projects/:projectId", async (req, res): Promise<void> => {
     return;
   }
   res.json(ReviewAdminProjectResponse.parse(project));
+});
+
+router.get("/admin/projects/:projectId/review", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const identity = await authorizeAdminIdentity(req, res);
+  if (!identity) return;
+  const parsedParams = GetAdminProjectReviewParams.safeParse(req.params);
+  if (!parsedParams.success) {
+    res.status(400).json({ error: "Invalid project ID." });
+    return;
+  }
+  const pitch = await getAdminFilmmakerPitch(parsedParams.data.projectId);
+  if (!pitch) {
+    res.status(404).json({ error: "Project not found." });
+    return;
+  }
+  const answers = pitch.answers;
+  const answerString = (key: string): string | null =>
+    typeof answers[key] === "string" ? answers[key] as string : null;
+  const answerBoolean = (key: string): boolean | null =>
+    typeof answers[key] === "boolean" ? answers[key] as boolean : null;
+  const answerNumber = (key: string): number | null =>
+    typeof answers[key] === "number" ? answers[key] as number : null;
+  const answerStrings = (key: string): string[] =>
+    Array.isArray(answers[key]) ? (answers[key] as unknown[]).filter((value): value is string => typeof value === "string") : [];
+  const project = pitch.project;
+  const filmmaker = pitch.filmmaker;
+  const projectAnswers = {
+    ...answers,
+    stage: project.stage ?? answerString("stage"),
+    stage_other: project.stageOther ?? answerString("stage_other"),
+    title: project.title ?? answerString("title"),
+    format: project.format ?? answerString("format"),
+    genre: project.genre ?? answerString("genre"),
+    genre_other: project.genreOther ?? answerString("genre_other"),
+    logline: project.logline ?? answerString("logline"),
+    budget: project.budget ?? answerNumber("budget"),
+    budget_from_example: project.budgetFromExample ?? answerBoolean("budget_from_example"),
+    deal_answer: project.dealAnswer ?? answerString("deal_answer"),
+    offer_per100: project.offerPer100 ?? answerNumber("offer_per100"),
+    offer_other_text: project.offerOtherText ?? answerString("offer_other_text"),
+    wants_lower: project.wantsLower ?? answerBoolean("wants_lower"),
+    payback_terms: project.paybackTerms ?? answerString("payback_terms"),
+    payback_terms_other: project.paybackTermsOther ?? answerString("payback_terms_other"),
+    funding_sources: filmmaker?.fundingSources ?? answerStrings("funding_sources"),
+    funding_other: filmmaker?.fundingOther ?? answerString("funding_other"),
+    reached_goal: filmmaker?.reachedGoal ?? answerBoolean("reached_goal"),
+    funding_experience: filmmaker?.fundingExperience ?? answerString("funding_experience"),
+    team_links: Array.isArray(project.teamLinks) && project.teamLinks.length
+      ? project.teamLinks.map(safeAdminWebUrl).filter((value): value is string => value !== null)
+      : answerStrings("team_links").map(safeAdminWebUrl).filter((value): value is string => value !== null),
+    money_use: project.moneyUse ?? answerString("money_use"),
+    distribution_plan: project.distributionPlan ?? answerString("distribution_plan"),
+    synopsis: project.synopsis ?? answerString("synopsis"),
+    trailer_url: safeAdminWebUrl(project.trailerUrl ?? answerString("trailer_url")),
+    pilot_url: safeAdminWebUrl(project.pilotUrl ?? answerString("pilot_url")),
+    poster_url: safeAdminWebUrl(project.posterUrl ?? answerString("poster_url")),
+    share_image_url: safeAdminWebUrl(project.shareImageUrl ?? answerString("share_image_url")),
+    pitch_deck_name: project.pitchDeckName,
+  };
+  const eligibleDeckUrl = project.pitchDeckStoragePath
+    ? `/api/filmmakers/project-materials/pitch-deck?project_id=${project.id}`
+    : null;
+  const [deckStatus, thumbnail] = await Promise.all([
+    checkFilmmakerPitchDeckStatus(project.pitchDeckStoragePath),
+    trailerThumbnail(project.trailerUrl),
+  ]);
+  const response = {
+    project: {
+      id: project.id,
+      title: projectAnswers.title,
+      format: projectAnswers.format,
+      genre: projectAnswers.genre,
+      stage: projectAnswers.stage,
+      stage_other: projectAnswers.stage_other,
+      logline: projectAnswers.logline,
+      budget: projectAnswers.budget,
+      budget_from_example: projectAnswers.budget_from_example,
+      deal_answer: projectAnswers.deal_answer,
+      offer_per100: projectAnswers.offer_per100,
+      offer_other_text: projectAnswers.offer_other_text,
+      wants_lower: projectAnswers.wants_lower,
+      payback_terms: projectAnswers.payback_terms,
+      payback_terms_other: projectAnswers.payback_terms_other,
+      funding_sources: projectAnswers.funding_sources,
+      funding_other: projectAnswers.funding_other,
+      reached_goal: projectAnswers.reached_goal,
+      funding_experience: projectAnswers.funding_experience,
+    },
+    filmmaker: filmmaker ? {
+      id: filmmaker.id,
+      name: filmmaker.name,
+      email: filmmaker.email,
+      phone: filmmaker.phone,
+      phone_verified: filmmaker.phoneVerified,
+      city: filmmaker.city,
+      state: filmmaker.state,
+      country: filmmaker.country,
+      favorite_genres: filmmaker.favoriteGenres ?? [],
+      chat_opt_in: filmmaker.chatOptIn,
+      no_project_yet: filmmaker.noProjectYet,
+    } : null,
+    answers: projectAnswers,
+    materials: {
+      synopsis: projectAnswers.synopsis,
+      trailer_url: projectAnswers.trailer_url,
+      pilot_url: projectAnswers.pilot_url,
+      poster_url: projectAnswers.poster_url,
+      share_image_url: projectAnswers.share_image_url,
+      pitch_deck_url: eligibleDeckUrl,
+      pitch_deck_name: project.pitchDeckName,
+      pitch_deck_status: deckStatus,
+      trailer_thumbnail_url: thumbnail,
+    },
+  };
+  res.json(GetAdminProjectReviewResponse.parse(response));
 });
 
 router.patch("/admin/messages/:messageId", async (req, res): Promise<void> => {

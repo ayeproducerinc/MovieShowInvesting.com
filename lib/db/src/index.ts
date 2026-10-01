@@ -6,6 +6,7 @@ import * as schema from "./schema";
 import {
   flowProgressTable,
   filmmakerAccountVisitorsTable,
+  filmmakerDraftMaterialsTable,
   filmmakersTable,
   investorsTable,
   projectsTable,
@@ -25,6 +26,7 @@ export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";
+export * from "./filmmaker-materials";
 
 export async function ensureVisitor(visitorId: string): Promise<void> {
   await db.insert(visitorsTable).values({ visitorId }).onConflictDoNothing();
@@ -80,6 +82,64 @@ export async function findVisitorFlowProgress(visitorId: string, flow: "filmmake
     eq(flowProgressTable.flow, flow),
   ));
   return record;
+}
+
+const meaningfulFilmmakerTextAnswers = [
+  "stage", "stage_other", "title", "genre", "genre_other", "logline", "trailer_url", "pilot_url",
+  "deal_answer", "offer_choice", "offer_other_text", "payback_terms", "payback_terms_other",
+  "funding_other", "funding_experience", "name", "email", "phone", "city", "state", "country",
+] as const;
+
+function hasMeaningfulFilmmakerAnswers(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const answers = value as Record<string, unknown>;
+  if (meaningfulFilmmakerTextAnswers.some((key) =>
+    typeof answers[key] === "string" && (answers[key] as string).trim().length > 0)) return true;
+  if (answers.no_project_yet === true || answers.wants_lower === true
+    || answers.chat_opt_in === true || answers.location_manual === true
+    || answers.reached_goal === true || answers.reached_goal === false
+    || answers.budget_mode === "custom" || answers.format === "show") return true;
+  if (typeof answers.budget === "number" && answers.budget > 0) return true;
+  if (typeof answers.offer_per100 === "number" && answers.offer_per100 > 0) return true;
+  return ["funding_sources", "favorite_genres"].some((key) =>
+    Array.isArray(answers[key]) && answers[key].length > 0);
+}
+
+function hasMeaningfulFilmmakerMaterials(
+  materials: typeof filmmakerDraftMaterialsTable.$inferSelect | undefined,
+): boolean {
+  return Boolean(materials && [
+    materials.synopsis, materials.trailerUrl, materials.bunnyVideoId, materials.posterUrl,
+    materials.posterStoragePath, materials.shareImageUrl, materials.shareImageStoragePath,
+    materials.pitchDeckStoragePath, materials.pitchDeckName,
+  ].some((value) => typeof value === "string" && value.trim().length > 0));
+}
+
+function hasMeaningfulFilmmakerDraft(
+  progress: FlowProgressRecord | undefined,
+  materials: typeof filmmakerDraftMaterialsTable.$inferSelect | undefined,
+): boolean {
+  return Boolean(progress && !progress.completed
+    && (hasMeaningfulFilmmakerAnswers(progress.answers) || hasMeaningfulFilmmakerMaterials(materials)));
+}
+
+/** True only for an unfinished, meaningful filmmaker draft with no account owner. */
+export async function hasUnlinkedMeaningfulFilmmakerDraft(visitorId: string): Promise<boolean> {
+  const [link] = await db.select({ visitorId: filmmakerAccountVisitorsTable.visitorId })
+    .from(filmmakerAccountVisitorsTable)
+    .where(eq(filmmakerAccountVisitorsTable.visitorId, visitorId))
+    .limit(1);
+  if (link) return false;
+
+  const [progress] = await db.select().from(flowProgressTable).where(and(
+    eq(flowProgressTable.visitorId, visitorId),
+    eq(flowProgressTable.flow, "filmmaker"),
+  )).limit(1);
+  if (!progress || progress.completed) return false;
+  const [materials] = await db.select().from(filmmakerDraftMaterialsTable)
+    .where(eq(filmmakerDraftMaterialsTable.visitorId, visitorId))
+    .limit(1);
+  return hasMeaningfulFilmmakerDraft(progress, materials);
 }
 
 export async function visitorExists(visitorId: string): Promise<boolean> {
@@ -217,7 +277,11 @@ export async function createFilmmakerSubmission(input: {
   replitUid?: string;
   firebaseEmail?: string;
   data: FilmmakerSubmissionData;
-}): Promise<{ filmmakerId: number; projectId: number | null }> {
+}): Promise<{
+  filmmakerId: number;
+  projectId: number | null;
+  discardedDraftMaterials: { paths: string[]; videoId: string | null } | null;
+}> {
   return db.transaction(async (tx) => {
     const identityUid = input.firebaseUid ?? input.replitUid;
     const provider = input.firebaseUid ? "firebase" : input.replitUid ? "replit" : null;
@@ -233,15 +297,29 @@ export async function createFilmmakerSubmission(input: {
     const [accountLink] = await tx.select().from(filmmakerAccountVisitorsTable)
       .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId))
       .for("update");
-    const accountLinkUid = accountLink?.firebaseUid ?? accountLink?.replitUid ?? null;
-    if (accountLink && accountLinkUid !== identityUid) {
+    const accountLinkMatchesIdentity = Boolean(
+      accountLink
+      && provider === "firebase"
+      && accountLink.firebaseUid === identityUid
+      && accountLink.replitUid === null,
+    ) || Boolean(
+      accountLink
+      && provider === "replit"
+      && accountLink.replitUid === identityUid
+      && accountLink.firebaseUid === null,
+    );
+    if (!accountLinkMatchesIdentity) {
       throw new FilmmakerSubmissionError("This visitor is linked to a different filmmaker account.");
     }
+    const accountLinkUid = identityUid;
     const verifiedEmailMatchesContact = Boolean(
       identityUid
       && input.firebaseEmail
       && normalizedEmail(input.firebaseEmail) === normalizedEmail(input.data.email),
     );
+    if (identityUid && !verifiedEmailMatchesContact) {
+      throw new FilmmakerSubmissionError("The verified account email must match the submitted contact email.");
+    }
     if (accountLink && !verifiedEmailMatchesContact) {
       throw new FilmmakerSubmissionError("The verified account email must match the submitted contact email.");
     }
@@ -252,7 +330,7 @@ export async function createFilmmakerSubmission(input: {
     const [existingProgress] = await tx.select().from(flowProgressTable).where(and(
       eq(flowProgressTable.visitorId, input.visitorId),
       eq(flowProgressTable.flow, "filmmaker"),
-    ));
+    )).for("update");
     const savedStage = existingProgress?.answers.stage;
     if (!existingProgress?.completed && savedStage === "other") {
       throw new FilmmakerSubmissionError(
@@ -265,6 +343,10 @@ export async function createFilmmakerSubmission(input: {
         throw new FilmmakerSubmissionError("A project stage of idea, production, or distribution is required.");
       }
     }
+
+    const [stagedMaterials] = await tx.select().from(filmmakerDraftMaterialsTable)
+      .where(eq(filmmakerDraftMaterialsTable.visitorId, input.visitorId))
+      .for("update");
     if (existingProgress?.completed) {
       const reference = storedSubmissionReference(existingProgress.answers);
       if (!reference) {
@@ -288,23 +370,11 @@ export async function createFilmmakerSubmission(input: {
       return {
         filmmakerId: priorFilmmaker.id,
         projectId: priorProject?.id ?? null,
+        discardedDraftMaterials: null,
       };
     }
 
-    let accountUid = accountLinkUid;
-    if (verifiedEmailMatchesContact && identityUid && provider && !accountLink) {
-      await tx.insert(filmmakerAccountVisitorsTable).values({
-        visitorId: input.visitorId,
-        firebaseUid: provider === "firebase" ? identityUid : null,
-        replitUid: provider === "replit" ? identityUid : null,
-      }).onConflictDoNothing();
-      const [linked] = await tx.select().from(filmmakerAccountVisitorsTable)
-        .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId));
-      if (!linked || (provider === "firebase" ? linked.firebaseUid : linked.replitUid) !== identityUid) {
-        throw new FilmmakerSubmissionError("This visitor is linked to a different filmmaker account.");
-      }
-      accountUid = identityUid;
-    }
+    const accountUid = accountLinkUid;
 
     const [syncedPhone] = accountUid && provider === "firebase"
       ? await tx.select({ phone: filmmakersTable.phone })
@@ -340,6 +410,16 @@ export async function createFilmmakerSubmission(input: {
       ...(!input.data.no_project_yet && input.data.wants_lower ? { offer_per100: 125 } : {}),
     };
     let projectId: number | null = null;
+    const discardedDraftMaterials = input.data.no_project_yet && stagedMaterials
+      ? {
+        paths: [
+          stagedMaterials.posterStoragePath,
+          stagedMaterials.shareImageStoragePath,
+          stagedMaterials.pitchDeckStoragePath,
+        ].filter((path): path is string => typeof path === "string"),
+        videoId: stagedMaterials.bunnyVideoId ?? null,
+      }
+      : null;
     if (!input.data.no_project_yet) {
       const title = input.data.title!;
       const slugBase = title.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
@@ -353,8 +433,16 @@ export async function createFilmmakerSubmission(input: {
         genreOther: input.data.genre_other,
         stage: input.data.stage,
         logline: input.data.logline,
-        trailerUrl: input.data.trailer_url,
+        trailerUrl: stagedMaterials?.trailerUrl ?? input.data.trailer_url,
         pilotUrl: input.data.pilot_url,
+        bunnyVideoId: stagedMaterials?.bunnyVideoId ?? null,
+        posterUrl: stagedMaterials?.posterUrl ?? null,
+        posterStoragePath: stagedMaterials?.posterStoragePath ?? null,
+        shareImageUrl: stagedMaterials?.shareImageUrl ?? null,
+        shareImageStoragePath: stagedMaterials?.shareImageStoragePath ?? null,
+        synopsis: stagedMaterials?.synopsis ?? null,
+        pitchDeckStoragePath: stagedMaterials?.pitchDeckStoragePath ?? null,
+        pitchDeckName: stagedMaterials?.pitchDeckName ?? null,
         budget: input.data.budget,
         budgetFromExample: input.data.budget_from_example,
         priceGroup: visitor.priceGroup,
@@ -366,6 +454,13 @@ export async function createFilmmakerSubmission(input: {
         paybackTermsOther: input.data.payback_terms_other,
       }).returning({ id: projectsTable.id });
       projectId = project.id;
+      if (stagedMaterials) {
+        await tx.delete(filmmakerDraftMaterialsTable)
+          .where(eq(filmmakerDraftMaterialsTable.visitorId, input.visitorId));
+      }
+    } else if (stagedMaterials) {
+      await tx.delete(filmmakerDraftMaterialsTable)
+        .where(eq(filmmakerDraftMaterialsTable.visitorId, input.visitorId));
     }
 
     await tx.insert(flowProgressTable).values({
@@ -392,7 +487,7 @@ export async function createFilmmakerSubmission(input: {
       },
     });
 
-    return { filmmakerId: filmmaker.id, projectId };
+    return { filmmakerId: filmmaker.id, projectId, discardedDraftMaterials };
   });
 }
 
@@ -401,6 +496,7 @@ export async function claimFilmmakerVisitor(input: {
   firebaseUid?: string;
   replitUid?: string;
   verifiedEmail: string;
+  expectedDraftId?: number;
 }): Promise<{ submissionClaimed: boolean; projectId: number | null }> {
   return db.transaction(async (tx) => {
     const provider = input.firebaseUid ? "firebase" : "replit";
@@ -418,7 +514,18 @@ export async function claimFilmmakerVisitor(input: {
     const [existingLink] = await tx.select().from(filmmakerAccountVisitorsTable)
       .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId))
       .for("update");
-    if (existingLink && (provider === "firebase" ? existingLink.firebaseUid : existingLink.replitUid) !== uid) {
+    const existingLinkMatchesIdentity = Boolean(
+      existingLink
+      && provider === "firebase"
+      && existingLink.firebaseUid === uid
+      && existingLink.replitUid === null,
+    ) || Boolean(
+      existingLink
+      && provider === "replit"
+      && existingLink.replitUid === uid
+      && existingLink.firebaseUid === null,
+    );
+    if (existingLink && !existingLinkMatchesIdentity) {
       throw new FilmmakerAccountError("visitor_owned_by_another_account", "This project belongs to a different filmmaker account.");
     }
 
@@ -426,8 +533,24 @@ export async function claimFilmmakerVisitor(input: {
       eq(flowProgressTable.visitorId, input.visitorId),
       eq(flowProgressTable.flow, "filmmaker"),
     )).for("update");
+    const [draftMaterials] = await tx.select().from(filmmakerDraftMaterialsTable)
+      .where(eq(filmmakerDraftMaterialsTable.visitorId, input.visitorId))
+      .for("update");
 
-    if (!existingLink && !progress?.completed && Object.keys(progress?.answers ?? {}).length > 0) {
+    if (input.expectedDraftId !== undefined && progress?.id !== input.expectedDraftId) {
+      throw new FilmmakerAccountError(
+        "account_draft_conflict",
+        "The filmmaker draft changed before it could be claimed. Refresh this page and try again.",
+      );
+    }
+    if (progress && !progress.completed && input.expectedDraftId === undefined) {
+      throw new FilmmakerAccountError(
+        "account_draft_conflict",
+        "X-MSI-Draft-Id is required to securely claim this unfinished filmmaker draft.",
+      );
+    }
+
+    if (!existingLink && hasMeaningfulFilmmakerDraft(progress, draftMaterials)) {
       const [activeDraft] = await tx.select({ visitorId: filmmakerAccountVisitorsTable.visitorId })
         .from(filmmakerAccountVisitorsTable)
         .innerJoin(flowProgressTable, and(
@@ -643,7 +766,10 @@ export async function startOrResumeFilmmakerAccountDraft(input: {
         eq(flowProgressTable.visitorId, input.currentVisitorId),
         eq(flowProgressTable.flow, "filmmaker"),
       )).for("update");
-      if (!link && !progress?.completed && Object.keys(progress?.answers ?? {}).length > 0) {
+      const [draftMaterials] = await tx.select().from(filmmakerDraftMaterialsTable)
+        .where(eq(filmmakerDraftMaterialsTable.visitorId, input.currentVisitorId))
+        .for("update");
+      if (!link && hasMeaningfulFilmmakerDraft(progress, draftMaterials)) {
         const [activeDraft] = await tx.select({ visitorId: filmmakerAccountVisitorsTable.visitorId })
           .from(filmmakerAccountVisitorsTable)
           .innerJoin(flowProgressTable, and(
@@ -917,6 +1043,10 @@ export async function getOwnedFilmmakerMedia(visitorId: string) {
     pendingBunnyVideoId: projectsTable.pendingBunnyVideoId,
     posterUrl: projectsTable.posterUrl,
     shareImageUrl: projectsTable.shareImageUrl,
+    posterStoragePath: projectsTable.posterStoragePath,
+    shareImageStoragePath: projectsTable.shareImageStoragePath,
+    pitchDeckStoragePath: projectsTable.pitchDeckStoragePath,
+    pitchDeckName: projectsTable.pitchDeckName,
   }).from(projectsTable).where(and(
     eq(projectsTable.id, owner.projectId),
     eq(projectsTable.filmmakerId, owner.filmmakerId),
@@ -953,6 +1083,7 @@ export async function finalizeOwnedBunnyVideo(input: {
       pendingBunnyVideoId: null,
       trailerUrl: input.trailerUrl,
       approved: false,
+      reviewDecision: null,
     })
     .where(and(
       eq(projectsTable.id, owner.projectId),
@@ -982,13 +1113,14 @@ export async function saveOwnedFilmmakerImage(input: {
   visitorId: string;
   kind: "poster" | "share";
   url: string;
+  storagePath: string;
 }): Promise<boolean> {
   const owner = await getOwnedCompletedProject(input.visitorId);
   if (!owner?.projectId) return false;
   const [updated] = await db.update(projectsTable)
     .set(input.kind === "poster"
-      ? { posterUrl: input.url, approved: false }
-      : { shareImageUrl: input.url, approved: false })
+      ? { posterUrl: input.url, posterStoragePath: input.storagePath, approved: false, reviewDecision: null }
+      : { shareImageUrl: input.url, shareImageStoragePath: input.storagePath, approved: false, reviewDecision: null })
     .where(and(
       eq(projectsTable.id, owner.projectId),
       eq(projectsTable.filmmakerId, owner.filmmakerId),
@@ -1011,6 +1143,8 @@ export async function removeOwnedFilmmakerImage(input: {
     const [project] = await tx.select({
       posterUrl: projectsTable.posterUrl,
       shareImageUrl: projectsTable.shareImageUrl,
+      posterStoragePath: projectsTable.posterStoragePath,
+      shareImageStoragePath: projectsTable.shareImageStoragePath,
     }).from(projectsTable).where(and(
       eq(projectsTable.id, input.projectId),
       eq(projectsTable.filmmakerId, owner.filmmakerId),
@@ -1027,8 +1161,8 @@ export async function removeOwnedFilmmakerImage(input: {
 
     const [updated] = await tx.update(projectsTable)
       .set(input.kind === "poster"
-        ? { posterUrl: null, approved: false }
-        : { shareImageUrl: null, approved: false })
+        ? { posterUrl: null, posterStoragePath: null, approved: false, reviewDecision: null }
+        : { shareImageUrl: null, shareImageStoragePath: null, approved: false, reviewDecision: null })
       .where(and(
         eq(projectsTable.id, input.projectId),
         eq(projectsTable.filmmakerId, owner.filmmakerId),
@@ -1057,6 +1191,8 @@ export async function getPublicProjectBySlug(slug: string) {
     trailerUrl: projectsTable.trailerUrl,
     posterUrl: projectsTable.posterUrl,
     shareImageUrl: projectsTable.shareImageUrl,
+    pitchDeckStoragePath: projectsTable.pitchDeckStoragePath,
+    pitchDeckName: projectsTable.pitchDeckName,
     approved: projectsTable.approved,
     showcaseRequested: projectsTable.showcaseRequested,
     hidden: projectsTable.hidden,
@@ -1107,6 +1243,8 @@ export async function getPublicProjectBySlug(slug: string) {
     trailerUrl: project.trailerUrl,
     posterUrl: project.posterUrl,
     shareImageUrl: project.shareImageUrl,
+    pitchDeckStoragePath: project.pitchDeckStoragePath,
+    pitchDeckName: project.pitchDeckName,
     confirmedPledgeTotal,
     approved: project.approved,
     showcaseRequested: Boolean(project.showcaseRequested),

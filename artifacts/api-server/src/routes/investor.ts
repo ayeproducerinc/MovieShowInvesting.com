@@ -162,12 +162,12 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid investor intent input." });
     return;
   }
-  const identity = await resolveProtectedIdentity(req, res, false);
-  if (req.get("authorization") && !identity) return;
+  const identity = await resolveProtectedIdentity(req, res, true);
+  if (!identity) return;
   const data = parsed.data;
   const email = data.email.trim().toLowerCase();
   const actualOwner = identity ? `${identity.provider}:${identity.uid}` : "visitor";
-  if (data.expected_investor_owner && data.expected_investor_owner !== actualOwner) {
+  if (data.expected_investor_owner !== actualOwner) {
     res.status(409).json({ error: "The investor account changed while this worksheet was open. Reload before saving." });
     return;
   }

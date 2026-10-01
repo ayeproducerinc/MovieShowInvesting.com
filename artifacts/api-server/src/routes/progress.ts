@@ -52,34 +52,6 @@ function setVisitorCookie(req: Request, res: Response, visitorId: string): void 
   });
 }
 
-async function resolveInvestorProgressVisitor(
-  req: Request,
-  res: Response,
-  cookieId: string | null,
-): Promise<{ allowed: true; visitorId: string | null } | { allowed: false }> {
-  const identity = await resolveProtectedIdentity(req, res, false);
-  if (req.get("authorization") !== undefined && !identity) return { allowed: false };
-  if (identity) {
-    res.status(409).json({ error: "Account progress must not use a guest visitor." });
-    return { allowed: false };
-  }
-  if (cookieId) {
-    const { rows } = await pool.query<InvestorVisitorRow>(
-      "select visitor_id, firebase_uid, replit_uid from investors where visitor_id = $1 order by id limit 2",
-      [cookieId],
-    );
-    if (rows.length > 1) {
-      res.status(409).json({ error: "This visitor has conflicting investor records and cannot be safely accessed." });
-      return { allowed: false };
-    }
-    if (rows[0]?.firebase_uid || rows[0]?.replit_uid) {
-      res.status(401).json({ error: "A verified account linked to this investor visitor is required." });
-      return { allowed: false };
-    }
-  }
-  return { allowed: true, visitorId: cookieId };
-}
-
 router.get("/price-group", async (req, res): Promise<void> => {
   const candidate = req.cookies?.[VISITOR_COOKIE];
   const visitorId = typeof candidate === "string" && UUID.test(candidate) ? candidate : randomUUID();
@@ -109,57 +81,50 @@ router.get("/progress/:flow", async (req, res): Promise<void> => {
     return;
   }
   if (parsedParams.data.flow === "investor") {
-    const identity = await resolveProtectedIdentity(req, res, false);
-    if (req.get("authorization") !== undefined && !identity) return;
-    if (identity) {
-      const { rows } = await pool.query<AccountProgressRow>(
-        "select last_screen, answers, completed, updated_at from investor_account_progress where provider = $1 and uid = $2",
-        [identity.provider, identity.uid],
+    const identity = await resolveProtectedIdentity(req, res, true);
+    if (!identity) return;
+    const { rows } = await pool.query<AccountProgressRow>(
+      "select last_screen, answers, completed, updated_at from investor_account_progress where provider = $1 and uid = $2",
+      [identity.provider, identity.uid],
+    );
+    let record: AccountProgressRow | undefined = rows[0];
+    if (!record) {
+      // Only a record already linked to this exact verified identity may
+      // supply legacy visitor progress. An unclaimed guest draft never can.
+      const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
+      const owner = await pool.query<InvestorVisitorRow>(
+        `select visitor_id, firebase_uid, replit_uid from investors where ${uidColumn} = $1 order by id limit 2`,
+        [identity.uid],
       );
-      let record: AccountProgressRow | undefined = rows[0];
-      if (!record) {
-        // Only a record already linked to this exact verified identity may
-        // supply legacy visitor progress. An unclaimed guest draft never can.
-        const uidColumn = identity.provider === "firebase" ? "firebase_uid" : "replit_uid";
-        const owner = await pool.query<InvestorVisitorRow>(
-          `select visitor_id, firebase_uid, replit_uid from investors where ${uidColumn} = $1 order by id limit 2`,
-          [identity.uid],
-        );
-        if (owner.rows.length > 1) {
-          res.status(409).json({ error: "This account has conflicting investor records." });
-          return;
-        }
-        if (owner.rows[0]?.visitor_id) {
-          const legacy = await findVisitorFlowProgress(owner.rows[0].visitor_id, "investor");
-          if (legacy) record = {
-            last_screen: legacy.lastScreen,
-            answers: legacy.answers as Record<string, unknown>,
-            completed: legacy.completed,
-            updated_at: new Date(legacy.updatedAt),
-          };
-        }
-      }
-      if (!record) {
-        res.status(404).json({ error: "No progress saved." });
+      if (owner.rows.length > 1) {
+        res.status(409).json({ error: "This account has conflicting investor records." });
         return;
       }
-      res.json(GetFlowProgressResponse.parse({
-        flow: "investor", last_screen: record.last_screen,
-        answers: record.answers, completed: record.completed,
-        updated_at: record.updated_at.toISOString(),
-      }));
+      if (owner.rows[0]?.visitor_id) {
+        const legacy = await findVisitorFlowProgress(owner.rows[0].visitor_id, "investor");
+        if (legacy) record = {
+          last_screen: legacy.lastScreen,
+          answers: legacy.answers as Record<string, unknown>,
+          completed: legacy.completed,
+          updated_at: new Date(legacy.updatedAt),
+        };
+      }
+    }
+    if (!record) {
+      res.status(404).json({ error: "No progress saved." });
       return;
     }
+    res.json(GetFlowProgressResponse.parse({
+      flow: "investor", last_screen: record.last_screen,
+      answers: record.answers, completed: record.completed,
+      updated_at: record.updated_at.toISOString(),
+    }));
+    return;
   }
 
   const cookieCandidate = req.cookies?.[VISITOR_COOKIE];
   const cookieId = typeof cookieCandidate === "string" && UUID.test(cookieCandidate) ? cookieCandidate : null;
   let visitorId = cookieId;
-  if (parsedParams.data.flow === "investor") {
-    const access = await resolveInvestorProgressVisitor(req, res, cookieId);
-    if (!access.allowed) return;
-    visitorId = access.visitorId;
-  }
   if (!visitorId) {
     res.status(404).json({ error: "No progress saved." });
     return;
@@ -201,42 +166,35 @@ router.post("/progress", async (req, res): Promise<void> => {
     return;
   }
   if (parsed.data.flow === "investor") {
-    const identity = await resolveProtectedIdentity(req, res, false);
-    if (req.get("authorization") !== undefined && !identity) return;
-    const actualOwner = identity ? `${identity.provider}:${identity.uid}` : "visitor";
-    if (parsed.data.expected_investor_owner && parsed.data.expected_investor_owner !== actualOwner) {
+    const identity = await resolveProtectedIdentity(req, res, true);
+    if (!identity) return;
+    const actualOwner = `${identity.provider}:${identity.uid}`;
+    if (parsed.data.expected_investor_owner !== actualOwner) {
       res.status(409).json({ error: "The investor account changed while this worksheet was open. Reload before saving." });
       return;
     }
-    if (identity) {
-      const { rows } = await pool.query<AccountProgressRow>(
-        `insert into investor_account_progress (provider, uid, last_screen, answers, completed)
-         values ($1, $2, $3, $4::jsonb, $5)
-         on conflict (provider, uid) do update set
-           last_screen = excluded.last_screen, answers = excluded.answers,
-           completed = excluded.completed, updated_at = now()
-         returning last_screen, answers, completed, updated_at`,
-        [identity.provider, identity.uid, parsed.data.last_screen,
-          JSON.stringify(parsed.data.answers), parsed.data.completed ?? false],
-      );
-      const record = rows[0];
-      res.json(SaveFlowProgressResponse.parse({
-        flow: "investor", last_screen: record.last_screen,
-        answers: record.answers, completed: record.completed,
-        updated_at: record.updated_at.toISOString(),
-      }));
-      return;
-    }
+    const { rows } = await pool.query<AccountProgressRow>(
+      `insert into investor_account_progress (provider, uid, last_screen, answers, completed)
+       values ($1, $2, $3, $4::jsonb, $5)
+       on conflict (provider, uid) do update set
+         last_screen = excluded.last_screen, answers = excluded.answers,
+         completed = excluded.completed, updated_at = now()
+       returning last_screen, answers, completed, updated_at`,
+      [identity.provider, identity.uid, parsed.data.last_screen,
+        JSON.stringify(parsed.data.answers), parsed.data.completed ?? false],
+    );
+    const record = rows[0];
+    res.json(SaveFlowProgressResponse.parse({
+      flow: "investor", last_screen: record.last_screen,
+      answers: record.answers, completed: record.completed,
+      updated_at: record.updated_at.toISOString(),
+    }));
+    return;
   }
 
   const cookieCandidate = req.cookies?.[VISITOR_COOKIE];
   const cookieId = typeof cookieCandidate === "string" && UUID.test(cookieCandidate) ? cookieCandidate : null;
   let visitorId = cookieId;
-  if (parsed.data.flow === "investor") {
-    const access = await resolveInvestorProgressVisitor(req, res, cookieId);
-    if (!access.allowed) return;
-    visitorId = access.visitorId;
-  }
   if (!visitorId) {
     res.status(400).json({ error: "A visitor cookie is required before saving progress." });
     return;

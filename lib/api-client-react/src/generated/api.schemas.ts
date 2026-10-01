@@ -546,6 +546,47 @@ export interface FilmmakerMediaConfig {
 
 export type FilmmakerTrailerBinary = Blob;
 
+export type FilmmakerImageBinary = Blob;
+
+export type FilmmakerPitchDeckBinary = Blob;
+
+export interface FilmmakerMaterialTextUpdate {
+  /**
+     * @maxLength 20000
+     * @nullable
+     */
+  synopsis?: string | null;
+  /**
+     * @maxLength 2048
+     * @nullable
+     */
+  trailer_url?: string | null;
+}
+
+export interface FilmmakerMaterialSnapshot {
+  /** @nullable */
+  synopsis: string | null;
+  /**
+     * @maxLength 2048
+     * @nullable
+     */
+  trailer_url: string | null;
+  /** @nullable */
+  poster_url: string | null;
+  /** @nullable */
+  share_image_url: string | null;
+  /**
+     * Protected app-routed deck URL; never a Bunny CDN URL
+     * @nullable
+     */
+  pitch_deck_url: string | null;
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  pitch_deck_name: string | null;
+}
+
 export interface FilmmakerTrailerUpload {
   video_id: string;
   trailer_url: string;
@@ -593,6 +634,13 @@ export interface PublicProject {
   trailer_thumbnail_url: string | null;
   /** @nullable */
   poster_url: string | null;
+  /**
+     * App-routed public deck link available only while project eligibility holds
+     * @nullable
+     */
+  pitch_deck_url: string | null;
+  /** @nullable */
+  pitch_deck_name: string | null;
   /** @minimum 0 */
   confirmed_pledge_total: number;
   approved: boolean;
@@ -617,6 +665,10 @@ export interface ExploreProject {
   stage: string | null;
   /** @nullable */
   poster_url: string | null;
+  /** @nullable */
+  pitch_deck_url: string | null;
+  /** @nullable */
+  pitch_deck_name: string | null;
   /**
      * @minimum 125
      * @nullable
@@ -1015,6 +1067,90 @@ export interface AdminProjectReview {
   hidden: boolean;
 }
 
+export type AdminProjectReviewDetailProject = {
+  /** @minimum 1 */
+  id: number;
+  /** @nullable */
+  title: string | null;
+  /** @nullable */
+  format: string | null;
+  /** @nullable */
+  genre: string | null;
+  /** @nullable */
+  stage: string | null;
+  /** @nullable */
+  stage_other: string | null;
+  /** @nullable */
+  logline: string | null;
+  /** @nullable */
+  budget: number | null;
+  /** @nullable */
+  budget_from_example: boolean | null;
+  /** @nullable */
+  deal_answer: string | null;
+  /** @nullable */
+  offer_per100: number | null;
+  /** @nullable */
+  offer_other_text: string | null;
+  /** @nullable */
+  wants_lower: boolean | null;
+  /** @nullable */
+  payback_terms: string | null;
+  /** @nullable */
+  payback_terms_other: string | null;
+  funding_sources: string[];
+  /** @nullable */
+  funding_other: string | null;
+  /** @nullable */
+  reached_goal: boolean | null;
+  /** @nullable */
+  funding_experience: string | null;
+};
+
+/**
+ * @nullable
+ */
+export type AdminProjectReviewDetailFilmmaker = { [key: string]: unknown } | null;
+
+export type AdminProjectReviewDetailAnswers = { [key: string]: unknown };
+
+export type AdminProjectReviewDetailMaterialsPitchDeckStatus = typeof AdminProjectReviewDetailMaterialsPitchDeckStatus[keyof typeof AdminProjectReviewDetailMaterialsPitchDeckStatus];
+
+
+export const AdminProjectReviewDetailMaterialsPitchDeckStatus = {
+  available: 'available',
+  missing: 'missing',
+  unavailable: 'unavailable',
+} as const;
+
+export type AdminProjectReviewDetailMaterials = {
+  /** @nullable */
+  synopsis: string | null;
+  /** @nullable */
+  trailer_url: string | null;
+  /** @nullable */
+  pilot_url: string | null;
+  /** @nullable */
+  poster_url: string | null;
+  /** @nullable */
+  share_image_url: string | null;
+  /** @nullable */
+  pitch_deck_url: string | null;
+  /** @nullable */
+  pitch_deck_name: string | null;
+  pitch_deck_status: AdminProjectReviewDetailMaterialsPitchDeckStatus;
+  /** @nullable */
+  trailer_thumbnail_url: string | null;
+};
+
+export interface AdminProjectReviewDetail {
+  project: AdminProjectReviewDetailProject;
+  /** @nullable */
+  filmmaker: AdminProjectReviewDetailFilmmaker;
+  answers: AdminProjectReviewDetailAnswers;
+  materials: AdminProjectReviewDetailMaterials;
+}
+
 export interface AdminMessageReviewInput {
   hidden: boolean;
 }
@@ -1042,6 +1178,37 @@ export type SearchLocationsParams = {
  * @maxLength 80
  */
 query: string;
+};
+
+export type UploadFilmmakerDraftImageParams = {
+kind: UploadFilmmakerDraftImageKind;
+};
+
+export type UploadFilmmakerDraftImageKind = typeof UploadFilmmakerDraftImageKind[keyof typeof UploadFilmmakerDraftImageKind];
+
+
+export const UploadFilmmakerDraftImageKind = {
+  poster: 'poster',
+  share: 'share',
+} as const;
+
+export type UploadFilmmakerProjectImageParams = {
+kind: UploadFilmmakerProjectImageKind;
+};
+
+export type UploadFilmmakerProjectImageKind = typeof UploadFilmmakerProjectImageKind[keyof typeof UploadFilmmakerProjectImageKind];
+
+
+export const UploadFilmmakerProjectImageKind = {
+  poster: 'poster',
+  share: 'share',
+} as const;
+
+export type GetFilmmakerProjectPitchDeckParams = {
+/**
+ * @minimum 1
+ */
+project_id: number;
 };
 
 export type GetPitchReviewCheckoutConfig200Mode = typeof GetPitchReviewCheckoutConfig200Mode[keyof typeof GetPitchReviewCheckoutConfig200Mode];

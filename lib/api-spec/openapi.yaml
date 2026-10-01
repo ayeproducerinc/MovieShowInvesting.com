@@ -535,9 +535,15 @@ paths:
       operationId: claimFilmmakerProject
       tags: [filmmakers]
       summary: Link the current visitor draft or legacy submission to a verified account
-      description: Requires the current visitor cookie. A completed legacy submission can only be claimed if its stored email matches the verified account email and it is not linked to another UID. A non-empty unlinked guest draft cannot be claimed while a different active draft exists for the account; the guest cookie and answers are preserved on conflict.
+      description: Requires the current visitor cookie. An unfinished draft claim requires X-MSI-Draft-Id to match the current locked filmmaker flow_progress row. A completed legacy submission can still be claimed without that header if its stored email matches the verified account email and it is not linked to another account. A non-empty unlinked guest draft cannot be claimed while a different active draft exists for the account; the guest cookie and answers are preserved on conflict.
       security:
         - firebaseBearer: []
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: false
+          description: Required when claiming an unfinished filmmaker draft; omitted for legacy completed-submission claims.
+          schema: { type: integer, minimum: 1 }
       responses:
         "200":
           description: Current draft or submission is linked to this account
@@ -552,7 +558,7 @@ paths:
         "403":
           description: Verified email does not match the submission or visitor belongs to another account
         "409":
-          description: An unfinished guest draft conflicts with a different active account draft
+          description: Draft identifier changed or an unfinished guest draft conflicts with a different active account draft
         "404":
           description: Visitor record was not found
         "503":
@@ -692,6 +698,541 @@ paths:
           description: Firebase verification is unavailable
         "409":
           description: Project context header is missing or does not match the current project
+  /filmmakers/draft-materials:
+    get:
+      operationId: getFilmmakerDraftMaterials
+      tags: [filmmakers]
+      summary: Read the current filmmaker draft's separately persisted optional materials
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Current draft materials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerMaterialSnapshot"
+        "401":
+          description: Sign-in required for an account-linked draft
+        "403":
+          description: Draft belongs to another account
+        "404":
+          description: Draft not found or already completed
+        "409":
+          description: Draft identifier does not match the current draft
+    patch:
+      operationId: updateFilmmakerDraftMaterials
+      tags: [filmmakers]
+      summary: Persist optional draft synopsis or trailer link independently of autosaved flow answers
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FilmmakerMaterialTextUpdate"
+      responses:
+        "200":
+          description: Updated draft material snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerMaterialSnapshot"
+        "400":
+          description: Invalid synopsis or trailer link
+        "401":
+          description: Sign-in required for an account-linked draft
+        "403":
+          description: Draft belongs to another account
+        "404":
+          description: Draft not found or no project is selected
+        "409":
+          description: Draft identifier does not match the current draft
+  /filmmakers/draft-materials/images:
+    post:
+      operationId: uploadFilmmakerDraftImage
+      tags: [filmmakers]
+      summary: Bounded upload of a poster or share image for a current filmmaker draft
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Filename
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: Content-Length
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 10485760 }
+        - name: kind
+          in: query
+          required: true
+          schema: { type: string, enum: [poster, share] }
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema: { $ref: "#/components/schemas/FilmmakerImageBinary" }
+          image/png:
+            schema: { $ref: "#/components/schemas/FilmmakerImageBinary" }
+          image/webp:
+            schema: { $ref: "#/components/schemas/FilmmakerImageBinary" }
+      responses:
+        "200":
+          description: Saved draft materials snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerMaterialSnapshot"
+        "400":
+          description: Image bytes, content type, filename, or draft context is invalid
+        "401":
+          description: Sign-in required for an account-linked draft
+        "403":
+          description: Draft belongs to another account
+        "404":
+          description: Draft not found or no project is selected
+        "413":
+          description: Image exceeds the 10 MB limit
+        "429":
+          description: Per-draft or server upload capacity reached
+        "502":
+          description: Bunny Storage upload failed
+  /filmmakers/draft-materials/trailer:
+    post:
+      operationId: uploadFilmmakerDraftTrailer
+      tags: [filmmakers]
+      summary: Server-bounded streaming upload of a trailer to the Movie Show Investing Bunny Stream collection
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Filename
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: Content-Length
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 524288000 }
+      requestBody:
+        required: true
+        content:
+          video/mp4:
+            schema: { $ref: "#/components/schemas/FilmmakerTrailerBinary" }
+          video/webm:
+            schema: { $ref: "#/components/schemas/FilmmakerTrailerBinary" }
+          video/quicktime:
+            schema: { $ref: "#/components/schemas/FilmmakerTrailerBinary" }
+      responses:
+        "200":
+          description: Saved draft materials snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerMaterialSnapshot"
+        "400":
+          description: Invalid trailer upload or draft context
+        "401":
+          description: Sign-in required for an account-linked draft
+        "403":
+          description: Draft belongs to another account
+        "404":
+          description: Draft not found or no project is selected
+        "411":
+          description: Content-Length is required
+        "413":
+          description: Trailer exceeds the 500 MB limit
+        "429":
+          description: Per-draft or server upload capacity reached
+        "502":
+          description: Bunny Stream upload failed
+  /filmmakers/draft-materials/pitch-deck:
+    get:
+      operationId: getFilmmakerDraftPitchDeck
+      tags: [filmmakers]
+      summary: Fetch the current draft's PDF deck through an authenticated Bunny storage gateway
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: PDF deck bytes (never a Bunny redirect)
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401":
+          description: Sign-in required for an account-linked draft
+        "403":
+          description: Draft belongs to another account
+        "404":
+          description: Draft deck not found
+        "502":
+          description: Bunny Storage could not serve the deck
+    post:
+      operationId: uploadFilmmakerDraftPitchDeck
+      tags: [filmmakers]
+      summary: Upload one PDF pitch deck, bounded to 20 MB and validated by PDF magic bytes
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Filename
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: Content-Length
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 20971520 }
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema: { $ref: "#/components/schemas/FilmmakerPitchDeckBinary" }
+      responses:
+        "200":
+          description: Saved draft materials snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerMaterialSnapshot"
+        "400":
+          description: File is not a PDF or draft context is invalid
+        "401":
+          description: Sign-in required for an account-linked draft
+        "403":
+          description: Draft belongs to another account
+        "404":
+          description: Draft not found or no project is selected
+        "411":
+          description: Content-Length is required
+        "413":
+          description: Pitch deck exceeds the 20 MB limit
+        "429":
+          description: Per-draft or server upload capacity reached
+        "502":
+          description: Bunny Storage upload failed
+  /filmmakers/draft-materials/{kind}:
+    delete:
+      operationId: deleteFilmmakerDraftMaterial
+      tags: [filmmakers]
+      summary: Remove one optional item from the current draft
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: { type: string, enum: [poster, share, trailer, pitch-deck] }
+        - name: X-MSI-Draft-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Updated draft materials snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerMaterialSnapshot"
+        "401":
+          description: Sign-in required for an account-linked draft
+        "403":
+          description: Draft belongs to another account
+        "404":
+          description: Draft not found
+        "409":
+          description: Draft identifier does not match the current draft
+  /filmmakers/project-materials:
+    get:
+      operationId: getFilmmakerProjectMaterials
+      tags: [filmmakers]
+      summary: Read materials for an account-owned completed project
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Current project materials snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerMaterialSnapshot" }
+        "401":
+          description: Verified sign-in required
+        "403":
+          description: Project belongs to another account
+        "404":
+          description: Project not found
+    patch:
+      operationId: updateFilmmakerProjectMaterials
+      tags: [filmmakers]
+      summary: Update optional materials on an account-owned completed project
+      description: Changes to approved pitch content return the project to review and remove its approval until reviewed again.
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FilmmakerMaterialTextUpdate" }
+      responses:
+        "200":
+          description: Updated project materials snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerMaterialSnapshot" }
+        "400":
+          description: Invalid trailer link or synopsis
+        "401":
+          description: Verified sign-in required
+        "403":
+          description: Project belongs to another account
+        "404":
+          description: Project not found
+  /filmmakers/project-materials/images:
+    post:
+      operationId: uploadFilmmakerProjectImage
+      tags: [filmmakers]
+      summary: Upload a poster or share image for an account-owned project
+      description: Replacing approved content pauses approval until the changed pitch is reviewed again.
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Filename
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: Content-Length
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 10485760 }
+        - name: kind
+          in: query
+          required: true
+          schema: { type: string, enum: [poster, share] }
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema: { $ref: "#/components/schemas/FilmmakerImageBinary" }
+          image/png:
+            schema: { $ref: "#/components/schemas/FilmmakerImageBinary" }
+          image/webp:
+            schema: { $ref: "#/components/schemas/FilmmakerImageBinary" }
+      responses:
+        "200":
+          description: Updated project materials snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerMaterialSnapshot" }
+        "401":
+          description: Verified sign-in required
+        "403":
+          description: Project belongs to another account
+        "404":
+          description: Project not found
+        "413":
+          description: Image exceeds 10 MB
+        "429":
+          description: Upload capacity reached
+        "502":
+          description: Bunny Storage upload failed
+  /filmmakers/project-materials/trailer:
+    post:
+      operationId: uploadFilmmakerProjectTrailer
+      tags: [filmmakers]
+      summary: Server-bounded streaming upload of a trailer for an account-owned project
+      description: Replacing approved content pauses approval until the changed pitch is reviewed again.
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Filename
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: Content-Length
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 524288000 }
+      requestBody:
+        required: true
+        content:
+          video/mp4:
+            schema: { $ref: "#/components/schemas/FilmmakerTrailerBinary" }
+          video/webm:
+            schema: { $ref: "#/components/schemas/FilmmakerTrailerBinary" }
+          video/quicktime:
+            schema: { $ref: "#/components/schemas/FilmmakerTrailerBinary" }
+      responses:
+        "200":
+          description: Updated project materials snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerMaterialSnapshot" }
+        "401":
+          description: Verified sign-in required
+        "403":
+          description: Project belongs to another account
+        "404":
+          description: Project not found
+        "411":
+          description: Content-Length is required
+        "413":
+          description: Trailer exceeds 500 MB
+        "429":
+          description: Upload capacity reached
+        "502":
+          description: Bunny Stream upload failed
+  /filmmakers/project-materials/pitch-deck:
+    get:
+      operationId: getFilmmakerProjectPitchDeck
+      tags: [filmmakers]
+      summary: Fetch a project deck through an authenticated owner or administrator Bunny storage gateway
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: project_id
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: PDF deck bytes, streamed by the API
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401":
+          description: Verified owner or administrator authentication required
+        "403":
+          description: Project belongs to another account
+        "404":
+          description: Deck not found
+        "502":
+          description: Bunny Storage could not serve the deck
+    post:
+      operationId: uploadFilmmakerProjectPitchDeck
+      tags: [filmmakers]
+      summary: Upload a PDF pitch deck (maximum 20 MB) to an account-owned project
+      description: Replacing approved content pauses approval until the changed pitch is reviewed again.
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Filename
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: Content-Length
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 20971520 }
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema: { $ref: "#/components/schemas/FilmmakerPitchDeckBinary" }
+      responses:
+        "200":
+          description: Updated project materials snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerMaterialSnapshot" }
+        "401":
+          description: Verified sign-in required
+        "403":
+          description: Project belongs to another account
+        "404":
+          description: Project not found
+        "411":
+          description: Content-Length is required
+        "413":
+          description: Deck exceeds 20 MB
+        "429":
+          description: Upload capacity reached
+        "502":
+          description: Bunny Storage upload failed
+  /filmmakers/project-materials/{kind}:
+    delete:
+      operationId: deleteFilmmakerProjectMaterial
+      tags: [filmmakers]
+      summary: Remove a selected optional material from an account-owned project
+      description: Removing approved content pauses approval until the changed pitch is reviewed again.
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: kind
+          in: path
+          required: true
+          schema: { type: string, enum: [poster, share, trailer, pitch-deck] }
+      responses:
+        "200":
+          description: Updated project materials snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerMaterialSnapshot" }
+        "401":
+          description: Verified sign-in required
+        "403":
+          description: Project belongs to another account
+        "404":
+          description: Project not found
   /filmmakers/review-checkout/config:
     get:
       operationId: getPitchReviewCheckoutConfig
@@ -977,6 +1518,27 @@ paths:
               schema: { type: string }
         "404":
           description: Project not found or hidden
+  /projects/{slug}/pitch-deck:
+    get:
+      operationId: getPublicProjectPitchDeck
+      tags: [projects]
+      summary: Fetch an eligible listed project's PDF deck through the app gateway
+      description: The current approval, requested-listing, not-hidden, and valid-stage conditions are rechecked on every request. The Bunny URL is never returned or redirected to.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 120, pattern: "^[a-z0-9-]+$" }
+      responses:
+        "200":
+          description: Inline PDF deck
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404":
+          description: Project is hidden, not eligible, or has no deck
+        "502":
+          description: Bunny Storage could not serve this deck
   /explore:
     get:
       operationId: getExplore
@@ -1399,6 +1961,32 @@ paths:
           description: Sign-in required
         "403":
           description: Not an admin
+        "404":
+          description: Project not found
+  /admin/projects/{projectId}/review:
+    get:
+      operationId: getAdminProjectReview
+      tags: [admin]
+      summary: Read the selected complete submitted pitch and all current attachments for admin review
+      description: Existing admin table rows and selection IDs remain unchanged; this endpoint is loaded by the selected project's Details action.
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Full pitch answers and attachment state for this project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminProjectReviewDetail"
+        "401":
+          description: Verified administrator sign-in required
+        "403":
+          description: Account is not an administrator
         "404":
           description: Project not found
   /admin/messages/{messageId}:
@@ -1833,6 +2421,33 @@ components:
     FilmmakerTrailerBinary:
       type: string
       format: binary
+    FilmmakerImageBinary:
+      type: string
+      format: binary
+    FilmmakerPitchDeckBinary:
+      type: string
+      format: binary
+    FilmmakerMaterialTextUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        synopsis: { type: ["string", "null"], maxLength: 20000 }
+        trailer_url: { type: ["string", "null"], maxLength: 2048 }
+    FilmmakerMaterialSnapshot:
+      type: object
+      additionalProperties: false
+      required: [synopsis, trailer_url, poster_url, share_image_url, pitch_deck_url, pitch_deck_name]
+      properties:
+        synopsis: { type: ["string", "null"] }
+        trailer_url: { type: ["string", "null"], maxLength: 2048 }
+        poster_url: { type: ["string", "null"], format: uri }
+        share_image_url: { type: ["string", "null"], format: uri }
+        pitch_deck_url:
+          type: ["string", "null"]
+          format: uri-reference
+          description: Protected app-routed deck URL; never a Bunny CDN URL
+        pitch_deck_name: { type: ["string", "null"], maxLength: 200 }
     FilmmakerTrailerUpload:
       type: object
       additionalProperties: false
@@ -1852,7 +2467,7 @@ components:
     PublicProject:
       type: object
       additionalProperties: false
-      required: [id, slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, confirmed_pledge_total, approved, showcase_requested, phone_verified, is_owner]
+      required: [id, slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, pitch_deck_url, pitch_deck_name, confirmed_pledge_total, approved, showcase_requested, phone_verified, is_owner]
       properties:
         id: { type: integer, minimum: 1 }
         slug: { type: string }
@@ -1870,6 +2485,8 @@ components:
         trailer_url: { type: ["string", "null"], format: uri }
         trailer_thumbnail_url: { type: ["string", "null"], format: uri }
         poster_url: { type: ["string", "null"], format: uri }
+        pitch_deck_url: { type: ["string", "null"], format: uri-reference, description: App-routed public deck link available only while project eligibility holds }
+        pitch_deck_name: { type: ["string", "null"] }
         confirmed_pledge_total: { type: number, minimum: 0 }
         approved: { type: boolean }
         showcase_requested: { type: boolean }
@@ -1878,7 +2495,7 @@ components:
     ExploreProject:
       type: object
       additionalProperties: false
-      required: [id, slug, title, logline, format, genre, stage, poster_url, offer_per_100, confirmed_pledge_total, is_owner]
+      required: [id, slug, title, logline, format, genre, stage, poster_url, offer_per_100, confirmed_pledge_total, is_owner, pitch_deck_url, pitch_deck_name]
       properties:
         id: { type: integer, minimum: 1 }
         slug: { type: string }
@@ -1888,6 +2505,8 @@ components:
         genre: { type: ["string", "null"] }
         stage: { type: ["string", "null"] }
         poster_url: { type: ["string", "null"], format: uri }
+        pitch_deck_url: { type: ["string", "null"], format: uri-reference }
+        pitch_deck_name: { type: ["string", "null"] }
         offer_per_100: { type: ["integer", "null"], minimum: 125 }
         confirmed_pledge_total: { type: number, minimum: 0 }
         is_owner: { type: boolean, description: True when the request has verified provider-qualified account ownership or the original project visitor cookie }
@@ -2251,6 +2870,57 @@ components:
         id: { type: integer }
         approved: { type: boolean }
         hidden: { type: boolean }
+    AdminProjectReviewDetail:
+      type: object
+      additionalProperties: false
+      required: [project, filmmaker, answers, materials]
+      properties:
+        project:
+          type: object
+          additionalProperties: false
+          required: [id, title, format, genre, stage, stage_other, logline, budget, budget_from_example, deal_answer, offer_per100, offer_other_text, wants_lower, payback_terms, payback_terms_other, funding_sources, funding_other, reached_goal, funding_experience]
+          properties:
+            id: { type: integer, minimum: 1 }
+            title: { type: ["string", "null"] }
+            format: { type: ["string", "null"] }
+            genre: { type: ["string", "null"] }
+            stage: { type: ["string", "null"] }
+            stage_other: { type: ["string", "null"] }
+            logline: { type: ["string", "null"] }
+            budget: { type: ["integer", "null"] }
+            budget_from_example: { type: ["boolean", "null"] }
+            deal_answer: { type: ["string", "null"] }
+            offer_per100: { type: ["integer", "null"] }
+            offer_other_text: { type: ["string", "null"] }
+            wants_lower: { type: ["boolean", "null"] }
+            payback_terms: { type: ["string", "null"] }
+            payback_terms_other: { type: ["string", "null"] }
+            funding_sources:
+              type: array
+              items: { type: string }
+            funding_other: { type: ["string", "null"] }
+            reached_goal: { type: ["boolean", "null"] }
+            funding_experience: { type: ["string", "null"] }
+        filmmaker:
+          type: ["object", "null"]
+          additionalProperties: true
+        answers:
+          type: object
+          additionalProperties: true
+        materials:
+          type: object
+          additionalProperties: false
+          required: [synopsis, trailer_url, pilot_url, poster_url, share_image_url, pitch_deck_url, pitch_deck_name, pitch_deck_status, trailer_thumbnail_url]
+          properties:
+            synopsis: { type: ["string", "null"] }
+            trailer_url: { type: ["string", "null"] }
+            pilot_url: { type: ["string", "null"] }
+            poster_url: { type: ["string", "null"], format: uri }
+            share_image_url: { type: ["string", "null"], format: uri }
+            pitch_deck_url: { type: ["string", "null"], format: uri-reference }
+            pitch_deck_name: { type: ["string", "null"] }
+            pitch_deck_status: { type: string, enum: [available, missing, unavailable] }
+            trailer_thumbnail_url: { type: ["string", "null"], format: uri }
     AdminMessageReviewInput:
       type: object
       required: [hidden]

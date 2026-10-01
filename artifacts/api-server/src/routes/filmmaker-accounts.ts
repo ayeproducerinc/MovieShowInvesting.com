@@ -5,6 +5,7 @@ import {
   FilmmakerAccountError,
   claimFilmmakerVisitor,
   ensureVisitor,
+  hasUnlinkedMeaningfulFilmmakerDraft,
   getFilmmakerAccountProjectVisitor,
   getFilmmakerAccountVisitorOwner,
   getInvestorAccountVisitorOwner,
@@ -29,6 +30,7 @@ router.use(cookieParser());
 const VISITOR_COOKIE = "msi_visitor_id";
 const ONE_YEAR = 365 * 24 * 60 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UNLINKED_DRAFT_ERROR = "Keep this original browser draft. Connect it here before switching projects. If this account has another unfinished pitch, finish that pitch in another browser or device first, then return here to connect this guest draft.";
 
 function readVisitorCookie(req: Request): string | null {
   const id = req.cookies?.[VISITOR_COOKIE];
@@ -43,6 +45,15 @@ function setVisitorCookie(req: Request, res: Response, visitorId: string): void 
     secure: req.secure,
     path: "/",
   });
+}
+
+async function refuseSwitchAwayFromUnlinkedDraft(
+  visitorId: string | null,
+  res: Response,
+): Promise<boolean> {
+  if (!visitorId || !await hasUnlinkedMeaningfulFilmmakerDraft(visitorId)) return false;
+  res.status(409).json({ code: "unlinked_browser_draft", error: UNLINKED_DRAFT_ERROR });
+  return true;
 }
 
 function accountError(res: Response, error: unknown, action: "claim" | "start"): boolean {
@@ -98,11 +109,21 @@ router.post("/filmmakers/projects/claim", async (req, res): Promise<void> => {
     res.status(400).json({ error: "A recorded visitor cookie is required to claim a project." });
     return;
   }
+  const draftHeader = req.get("X-MSI-Draft-Id");
+  let expectedDraftId: number | undefined;
+  if (draftHeader !== undefined) {
+    if (!/^[1-9]\d*$/.test(draftHeader) || !Number.isSafeInteger(Number(draftHeader))) {
+      res.status(400).json({ error: "A valid X-MSI-Draft-Id is required to claim a filmmaker draft." });
+      return;
+    }
+    expectedDraftId = Number(draftHeader);
+  }
   try {
     const result = await claimFilmmakerVisitor({
       visitorId,
       ...(identity.provider === "firebase" ? { firebaseUid: identity.uid } : { replitUid: identity.uid }),
       verifiedEmail: identity.email,
+      ...(expectedDraftId !== undefined ? { expectedDraftId } : {}),
     });
     res.json(ClaimFilmmakerProjectResponse.parse({
       claimed: true,
@@ -119,6 +140,7 @@ router.post("/filmmakers/projects/start", async (req, res): Promise<void> => {
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
   const currentVisitorId = readVisitorCookie(req);
+  if (await refuseSwitchAwayFromUnlinkedDraft(currentVisitorId, res)) return;
   try {
     const draft = await startOrResumeFilmmakerAccountDraft({
       ...(identity.provider === "firebase" ? { firebaseUid: identity.uid } : { replitUid: identity.uid }),
@@ -139,6 +161,7 @@ router.post("/filmmakers/projects/start", async (req, res): Promise<void> => {
 router.post("/filmmakers/projects/resume", async (req, res): Promise<void> => {
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
+  if (await refuseSwitchAwayFromUnlinkedDraft(readVisitorCookie(req), res)) return;
   const draft = await resumeFilmmakerAccountDraft(identity.uid, identity.provider);
   if (!draft) {
     res.status(404).json({ error: "No resumable filmmaker draft was found." });
@@ -183,6 +206,7 @@ router.post("/filmmakers/projects/:project_id/select", async (req, res): Promise
   }
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
+  if (await refuseSwitchAwayFromUnlinkedDraft(readVisitorCookie(req), res)) return;
   const visitorId = await getFilmmakerAccountProjectVisitor(identity.uid, params.data.project_id, identity.provider);
   if (!visitorId) {
     res.status(404).json({ error: "Project is not available to this filmmaker account." });

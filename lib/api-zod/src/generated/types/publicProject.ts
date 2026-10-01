@@ -32,6 +32,13 @@ export interface PublicProject {
   trailer_thumbnail_url: string | null;
   /** @nullable */
   poster_url: string | null;
+  /**
+     * App-routed public deck link available only while project eligibility holds
+     * @nullable
+     */
+  pitch_deck_url: string | null;
+  /** @nullable */
+  pitch_deck_name: string | null;
   /** @minimum 0 */
   confirmed_pledge_total: number;
   approved: boolean;

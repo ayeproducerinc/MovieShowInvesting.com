@@ -4,6 +4,7 @@ import {
   createFilmmakerSubmission,
   FilmmakerSubmissionError,
   getCompletedFilmmakerResult,
+  getFilmmakerAccountVisitorOwner,
   findVisitorFlowProgress,
   updateOwnedFilmmakerShowcase,
   type FilmmakerSubmissionData,
@@ -23,6 +24,7 @@ import {
 } from "../lib/filmmaker-auth";
 import { recordTransactionalEmailStatus, sendTransactionalEmail } from "../lib/mailjet";
 import { reserveFilmmakerSubmissionAttempt } from "../lib/filmmaker-submission-limit";
+import { cleanupDiscardedDraftMaterials } from "./filmmaker-draft-materials";
 import { issuePitchReviewProof } from "../lib/pitch-review-proof";
 
 const router: IRouter = Router();
@@ -125,17 +127,21 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     res.status(400).json({ error: "A recorded visitor cookie is required to submit." });
     return;
   }
+  const identity = await authenticateFilmmaker(req, res, true);
+  if (!identity) return;
   const access = await authorizeFilmmakerVisitor(req, res, cookieId);
   if (!access.allowed) return;
-  if (access.identity) {
-    const draft = await findVisitorFlowProgress(cookieId, "filmmaker");
-    if (!draft) {
-      res.status(409).json({ error: "No current filmmaker draft was found for this visitor." });
-      return;
-    }
-    if (!requireMatchingFilmmakerContext(req, res, "X-MSI-Draft-Id", draft.id, "draft")) return;
+  const owner = await getFilmmakerAccountVisitorOwner(cookieId);
+  if (!owner || owner.provider !== identity.provider || owner.uid !== identity.uid) {
+    res.status(403).json({ error: "Connect this saved browser draft to your verified account before sending the final submission." });
+    return;
   }
-  const identity = access.identity ?? await authenticateFilmmaker(req, res, false);
+  const draft = await findVisitorFlowProgress(cookieId, "filmmaker");
+  if (!draft || draft.completed) {
+    res.status(409).json({ error: "No current filmmaker draft was found for this visitor." });
+    return;
+  }
+  if (!requireMatchingFilmmakerContext(req, res, "X-MSI-Draft-Id", draft.id, "draft")) return;
 
   if (!data.no_project_yet) {
     const requiredProjectValues: Array<[string, unknown]> = [
@@ -191,6 +197,12 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
       firebaseEmail: identity?.email,
       data: data as FilmmakerSubmissionData,
     });
+    if (result.discardedDraftMaterials) {
+      await cleanupDiscardedDraftMaterials({
+        visitorId: cookieId,
+        ...result.discardedDraftMaterials,
+      });
+    }
 
     const emailType = "filmmaker_submission";
     try {

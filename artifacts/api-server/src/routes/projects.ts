@@ -7,6 +7,7 @@ import {
   GetPublicProjectResponse,
 } from "@workspace/api-zod";
 import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
+import { serveFilmmakerPitchDeck } from "./filmmaker-draft-materials";
 
 const router: IRouter = Router();
 const thumbnailCache = new Map<string, { expiresAt: number; url: string | null }>();
@@ -55,7 +56,7 @@ function cacheThumbnail(key: string, url: string | null): void {
   thumbnailCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, url });
 }
 
-async function trailerThumbnail(value: string | null): Promise<string | null> {
+export async function trailerThumbnail(value: string | null): Promise<string | null> {
   if (!value) return null;
   const identity = videoIdentity(value);
   if (!identity) return null;
@@ -143,6 +144,8 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
     || (identity?.provider === "replit" && project.replitUid === identity.uid)
     || (visitorId && project.visitorId === visitorId),
   );
+  const listingEligible = project.approved && project.showcaseRequested
+    && ["idea", "production", "distribution"].includes(project.stage ?? "");
   const response = {
     id: project.id,
     slug: project.slug,
@@ -157,9 +160,13 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
       : [],
     money_use: project.moneyUse,
     distribution_plan: project.distributionPlan,
-    trailer_url: safeWebUrl(project.trailerUrl),
-    trailer_thumbnail_url: await trailerThumbnail(project.trailerUrl),
-    poster_url: safeWebUrl(project.posterUrl),
+    trailer_url: listingEligible ? safeWebUrl(project.trailerUrl) : null,
+    trailer_thumbnail_url: listingEligible ? await trailerThumbnail(project.trailerUrl) : null,
+    poster_url: listingEligible ? safeWebUrl(project.posterUrl) : null,
+    pitch_deck_url: listingEligible && project.pitchDeckStoragePath
+      ? `/api/projects/${encodeURIComponent(project.slug)}/pitch-deck`
+      : null,
+    pitch_deck_name: listingEligible && project.pitchDeckStoragePath ? project.pitchDeckName : null,
     confirmed_pledge_total: project.confirmedPledgeTotal,
     approved: project.approved,
     showcase_requested: project.showcaseRequested,
@@ -186,16 +193,35 @@ router.get("/projects/:slug/share", async (req, res): Promise<void> => {
     return;
   }
   const browserUrl = `${origin}/project/${encodeURIComponent(project.slug)}`;
-  const image = safeWebUrl(project.shareImageUrl) ?? safeWebUrl(project.posterUrl)
+  const eligible = project.approved && project.showcaseRequested
+    && ["idea", "production", "distribution"].includes(project.stage ?? "");
+  const image = (eligible ? safeWebUrl(project.shareImageUrl) ?? safeWebUrl(project.posterUrl) : null)
     ?? `${origin}${DEFAULT_SHARE_IMAGE}`;
   const description = (project.synopsis ?? project.logline ?? "Discover this independent film project.")
     .replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 300);
   const title = `${project.title} | Movie Show Investing`;
-  const needsNoIndex = !project.approved || !project.showcaseRequested;
+  const needsNoIndex = !eligible;
   const robotsMeta = needsNoIndex ? '<meta name="robots" content="noindex,nofollow">' : "";
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${robotsMeta}<link rel="canonical" href="${htmlEscape(browserUrl)}"><meta name="description" content="${htmlEscape(description)}"><meta property="og:type" content="website"><meta property="og:title" content="${htmlEscape(title)}"><meta property="og:description" content="${htmlEscape(description)}"><meta property="og:image" content="${htmlEscape(image)}"><meta property="og:url" content="${htmlEscape(browserUrl)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${htmlEscape(title)}"><meta name="twitter:description" content="${htmlEscape(description)}"><meta name="twitter:image" content="${htmlEscape(image)}"><meta http-equiv="refresh" content="0;url=${htmlEscape(browserUrl)}"><title>${htmlEscape(title)}</title></head><body><p>Opening project page: <a href="${htmlEscape(browserUrl)}">${htmlEscape(project.title)}</a></p></body></html>`;
   if (needsNoIndex) res.setHeader("X-Robots-Tag", "noindex, nofollow");
   res.type("html").send(GetProjectShareMetadataResponse.parse(html));
+});
+
+router.get("/projects/:slug/pitch-deck", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "no-store");
+  const params = GetPublicProjectParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(404).type("text/plain").send("Pitch deck not found.");
+    return;
+  }
+  const project = await getPublicProjectBySlug(params.data.slug);
+  if (!project || !project.approved || !project.showcaseRequested
+    || !["idea", "production", "distribution"].includes(project.stage ?? "")
+    || !project.pitchDeckStoragePath) {
+    res.status(404).type("text/plain").send("Pitch deck is not publicly available.");
+    return;
+  }
+  await serveFilmmakerPitchDeck(req, res, project.pitchDeckStoragePath, project.pitchDeckName);
 });
 
 export default router;

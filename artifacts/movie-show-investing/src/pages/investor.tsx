@@ -110,17 +110,33 @@ export function InvestorDone() {
   </div></section>;
 }
 
+function InvestorSignInGate({ firebaseReady, queryClient, projectSlug }: { firebaseReady:boolean; queryClient:ReturnType<typeof useQueryClient>; projectSlug:string|null }) {
+  return <section className="inv"><div className="page-wrap inv-state" style={{maxWidth:850}} data-testid="investor-sign-in-gate">
+    <p className="inv-kicker">Account required / Before step 1</p>
+    <h1>Start with a verified account.</h1>
+    <p>Sign in with Google before beginning the investor worksheet. Your answers and saved non-binding interest will belong to that account from the start{projectSlug ? `, while keeping the selected project context (${projectSlug})` : ''}.</p>
+    <div className="inv-note"><p>This verifies access to an account email; it does not verify legal identity or complete KYC.</p><p>It does not sign or confirm the separate exact-interest acknowledgment, collect money, or make an investment.</p></div>
+    <div className="inv-actions"><GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-investor-start-sign-in" label="Sign in to begin" /><Link href="/explore" className="inv-button secondary">Explore projects without signing in</Link></div>
+    <p className="inv-small">After sign-in, you’ll return to this same worksheet entry. Any project choice or repeat-entry context in the address is preserved.</p>
+  </div></section>;
+}
+
 export default function Investor() {
   const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
   const firebaseReady = useFirebaseSessionReady();
+  const queryClient = useQueryClient();
   const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
   const expectedOwner = replitAuth.user ? `replit:${replitAuth.user.id}` : firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
   const search = window.location.search;
-  return <InvestorWorksheet key={`${expectedOwner}:${search}`} identityId={identityId} expectedOwner={expectedOwner} authLoading={replitAuth.isLoading || !firebaseReady} />;
+  if (replitAuth.isLoading || !firebaseReady) return <section className="inv"><div className="page-wrap inv-state" role="status" aria-label="Checking sign-in"><div className="inv-skeleton" style={{height:95}}/><div className="inv-skeleton"/></div></section>;
+  if (!replitAuth.user && !firebaseUser) {
+    return <InvestorSignInGate firebaseReady={firebaseReady} queryClient={queryClient} projectSlug={new URLSearchParams(search).get('project')} />;
+  }
+  return <InvestorWorksheet key={`${expectedOwner}:${search}`} identityId={identityId} expectedOwner={expectedOwner} signedInEmail={replitAuth.user?.email ?? firebaseUser?.email ?? null} authLoading={replitAuth.isLoading || !firebaseReady} />;
 }
 
-function InvestorWorksheet({ identityId, expectedOwner, authLoading }: { identityId: string; expectedOwner: string; authLoading: boolean }) {
+function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoading }: { identityId: string; expectedOwner: string; signedInEmail:string|null; authLoading: boolean }) {
   const params = new URLSearchParams(window.location.search);
   const targetSlug = params.get('project');
   const newEntry = params.get('new') === '1';
@@ -201,6 +217,10 @@ function InvestorWorksheet({ identityId, expectedOwner, authLoading }: { identit
       setReady(true);
     }
   },[progress.data,progress.error,explore.isSuccess,current.isSuccess]);
+  useEffect(()=>{
+    if(!ready || identityId==='visitor' || !signedInEmail) return;
+    setA(current=>current.email.trim()?current:{...current,email:signedInEmail});
+  },[ready,identityId,signedInEmail]);
   useEffect(()=>{
     if (!ready || selectionNeeded || screen!==4 || !explore.isSuccess || matchState!=='idle' || restoredMatchStarted.current) return;
     restoredMatchStarted.current=true;

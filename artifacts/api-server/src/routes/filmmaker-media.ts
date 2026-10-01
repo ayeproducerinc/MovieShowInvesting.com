@@ -529,6 +529,7 @@ router.post(
         visitorId: ownerId,
         kind: query.data.kind,
         url: cdnUrl,
+        storagePath: path,
       });
     } catch (error) {
       try {
