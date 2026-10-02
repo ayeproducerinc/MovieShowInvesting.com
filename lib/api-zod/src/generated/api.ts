@@ -446,6 +446,27 @@ export const GetFilmmakerResultResponse = zod.object({
 
 
 /**
+ * @summary Register verified homepage sign-in once and reconcile original-browser work
+ */
+
+
+
+export const JoinFilmmakerCommunityBody = zod.object({
+  "source": zod.enum(['homepage']),
+  "draft_id": zod.number().int().min(1).optional()
+})
+
+export const joinFilmmakerCommunityResponseFilmmakersMin = 0;
+
+
+
+export const JoinFilmmakerCommunityResponse = zod.object({
+  "joined": zod.boolean(),
+  "filmmakers": zod.number().int().min(joinFilmmakerCommunityResponseFilmmakersMin)
+})
+
+
+/**
  * Requires a verified Firebase account token. Project ownership is based on linked Firebase UID, never the submitted email alone.
  * @summary List projects and draft state for the signed-in filmmaker
  */

@@ -114,6 +114,25 @@ export interface HealthStatus {
   status: string;
 }
 
+export type FilmmakerCommunityInputSource = typeof FilmmakerCommunityInputSource[keyof typeof FilmmakerCommunityInputSource];
+
+
+export const FilmmakerCommunityInputSource = {
+  homepage: 'homepage',
+} as const;
+
+export interface FilmmakerCommunityInput {
+  source: FilmmakerCommunityInputSource;
+  /** @minimum 1 */
+  draft_id?: number;
+}
+
+export interface FilmmakerCommunityResult {
+  joined: boolean;
+  /** @minimum 0 */
+  filmmakers: number;
+}
+
 export interface SiteStats {
   /** @minimum 0 */
   filmmakers: number;

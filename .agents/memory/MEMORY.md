@@ -29,3 +29,4 @@
 - [Manual frontend build environment](manual-frontend-build-environment.md) — shell builds do not inherit managed workflow values; supply the required build-time environment explicitly.
 - [Fixture cleanup evidence](fixture-cleanup-evidence.md) — remove temporary credentials separately; keep restricted unresolved asset evidence until remote deletion is verified.
 - [Filmmaker community count](filmmaker-community-count.md) — first filmmaker activity qualifies once overall; guest/account reconciliation uses secure ownership proof, not email.
+- [Mounted public query observers](mounted-public-query-observers.md) — preserve public aggregate query objects during auth changes; clearing them can leave mounted pages stale.

@@ -1,10 +1,11 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import type { Auth } from 'firebase/auth';
+import type { Auth, User } from 'firebase/auth';
 import { SiGoogle } from 'react-icons/si';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
 import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-web';
 import { signInWithGoogle } from '@/lib/google-sign-in';
+import { clearPrivateAuthQueries } from '@/lib/homepage-community';
 import { canPrepareRegisteredFilmmakerHandoff, clearFilmmakerAuthHandoff, prepareRegisteredFilmmakerHandoff, subscribeFilmmakerAuthPreparation } from '@/lib/filmmaker-auth-handoff';
 
 type Props = {
@@ -16,11 +17,12 @@ type Props = {
   label?: string;
   onBeforeSignIn?: () => boolean | void;
   onSignInError?: (message: string) => void;
+  onSignedIn?: (user: User) => void;
 };
 
 export function GoogleSignInButton({
   auth, queryClient, className, disabled = false,
-  testId = 'button-continue-google', label, onBeforeSignIn, onSignInError,
+  testId = 'button-continue-google', label, onBeforeSignIn, onSignInError, onSignedIn,
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
@@ -76,7 +78,7 @@ export function GoogleSignInButton({
 
     setBusy(true);
     setAuthTokenGetter(null);
-    queryClient.clear();
+    clearPrivateAuthQueries(queryClient);
     const signIn = signInWithGoogle(auth);
     try {
       const [result, prepared] = await Promise.all([signIn, Promise.resolve(preparation)]);
@@ -86,6 +88,7 @@ export function GoogleSignInButton({
       setFirebaseSignedIn(Boolean(result.user));
       if (!isReplitAuthActive() && !isReplitAuthLoading()) {
         setAuthTokenGetter(() => auth.currentUser?.getIdToken() ?? null);
+        onSignedIn?.(result.user);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Google sign-in could not be completed. Please try again.';

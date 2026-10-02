@@ -454,6 +454,32 @@ paths:
           description: Firebase UID does not own this visitor
         "503":
           description: Firebase verification is unavailable
+  /filmmakers/community/join:
+    post:
+      operationId: joinFilmmakerCommunity
+      tags: [filmmaker]
+      summary: Register verified homepage sign-in once and reconcile original-browser work
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FilmmakerCommunityInput"
+      responses:
+        "200":
+          description: Verified account joined; count reflects deduplicated known identities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerCommunityResult"
+        "400":
+          description: Invalid input or missing original-browser draft context
+        "401":
+          description: Verified sign-in required
+        "403":
+          description: Browser work belongs to another account
+        "409":
+          description: Browser draft cannot be safely connected
   /filmmakers/projects:
     get:
       operationId: getFilmmakerProjects
@@ -2134,6 +2160,25 @@ components:
           type: string
       required:
         - status
+    FilmmakerCommunityInput:
+      type: object
+      required: [source]
+      properties:
+        source:
+          type: string
+          enum: [homepage]
+        draft_id:
+          type: integer
+          minimum: 1
+    FilmmakerCommunityResult:
+      type: object
+      required: [joined, filmmakers]
+      properties:
+        joined:
+          type: boolean
+        filmmakers:
+          type: integer
+          minimum: 0
     SiteStats:
       type: object
       required: [filmmakers]

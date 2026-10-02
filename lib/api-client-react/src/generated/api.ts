@@ -43,6 +43,8 @@ import type {
   DeleteFilmmakerImageParams,
   ExploreProjects,
   FilmmakerAccountLeave,
+  FilmmakerCommunityInput,
+  FilmmakerCommunityResult,
   FilmmakerDraftState,
   FilmmakerImageUpload,
   FilmmakerInterestAlert,
@@ -1851,6 +1853,94 @@ export function useGetFilmmakerResult<TData = Awaited<ReturnType<typeof getFilmm
 
 
 
+
+export const getJoinFilmmakerCommunityUrl = () => {
+
+
+
+
+  return `/api/filmmakers/community/join`
+}
+
+/**
+ * @summary Register verified homepage sign-in once and reconcile original-browser work
+ */
+export const joinFilmmakerCommunity = async (filmmakerCommunityInput: FilmmakerCommunityInput, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerCommunityResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerCommunityResult>(getJoinFilmmakerCommunityUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(filmmakerCommunityInput)
+  }
+);}
+
+
+
+
+
+export const getJoinFilmmakerCommunityMutationKey = () => ['joinFilmmakerCommunity'] as const;
+
+export const getJoinFilmmakerCommunityMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinFilmmakerCommunity>>, TError,JoinFilmmakerCommunityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinFilmmakerCommunity>>, TError,JoinFilmmakerCommunityMutationVariables, TContext> => {
+
+const mutationKey = getJoinFilmmakerCommunityMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinFilmmakerCommunity>>, JoinFilmmakerCommunityMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  joinFilmmakerCommunity(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinFilmmakerCommunityMutationResult = NonNullable<Awaited<ReturnType<typeof joinFilmmakerCommunity>>>
+    export type JoinFilmmakerCommunityMutationBody = BodyType<FilmmakerCommunityInput>
+    export type JoinFilmmakerCommunityMutationError = ErrorType<void>
+    export type JoinFilmmakerCommunityMutationVariables = {data: BodyType<FilmmakerCommunityInput>}
+
+    /**
+ * @summary Register verified homepage sign-in once and reconcile original-browser work
+ */
+export const useJoinFilmmakerCommunity = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinFilmmakerCommunity>>, TError,JoinFilmmakerCommunityMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinFilmmakerCommunity>>,
+        TError,
+        JoinFilmmakerCommunityMutationVariables,
+        TContext
+      > => {
+      return useMutation(getJoinFilmmakerCommunityMutationOptions(options));
+    }
 
 export const getGetFilmmakerProjectsUrl = () => {
 

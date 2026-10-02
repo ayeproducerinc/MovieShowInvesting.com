@@ -8,6 +8,7 @@ import {
   useGetFirebaseConfig,
 } from '@workspace/api-client-react';
 import { isReplitAuthActive, isReplitAuthLoading, useAuth } from '@workspace/replit-auth-web';
+import { clearPrivateAuthQueries } from '@/lib/homepage-community';
 
 const APP_NAME = 'movie-show-investing';
 let initializedAuth: Auth | null = null;
@@ -75,7 +76,7 @@ export function FirebaseBootstrap() {
       initializedAuth = getAuth(app);
       return onAuthStateChanged(initializedAuth, user => {
         if (previousUid !== (user?.uid ?? null)) {
-          if (previousUid !== null || user) queryClient.clear();
+          if (previousUid !== null || user) clearPrivateAuthQueries(queryClient);
           previousUid = user?.uid ?? null;
         }
         setAuthTokenGetter(user && !isReplitAuthActive() && !isReplitAuthLoading() ? () => initializedAuth?.currentUser?.getIdToken() ?? null : null);

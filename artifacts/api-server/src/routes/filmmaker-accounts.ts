@@ -12,6 +12,8 @@ import {
   listFilmmakerAccountProjects,
   resumeFilmmakerAccountDraft,
   recordFilmmakerAccountActivity,
+  findVisitorFlowProgress,
+  getFilmmakerCount,
   startOrResumeFilmmakerAccountDraft,
 } from "@workspace/db";
 import {
@@ -22,6 +24,8 @@ import {
   SelectFilmmakerProjectParams,
   SelectFilmmakerProjectResponse,
   StartFilmmakerProjectResponse,
+  JoinFilmmakerCommunityBody,
+  JoinFilmmakerCommunityResponse,
 } from "@workspace/api-zod";
 import { authenticateFilmmaker } from "../lib/filmmaker-auth";
 
@@ -84,6 +88,47 @@ function accountError(res: Response, error: unknown, action: "claim" | "start"):
       return false;
   }
 }
+
+router.post("/filmmakers/community/join", async (req, res): Promise<void> => {
+  const parsed = JoinFilmmakerCommunityBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "A valid homepage community registration is required." });
+    return;
+  }
+  const identity = await authenticateFilmmaker(req, res, true);
+  if (!identity) return;
+  const visitorId = readVisitorCookie(req);
+  try {
+    if (visitorId) {
+      const owner = await getFilmmakerAccountVisitorOwner(visitorId);
+      if (owner && (owner.provider !== identity.provider || owner.uid !== identity.uid)) {
+        res.status(403).json({ error: "This browser work belongs to another account. Sign in with its owner before connecting it." });
+        return;
+      }
+      const progress = !owner ? await findVisitorFlowProgress(visitorId, "filmmaker") : null;
+      if (progress && (progress.completed || await hasUnlinkedMeaningfulFilmmakerDraft(visitorId))) {
+        // Readable browser context is not ownership by email. The existing claim
+        // verifies original-browser proof, current draft ID, and account conflicts.
+        if (parsed.data.draft_id !== progress.id) {
+          res.status(409).json({ error: "Your browser draft changed. Retry to refresh its context before connecting it." });
+          return;
+        }
+        await claimFilmmakerVisitor({
+          visitorId,
+          ...(identity.provider === "firebase" ? { firebaseUid: identity.uid } : { replitUid: identity.uid }),
+          verifiedEmail: identity.email,
+          expectedDraftId: parsed.data.draft_id,
+        });
+      }
+    }
+    await recordFilmmakerAccountActivity(identity.uid, identity.provider);
+    res.set("Cache-Control", "no-store");
+    res.json(JoinFilmmakerCommunityResponse.parse({ joined: true, filmmakers: await getFilmmakerCount() }));
+  } catch (error) {
+    if (accountError(res, error, "claim")) return;
+    throw error;
+  }
+});
 
 router.get("/filmmakers/projects", async (req, res): Promise<void> => {
   const identity = await authenticateFilmmaker(req, res, true);

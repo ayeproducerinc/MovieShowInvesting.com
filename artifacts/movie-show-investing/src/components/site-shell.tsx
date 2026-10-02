@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { ArrowUpRight, Menu, X } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { signOut } from 'firebase/auth';
+import { signOut, type User } from 'firebase/auth';
 import { useQueryClient } from '@tanstack/react-query';
 import { leaveFilmmakerAccount } from '@workspace/api-client-react';
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
@@ -10,6 +10,7 @@ import { useAuth } from '@workspace/replit-auth-web';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { ReplayConsent } from '@/components/replay-consent';
 import { hasReplayProviderConfigured } from '@/lib/analytics';
+import { clearPrivateAuthQueries, communityRegistrationError, refreshCommunityCount, registerHomepageCommunity } from '@/lib/homepage-community';
 
 const navigation = [
   { href: '/explore', label: 'Explore projects' },
@@ -28,13 +29,30 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
+  const [communityRegistration, setCommunityRegistration] = useState<{ uid: string; pending: boolean; error: string } | null>(null);
+  async function joinFromHomepage(signedInUser: User) {
+    setCommunityRegistration({ uid: signedInUser.uid, pending: true, error: '' });
+    try {
+      const result = await registerHomepageCommunity(await signedInUser.getIdToken());
+      if (getInitializedAuth()?.currentUser?.uid !== signedInUser.uid) return;
+      await refreshCommunityCount(queryClient, result.filmmakers);
+      if (getInitializedAuth()?.currentUser?.uid === signedInUser.uid) setCommunityRegistration(null);
+    } catch (error) {
+      if (getInitializedAuth()?.currentUser?.uid === signedInUser.uid) {
+        setCommunityRegistration({ uid: signedInUser.uid, pending: false, error: communityRegistrationError(error) });
+      }
+    }
+  }
+  // Capture intent on this button's successful sign-in, not on all auth changes
+  // (which would incorrectly register investors returning to the homepage).
+  const onHomepageSignedIn = location === '/' ? (signedInUser: User) => { void joinFromHomepage(signedInUser); } : undefined;
   async function leave() {
     if (replitAuth.user) {
       setSigningOut(true);
       setSignOutError('');
       try {
         clearFilmmakerAction();
-        queryClient.clear();
+        clearPrivateAuthQueries(queryClient);
         replitAuth.logout('/');
       } catch {
         setSignOutError('Could not sign out. Please try again.');
@@ -50,7 +68,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
       await leaveFilmmakerAccount();
       await signOut(auth);
       clearFilmmakerAction();
-      queryClient.clear();
+      clearPrivateAuthQueries(queryClient);
       setOpen(false);
       navigate('/');
     } catch {
@@ -83,7 +101,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
                 <Link href="/me/projects" data-testid="link-header-my-projects" className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">My projects</Link>
                 <button type="button" data-testid="button-header-sign-out" onClick={() => void leave()} disabled={signingOut || replitAuth.isLoading} className="text-[12px] font-semibold whitespace-nowrap underline underline-offset-4">Sign out</button>
               </> : <>
-                <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold whitespace-nowrap text-[#902f4d]" testId="button-header-google-sign-in" label="Sign in" />
+                <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold whitespace-nowrap text-[#902f4d]" testId="button-header-google-sign-in" label="Sign in" onSignedIn={onHomepageSignedIn} />
               </>}
             </div>
             <button type="button" data-testid="button-toggle-menu" className="inline-flex h-10 w-10 items-center justify-center border border-[#26303d] lg:hidden" aria-expanded={open} aria-controls="mobile-site-navigation" aria-label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen(!open)}>{open ? <X size={19} /> : <Menu size={19} />}</button>
@@ -95,13 +113,16 @@ export function SiteShell({ children }: { children: ReactNode }) {
             <Link href="/me/projects" data-testid="link-mobile-my-projects" onClick={() => setOpen(false)} className="text-[12px] font-bold text-[#902f4d]">My projects</Link>
             <button type="button" data-testid="button-mobile-sign-out" onClick={() => void leave()} disabled={signingOut || replitAuth.isLoading} className="text-[12px] font-semibold underline underline-offset-4">Sign out</button>
           </> : <>
-            <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold text-[#902f4d]" testId="button-mobile-google-sign-in" label="Sign in" />
+            <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={replitAuth.isLoading || !firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold text-[#902f4d]" testId="button-mobile-google-sign-in" label="Sign in" onSignedIn={onHomepageSignedIn} />
           </>}
         </div>
         {open && <nav id="mobile-site-navigation" className="absolute top-full left-0 right-0 border-b border-[#bcb4a7] bg-[#f4f0e7] px-5 pb-5 shadow-lg lg:hidden" aria-label="Mobile navigation">
           {navigation.map((item) => <Link key={item.href} href={item.href} data-testid={`link-mobile-${item.href.replaceAll('/', '-')}`} onClick={() => setOpen(false)} className="flex items-center justify-between border-t border-[#cec7bb] py-4 text-lg font-semibold">{item.label}<ArrowUpRight size={18}/></Link>)}
         </nav>}
         {signOutError && <p className="page-wrap pb-2 text-sm text-[#902f4d]" role="alert">{signOutError}</p>}
+        {communityRegistration && communityRegistration.uid === user?.uid && !replitAuth.user && <p className="page-wrap pb-2 text-sm text-[#902f4d]" role={communityRegistration.pending ? 'status' : 'alert'} data-testid="status-community-registration">
+          {communityRegistration.pending ? 'Updating community count…' : <>You are signed in, but your community count was not updated. {communityRegistration.error} <button type="button" className="font-semibold underline" data-testid="button-retry-community-registration" onClick={() => { if (user) void joinFromHomepage(user); }}>Try again</button></>}
+        </p>}
       </header>
       <main className="flex-1">{children}</main>
       <footer className="bg-[#202936] text-[#f4f0e7]">
