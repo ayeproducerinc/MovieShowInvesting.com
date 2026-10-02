@@ -1,7 +1,8 @@
 import { and, eq } from "drizzle-orm";
-import { db } from "./index";
+import { db, hasMeaningfulFilmmakerDraft } from "./index";
 import {
   filmmakerDraftMaterialsTable,
+  filmmakerActivityTable,
   filmmakersTable,
   flowProgressTable,
   projectsTable,
@@ -73,6 +74,11 @@ export async function updateFilmmakerDraftText(input: {
       target: filmmakerDraftMaterialsTable.visitorId,
       set: { ...changes, updatedAt: new Date() },
     }).returning();
+    if (hasMeaningfulFilmmakerDraft({ ...progress, completed: false }, materials)) {
+      await tx.insert(filmmakerActivityTable).values({
+        identityKey: `visitor:${input.visitorId}`, visitorId: input.visitorId,
+      }).onConflictDoNothing();
+    }
     return { materials, previousVideoId: input.trailerUrl !== undefined ? current?.bunnyVideoId ?? null : null };
   });
 }
@@ -122,6 +128,11 @@ export async function saveFilmmakerDraftAsset(input: {
       target: filmmakerDraftMaterialsTable.visitorId,
       set: { ...changes, updatedAt: new Date() },
     }).returning();
+    if (hasMeaningfulFilmmakerDraft({ ...progress, completed: false }, materials)) {
+      await tx.insert(filmmakerActivityTable).values({
+        identityKey: `visitor:${input.visitorId}`, visitorId: input.visitorId,
+      }).onConflictDoNothing();
+    }
     return { materials, previousPath, previousVideoId };
   });
 }

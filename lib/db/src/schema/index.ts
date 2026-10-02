@@ -19,6 +19,7 @@
 
 export * from "./visitors";
 export * from "./filmmakers";
+export * from "./filmmaker-activity";
 export * from "./projects";
 export * from "./pitch-review-checkouts";
 export * from "./investors";

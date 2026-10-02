@@ -6,6 +6,7 @@ import * as schema from "./schema";
 import {
   flowProgressTable,
   filmmakerAccountVisitorsTable,
+  filmmakerActivityTable,
   filmmakerDraftMaterialsTable,
   filmmakersTable,
   investorsTable,
@@ -27,6 +28,7 @@ export const db = drizzle(pool, { schema });
 
 export * from "./schema";
 export * from "./filmmaker-materials";
+export * from "./filmmaker-activity";
 
 export async function ensureVisitor(visitorId: string): Promise<void> {
   await db.insert(visitorsTable).values({ visitorId }).onConflictDoNothing();
@@ -48,17 +50,6 @@ export async function recordVisitorAttribution(input: {
       refCodeUsed: sql`coalesce(${visitorsTable.refCodeUsed}, excluded.ref_code_used)`,
     },
   });
-}
-
-export async function getFilmmakerCount(): Promise<number> {
-  const [result] = await db.select({
-    total: sql<number>`count(distinct case
-      when ${filmmakersTable.firebaseUid} is not null then 'uid:' || ${filmmakersTable.firebaseUid}
-      when ${filmmakersTable.replitUid} is not null then 'replit:' || ${filmmakersTable.replitUid}
-      else 'filmmaker:' || ${filmmakersTable.id}::text
-    end)::int`,
-  }).from(filmmakersTable);
-  return result.total;
 }
 
 export async function readVisitorPriceGroup(visitorId: string): Promise<"A" | "B" | null> {
@@ -115,8 +106,8 @@ function hasMeaningfulFilmmakerMaterials(
   ].some((value) => typeof value === "string" && value.trim().length > 0));
 }
 
-function hasMeaningfulFilmmakerDraft(
-  progress: FlowProgressRecord | undefined,
+export function hasMeaningfulFilmmakerDraft(
+  progress: Pick<FlowProgressRecord, "answers" | "completed"> | undefined,
   materials: typeof filmmakerDraftMaterialsTable.$inferSelect | undefined,
 ): boolean {
   return Boolean(progress && !progress.completed
@@ -183,6 +174,12 @@ export async function saveVisitorFlowProgress(input: {
           updatedAt: new Date(),
         },
       }).returning();
+      if (hasMeaningfulFilmmakerDraft(record, undefined)) {
+        await tx.insert(filmmakerActivityTable).values({
+          identityKey: `visitor:${input.visitorId}`,
+          visitorId: input.visitorId,
+        }).onConflictDoNothing();
+      }
       return record;
     });
   }

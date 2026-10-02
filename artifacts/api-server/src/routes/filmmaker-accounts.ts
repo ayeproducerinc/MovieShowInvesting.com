@@ -11,6 +11,7 @@ import {
   getInvestorAccountVisitorOwner,
   listFilmmakerAccountProjects,
   resumeFilmmakerAccountDraft,
+  recordFilmmakerAccountActivity,
   startOrResumeFilmmakerAccountDraft,
 } from "@workspace/db";
 import {
@@ -88,6 +89,8 @@ router.get("/filmmakers/projects", async (req, res): Promise<void> => {
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
   const result = await listFilmmakerAccountProjects(identity.uid, identity.provider);
+  // This is filmmaker hub entry, not a generic authentication or investor request.
+  await recordFilmmakerAccountActivity(identity.uid, identity.provider);
   res.json(GetFilmmakerProjectsResponse.parse({
     projects: result.projects.map((project) => ({
       id: project.id,

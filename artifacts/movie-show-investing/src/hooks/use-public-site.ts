@@ -41,7 +41,7 @@ function beginVisit(record: (data: { data: VisitInput }) => Promise<unknown>) {
 
 export function usePublicSite() {
   const stats = useGetSiteStats({
-    query: { queryKey: getGetSiteStatsQueryKey(), retry: 1, staleTime: 60_000 },
+    query: { queryKey: getGetSiteStatsQueryKey(), retry: 1, staleTime: 60_000, refetchOnMount: 'always' },
   });
   return { stats };
 }

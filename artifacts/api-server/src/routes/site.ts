@@ -18,6 +18,7 @@ const ONE_YEAR = 365 * 24 * 60 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 router.get("/stats", async (_req, res): Promise<void> => {
+  res.set("Cache-Control", "no-store");
   const filmmakers = await getFilmmakerCount();
   res.json(GetSiteStatsResponse.parse({ filmmakers }));
 });
