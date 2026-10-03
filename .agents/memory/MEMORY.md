@@ -30,3 +30,4 @@
 - [Fixture cleanup evidence](fixture-cleanup-evidence.md) — remove temporary credentials separately; keep restricted unresolved asset evidence until remote deletion is verified.
 - [Filmmaker community count](filmmaker-community-count.md) — first filmmaker activity qualifies once overall; guest/account reconciliation uses secure ownership proof, not email.
 - [Mounted public query observers](mounted-public-query-observers.md) — preserve public aggregate query objects during auth changes; clearing them can leave mounted pages stale.
+- [Proposal consent boundary](proposal-consent-boundary.md) — an unfinished legacy draft must explicitly review new economics; an old acceptance cannot manufacture backend agreement.

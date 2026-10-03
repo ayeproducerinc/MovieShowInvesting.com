@@ -1,5 +1,6 @@
 import { ArrowUpRight } from 'lucide-react';
 import { Link } from 'wouter';
+import { ProposalSummary } from './proposal-summary';
 import type { ExploreProject } from '@workspace/api-client-react';
 
 type ExploreProjectWithDeck = ExploreProject & { pitch_deck_url?: string | null; pitch_deck_name?: string | null };
@@ -22,6 +23,7 @@ export function InvestorProjectCard({ project, action, matched = false, showPitc
       {matched && <span className="inv-match-badge" data-testid={`badge-match-${project.id}`}>Matches your preferences</span>}
       <h2>{project.title}</h2>
       <p>{project.logline || 'Read the project dossier for more about this story.'}</p>
+      {(project.proposal || project.budget) && <ProposalSummary proposal={project.proposal} budget={project.budget} stage={project.stage} testId={`proposal-${project.id}`} />}
       <div className="inv-project-links">
         <Link href={`/project/${project.slug}`} data-testid={`link-project-${project.id}`}>View project <ArrowUpRight size={13} className="inline"/></Link>
         {deckUrl && <a href={deckUrl} target="_blank" rel="noopener noreferrer" data-testid={`link-pitch-deck-${project.id}`}>View pitch deck <ArrowUpRight size={13} className="inline"/></a>}

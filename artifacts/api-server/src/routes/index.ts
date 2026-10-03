@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import ageConfirmationRouter from "./age-confirmation";
 import siteRouter from "./site";
 import progressRouter from "./progress";
 import adminRouter from "./admin";
@@ -23,6 +24,7 @@ const router: IRouter = Router();
 
 router.use(replitAuthRouter);
 router.use(healthRouter);
+router.use(ageConfirmationRouter);
 router.use(siteRouter);
 router.use(progressRouter);
 router.use(adminRouter);

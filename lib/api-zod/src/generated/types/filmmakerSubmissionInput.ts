@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { FilmmakerProposalInput } from './filmmakerProposalInput';
 import type { FilmmakerSubmissionInputDealAnswer } from './filmmakerSubmissionInputDealAnswer';
 import type { FilmmakerSubmissionInputFormat } from './filmmakerSubmissionInputFormat';
 import type { FilmmakerSubmissionInputGenre } from './filmmakerSubmissionInputGenre';
@@ -12,6 +13,8 @@ import type { FilmmakerSubmissionInputPaybackTerms } from './filmmakerSubmission
 import type { FilmmakerSubmissionInputStage } from './filmmakerSubmissionInputStage';
 
 export interface FilmmakerSubmissionInput {
+  age_confirmed?: true;
+  proposal?: FilmmakerProposalInput;
   /** Leave blank. Bot-detection field; never stored with the submission. */
   website?: string;
   no_project_yet: boolean;
@@ -23,7 +26,10 @@ export interface FilmmakerSubmissionInput {
   logline?: string;
   trailer_url?: string;
   pilot_url?: string;
-  /** @minimum 1 */
+  /**
+     * @minimum 1
+     * @maximum 2147483647
+     */
   budget?: number;
   budget_from_example?: boolean;
   deal_answer?: FilmmakerSubmissionInputDealAnswer;

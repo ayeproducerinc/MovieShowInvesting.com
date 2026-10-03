@@ -3,6 +3,7 @@ import { boolean, check, integer, jsonb, pgTable, serial, text, timestamp } from
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { filmmakersTable } from "./filmmakers";
+import type { Proposal } from "../proposal";
 
 export const projectsTable = pgTable("projects", {
   id: serial("id").primaryKey(),
@@ -30,6 +31,7 @@ export const projectsTable = pgTable("projects", {
   priceGroup: text("price_group"),
   dealAnswer: text("deal_answer"),
   offerPer100: integer("offer_per100"),
+  proposal: jsonb("proposal").$type<Proposal>(),
   offerOtherText: text("offer_other_text"),
   wantsLower: boolean("wants_lower"),
   paybackTerms: text("payback_terms"),

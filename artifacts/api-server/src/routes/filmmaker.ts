@@ -8,6 +8,7 @@ import {
   findVisitorFlowProgress,
   updateOwnedFilmmakerShowcase,
   type FilmmakerSubmissionData,
+  snapshotProposal,
 } from "@workspace/db";
 import {
   SubmitFilmmakerBody,
@@ -26,6 +27,7 @@ import { recordTransactionalEmailStatus, sendTransactionalEmail } from "../lib/m
 import { reserveFilmmakerSubmissionAttempt } from "../lib/filmmaker-submission-limit";
 import { cleanupDiscardedDraftMaterials } from "./filmmaker-draft-materials";
 import { issuePitchReviewProof } from "../lib/pitch-review-proof";
+import { requireAccountAgeConfirmation } from "../lib/age-confirmation";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -36,6 +38,7 @@ const SHOWCASE_FIELDS = new Set([
   "showcase_requested", "synopsis", "team_links", "money_use", "distribution_plan", "trailer_url",
 ]);
 const INPUT_FIELDS = new Set([
+  "proposal", "age_confirmed",
   "website",
   "no_project_yet", "stage", "title", "format", "genre", "genre_other",
   "logline", "trailer_url", "pilot_url", "budget", "budget_from_example", "deal_answer",
@@ -129,6 +132,7 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
   }
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
+  if (!await requireAccountAgeConfirmation(identity, res)) return;
   const access = await authorizeFilmmakerVisitor(req, res, cookieId);
   if (!access.allowed) return;
   const owner = await getFilmmakerAccountVisitorOwner(cookieId);
@@ -144,6 +148,21 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
   if (!requireMatchingFilmmakerContext(req, res, "X-MSI-Draft-Id", draft.id, "draft")) return;
 
   if (!data.no_project_yet) {
+    if (!data.proposal || !data.stage) {
+      res.status(400).json({ error: "Review and save the structured project repayment proposal before submitting." });
+      return;
+    }
+    try {
+      const proposal = snapshotProposal(data.stage, data.proposal);
+      if (data.offer_per100 !== proposal.repayment_per100 || data.wants_lower) {
+        res.status(400).json({ error: "The saved repayment target must match the selected proposal." });
+        return;
+      }
+      Object.assign(data, { proposal });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Invalid proposal." });
+      return;
+    }
     const requiredProjectValues: Array<[string, unknown]> = [
       ["stage", data.stage],
       ["title", data.title],
@@ -312,6 +331,7 @@ router.get("/filmmakers/result", async (req, res): Promise<void> => {
     genre_other: project?.genreOther ?? stringAnswer("genre_other"),
     logline: project?.logline ?? stringAnswer("logline"),
     offer_per100: project?.offerPer100 ?? numberAnswer("offer_per100"),
+    proposal: project?.proposal ?? null,
     offer_other_text: project?.offerOtherText ?? stringAnswer("offer_other_text"),
     wants_lower: project?.wantsLower ?? booleanAnswer("wants_lower"),
     budget: project?.budget ?? numberAnswer("budget"),

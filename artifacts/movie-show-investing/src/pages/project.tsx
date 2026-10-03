@@ -9,6 +9,7 @@ import { ProjectShare } from '@/components/project-share';
 import { ProjectQuestionForm } from '@/components/project-question-form';
 import { ProjectConversationEntry } from '@/components/project-conversation-entry';
 import { money } from './filmmaker-calculator';
+import { ProposalSummary } from '@/components/proposal-summary';
 
 const securitiesNotice = "Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.";
 type PublicProjectWithPitchDeck = PublicProject & { pitch_deck_url?: string | null; pitch_deck_name?: string | null };
@@ -117,6 +118,7 @@ export default function Project() {
       <div>
         {(poster || thumbnail) && <div className="dossier-section"><span className="dossier-kicker">A first look</span><img className="dossier-poster" src={poster || thumbnail || ''} alt={`${data.title} project artwork`} data-testid="img-project-artwork" loading="lazy"/></div>}
         {bunnyEmbed ? <div className="dossier-section"><span className="dossier-kicker">The trailer</span><h2>See it in motion.</h2><div className="dossier-video"><iframe src={bunnyEmbed} title={`${data.title} trailer`} loading="lazy" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowFullScreen data-testid="iframe-project-trailer" /></div><p className="dossier-status">Player not working? <a href={bunnyEmbed} target="_blank" rel="noopener noreferrer" data-testid="link-project-trailer">Open the trailer in a new tab <ArrowUpRight size={14} style={{ display: 'inline' }}/></a></p></div> : trailer && <div className="dossier-section"><span className="dossier-kicker">The trailer</span><h2>See it in motion.</h2><a className="dossier-media-link" href={trailer} target="_blank" rel="noopener noreferrer" data-testid="link-project-trailer">Watch the trailer <ArrowUpRight size={15} style={{ display: 'inline' }}/></a></div>}
+        {eligible && (data.proposal || data.budget) && <section className="dossier-section" data-testid="section-project-proposal"><span className="dossier-kicker">The filmmaker’s proposed terms</span><h2>Budget and repayment.</h2><ProposalSummary proposal={data.proposal} budget={data.budget} stage={data.stage} testId="project-proposal"/></section>}
         <ProjectDetail label="01 / The story" title="Synopsis." value={data.synopsis}/>
         <ProjectDetail label="02 / The plan" title="Use of funds." value={data.money_use}/>
         <ProjectDetail label="03 / The path forward" title="Distribution." value={data.distribution_plan}/>

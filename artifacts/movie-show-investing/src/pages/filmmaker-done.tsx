@@ -9,7 +9,9 @@ import { setFilmmakerAction } from '@/lib/filmmaker-intent';
 import { consumePitchReviewChoice, getPitchReviewProof, type PitchReviewChoice } from '@/lib/pitch-review-intent';
 import { ProjectShare } from '@/components/project-share';
 import { ProjectMaterialsEditor } from '@/components/project-materials-editor';
-import { calculateDeal, money, type Stage } from './filmmaker-calculator';
+import { legacyDeal, money, type Stage } from './filmmaker-calculator';
+import { AgeGateForCurrentUser } from '@/components/age-acknowledgment';
+import { ProposalSummary } from '@/components/proposal-summary';
 import { useAuth } from '@workspace/replit-auth-web';
 
 const clean = (value: string) => value.trim() || null;
@@ -202,7 +204,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
              {!canCheckout && <p role="status" className="mb-3 text-xs text-[#4d5557]">{paymentNotice}</p>}
              {unsavedDetails && <p role="alert" className="mb-3 text-sm text-[#943c55]">You have unsaved pitch details. Close this window and save them before checkout so they are included in your review.</p>}
              {checkoutError && <p role="alert" className="mb-3 text-sm text-[#943c55]">{checkoutError}</p>}
-             <div className="flex flex-wrap gap-3">
+             <AgeGateForCurrentUser role="filmmaker"><div className="flex flex-wrap gap-3">
              <button type="button" className="dossier-button" disabled={!canCheckout || checkout.isPending || needsReselect || unsavedDetails} data-testid="button-pay-review" onClick={() => void (async () => {
               setCheckoutError('');
               try {
@@ -234,7 +236,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
               })()}>{checkout.isPending ? 'Opening checkout…' : 'Continue to checkout'}</button>
             {offerSource !== 'paid' && <button type="button" className="dossier-button dossier-button-outline" disabled={checkout.isPending} onClick={closePaywall}>Not now</button>}
             {needsReselect && <Link href="/me/projects" className="underline">Open My projects</Link>}
-             </div>
+             </div></AgeGateForCurrentUser>
           </div>
         </div>
       </div>}
@@ -360,7 +362,16 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
   const stage = (['distribution', 'production', 'idea'].includes(stageValue || '') ? stageValue : null) as Stage | null;
   const legacyStage = stageValue && !stage ? stageValue : null;
   const legacyStageDetail = (data as FilmmakerResult & { stage_other?: string | null }).stage_other;
-  const deal = stage && data.budget && data.offer_per100 && data.price_group ? calculateDeal(data.budget, stage, data.price_group, data.offer_per100) : null;
+  const snapshot = data.proposal ?? null;
+  const repayment = snapshot?.repayment_per100 ?? data.offer_per100 ?? null;
+  const snapshotFee = snapshot?.platform_fee_percent;
+  const deal = stage && data.budget && repayment && (snapshot ? snapshotFee !== undefined : data.price_group) ? (() => {
+    // Snapshot fee when present; otherwise the historical group/stage fee. Never re-priced.
+    const base = legacyDeal(data.budget, stage, (data.price_group ?? 'A') as 'A' | 'B', repayment);
+    if (!snapshot) return base;
+    const platformFee = Math.round(data.budget * snapshotFee!) / 100;
+    return { ...base, feeRate: snapshotFee!, platformFee, combinedPayback: Math.round((base.investorTarget + platformFee) * 100) / 100 };
+  })() : null;
     const reviewEligible = Boolean(!editMaterials && data.project_slug && !activeShowcaseStatus?.hidden && !activeShowcaseStatus?.showcase_requested && !reviewStatus.data?.paid && !reviewStatus.data?.pending);
    return <section className="dossier"><div className="page-wrap">
      <div className="dossier-head"><Link href="/" className="dossier-kicker" data-testid="link-result-home">Movie Show Investing / Filmmakers</Link><span className="dossier-kicker">Final submission received</span></div>
@@ -372,13 +383,13 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
          {checkoutReturn === 'return' && <p role="status" className="dossier-notice">{reviewStatus.isError ? 'We could not verify the payment yet. Please retry status later and do not pay again.' : reviewStatus.data?.paid ? 'Payment verified. Your pitch is pending editorial review, not approved for public listing.' : 'We are verifying your payment. Your pitch stays unlisted until verification completes; do not pay again while it is pending.'}</p>}
         <section className="dossier-section"><span className="dossier-kicker">01 / Project on file</span><h2 data-testid="text-result-title">{data.title || 'Untitled project'}</h2><p>{[data.format, data.genre === 'Other' ? data.genre_other || data.genre : data.genre, legacyStage ? `${legacyStage === 'other' ? 'Other stage (legacy)' : `Legacy stage: ${legacyStage}`}${legacyStageDetail ? ` — ${legacyStageDetail}` : ''}` : stage].filter(Boolean).join(' · ')}</p>{data.logline && <p data-testid="text-result-logline" style={{ fontSize: 18, color: '#202936' }}>{data.logline}</p>}</section>
           {data.project_slug && !activeShowcaseStatus?.hidden && <ShowcaseForm key={data.project_slug} result={{ ...data, approved: activeShowcaseStatus?.approved ?? data.approved, showcase_requested: activeShowcaseStatus?.showcase_requested ?? data.showcase_requested, hidden: activeShowcaseStatus?.hidden ?? data.hidden }} onSaved={refreshShowcaseStatus} reviewStatus={reviewStatus.data} reviewStatusState={reviewStatus.isSuccess ? 'verified' : reviewStatus.isError ? 'unavailable' : 'checking'} checkoutEnabled={checkoutEnabled} checkoutUnavailableText={checkoutUnavailableText} autoOpenReady={(reviewStatus.isSuccess || reviewStatus.isError) && checkoutReturn === null} reviewTriggerRef={reviewTriggerRef} />}
-        {deal && data.budget && data.offer_per100 && <section className="dossier-section"><span className="dossier-kicker">02 / Your selected offer</span><h2>The illustrative deal.</h2><div className="fm-receipt" data-testid="receipt-result-deal"><h3>At a glance</h3><dl>
+        {deal && data.budget && repayment && <section className="dossier-section"><span className="dossier-kicker">02 / Your selected offer</span><h2>The illustrative deal.</h2><div className="fm-receipt" data-testid="receipt-result-deal"><h3>At a glance</h3><dl>
            <div><dt>{data.budget_from_example ? 'Illustrative example budget' : 'Your estimated project budget'}</dt><dd data-testid="text-result-budget">{money(data.budget)}</dd></div>
-          <div><dt>Investor payback target · {money(data.offer_per100)} per $100 of budget</dt><dd data-testid="text-result-investor-target">{money(deal.investorTarget)}</dd></div>
+          <div><dt>Investor payback target · {money(repayment!)} per $100 of budget</dt><dd data-testid="text-result-investor-target">{money(deal.investorTarget)}</dd></div>
           <div><dt>Platform fee · {money(deal.feeRate)} per $100 of budget</dt><dd data-testid="text-result-platform-fee">{money(deal.platformFee)}</dd></div>
           <div className="fm-total"><dt>Combined payback threshold</dt><dd data-testid="text-result-combined-payback">{money(deal.combinedPayback)}</dd></div>
-          <div><dt>After both targets are satisfied</dt><dd>{stage === 'idea' ? 'you keep it all' : `You keep ${money(deal.filmmakerAfter)} of every $100`}</dd></div>
-        </dl><p className="fm-small" style={{ marginTop: 18 }}>Illustrative terms for conversation only. The investor target and platform fee are separate amounts. This is not a return forecast or an offer to invest.</p></div><p className="dossier-notice">All available receipts after processing fees go into a pool allocated proportionally between the outstanding investor payback target and separate platform fee. Neither has payment priority. These are examples, not forecasts or guarantees. Actual receipts may differ, and the payback threshold may never be reached.</p></section>}
+          {!snapshot && <div><dt>After both targets are satisfied</dt><dd>Backend terms unspecified in this earlier submission</dd></div>}
+        </dl>{snapshot && <ProposalSummary proposal={snapshot} budget={data.budget} stage={stage} testId="result-proposal" />}<p className="fm-small" style={{ marginTop: 18 }}>Illustrative terms for conversation only. The investor target and platform fee are separate amounts. This is not a return forecast or an offer to invest.</p></div><p className="dossier-notice">All available receipts after processing fees go into a pool allocated proportionally between the outstanding investor payback target and separate platform fee. Neither has payment priority. These are examples, not forecasts or guarantees. Actual receipts may differ, and the payback threshold may never be reached.</p></section>}
         {data.project_slug && !activeShowcaseStatus?.hidden && <ProjectShare slug={data.project_slug} title={data.title || 'Untitled project'} genre={data.genre} logline={data.logline} approved={activeShowcaseStatus?.approved ?? false} showcaseRequested={activeShowcaseStatus?.showcase_requested ?? false} />}
         {data.project_slug && <div className="dossier-section" data-testid="section-manage-pitch-materials"><span className="dossier-kicker">Your project / saved materials</span><h2>Update your pitch materials.</h2><p>Synopsis, trailer, poster, share image, and pitch deck are managed separately from your project details.</p><Link href="/start/filmmaker/done?edit=materials" className="dossier-button dossier-button-outline" data-testid="link-manage-pitch-materials">Manage pitch materials <ArrowRight size={16}/></Link></div>}
       </div>

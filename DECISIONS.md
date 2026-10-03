@@ -15,6 +15,23 @@ These product rules are locked for the MVP. Change them only when the owner expl
 
 ## Slates and offers
 
+### New structured onboarding proposals
+
+The owner approved these terms for new proposals. They supersede the historical table below for new submissions only; existing submissions and signed investor records retain their original terms.
+
+| Stage | Total investor repayment per $100, including capital | Platform spread per $100 of original investment | Backend split |
+|---|---:|---:|---|
+| Distribution | $125 | $15 | 50% investor / 50% filmmaker |
+| Production | $150 | $10 | 50% investor / 50% filmmaker |
+| Idea | $175 | $5 | 50% investor / 50% filmmaker |
+
+- The platform spread is separate from the investor target and does not reduce it. It is not a recurring percentage of revenue. Retain the existing proportional platform-fee allocation priority; the owner approved new spread amounts, not a different platform-fee collection priority.
+- Standard terms have no early filmmaker revenue payments. Under negotiation, a filmmaker may propose an early percentage (10% is an editable example), custom repayment, backend split, and duration. The investor target remains unchanged; early payments may delay reaching it.
+- Backend begins after the full investor repayment target, not merely principal. Standard duration is five years. Backend percentages apply to project revenue remaining after payment-processing and distribution fees, not gross revenue; identify each fee separately and never deduct the same fee twice.
+- Structured proposals preserve the original suggestion and submitted terms separately. Historic projects without structured backend terms remain unspecified, not retrospectively 50/50.
+
+### Historical offers (do not apply to new structured proposals)
+
 | Slate | Project stage | Default investor offer per $100 | Platform fee per $100 | Filmmaker share after payback |
 |---|---|---:|---:|---:|
 | Distribution | Looking for distribution or already distributed | $125 | $25 (Group B test: $15) | $67 of each $100 |
@@ -30,6 +47,7 @@ These product rules are locked for the MVP. Change them only when the owner expl
 
 ## Phase 1 allocation rule
 
+- The historical after-payback shares below apply only to older submissions. New structured proposals use the approved backend terms above.
 - The amount due in Phase 1 is the investor payback target plus the platform fee.
 - After payment-processing fees, all available project receipts go into a Phase 1 pool. Allocate the pool proportionally between the outstanding investor target and platform fee until both are satisfied.
 - Show the investor target, platform fee, and combined Phase 1 amount as separate figures to filmmakers.
@@ -39,6 +57,8 @@ These product rules are locked for the MVP. Change them only when the owner expl
 
 ## Investor language and notices
 
+- Both filmmaker and investor onboarding require a dated, account-owned, self-declared 18+ acknowledgment; server enforcement also applies to submissions, signatures, and paid review checkout. Public browsing remains ungated.
+- Below the age checkbox, explain future date-of-birth and government photo-ID verification through KYC before investing (investor flow) or receiving funding (filmmaker flow). No birth dates or IDs are collected now; onboarding guarantees neither an offering nor eligibility. Use the owner's exact role-specific text.
 - Use “Payback goal: $X for every $100” for project offers and “Payback goal: $X back on your $Y” for a specific pledge.
 - Do not describe a payback goal as a return, earnings, an expectation, or a realistic outcome. Never imply that a payback is guaranteed.
 - Required risk disclosure: **“Returns aren’t guaranteed. You may get back less, or nothing.”** This exact disclosure is permitted wherever the prohibition above would otherwise rule out the word “returns.”

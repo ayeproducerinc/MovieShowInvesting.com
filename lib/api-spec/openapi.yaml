@@ -33,6 +33,31 @@ tags:
   - name: auth
     description: Browser sign-in and session status
 paths:
+  /participation/age-confirmation:
+    get:
+      operationId: getAgeConfirmation
+      responses:
+        "200":
+          description: Current account's self-declared age acknowledgment; guests have no account acknowledgment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgeConfirmation"
+    post:
+      operationId: confirmAge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgeConfirmationInput"
+      responses:
+        "200":
+          description: Dated acknowledgment saved to the verified account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgeConfirmation"
   /auth/user:
     get:
       operationId: getCurrentAuthUser
@@ -2231,6 +2256,9 @@ components:
       additionalProperties: false
       required: [no_project_yet, name, email, city, favorite_genres, chat_opt_in]
       properties:
+        age_confirmed: { type: boolean, enum: [true] }
+        proposal:
+          $ref: "#/components/schemas/FilmmakerProposalInput"
         website: { type: string, description: "Leave blank. Bot-detection field; never stored with the submission." }
         no_project_yet: { type: boolean }
         stage: { type: string, enum: [distribution, production, idea] }
@@ -2241,7 +2269,7 @@ components:
         logline: { type: string }
         trailer_url: { type: string }
         pilot_url: { type: string }
-        budget: { type: integer, minimum: 1 }
+        budget: { type: integer, minimum: 1, maximum: 2147483647 }
         budget_from_example: { type: boolean }
         deal_answer: { type: string, enum: [yes, maybe, no] }
         offer_per100: { type: integer, minimum: 125 }
@@ -2300,6 +2328,10 @@ components:
       additionalProperties: false
       required: [completed, no_project_yet, project_id, project_slug, checkout_proof, stage, stage_other, title, format, genre, genre_other, logline, offer_per100, offer_other_text, wants_lower, budget, budget_from_example, price_group, deal_answer, payback_terms, payback_terms_other, showcase_requested, approved, hidden, synopsis, team_links, money_use, distribution_plan, trailer_url, poster_url, share_image_url]
       properties:
+        proposal:
+          anyOf:
+            - $ref: "#/components/schemas/FilmmakerProposal"
+            - type: "null"
         completed: { type: boolean, enum: [true] }
         no_project_yet: { type: boolean }
         project_id: { type: ["integer", "null"], minimum: 1 }
@@ -2514,6 +2546,11 @@ components:
       additionalProperties: false
       required: [id, slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, pitch_deck_url, pitch_deck_name, confirmed_pledge_total, approved, showcase_requested, phone_verified, is_owner]
       properties:
+        budget: { type: ["integer", "null"] }
+        proposal:
+          anyOf:
+            - $ref: "#/components/schemas/FilmmakerProposal"
+            - type: "null"
         id: { type: integer, minimum: 1 }
         slug: { type: string }
         title: { type: string }
@@ -2542,6 +2579,11 @@ components:
       additionalProperties: false
       required: [id, slug, title, logline, format, genre, stage, poster_url, offer_per_100, confirmed_pledge_total, is_owner, pitch_deck_url, pitch_deck_name]
       properties:
+        budget: { type: ["integer", "null"] }
+        proposal:
+          anyOf:
+            - $ref: "#/components/schemas/FilmmakerProposal"
+            - type: "null"
         id: { type: integer, minimum: 1 }
         slug: { type: string }
         title: { type: string }
@@ -2564,6 +2606,41 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ExploreProject"
+    AgeConfirmationInput:
+      type: object
+      additionalProperties: false
+      required: [age_confirmed]
+      properties:
+        age_confirmed: { type: boolean, enum: [true] }
+    AgeConfirmation:
+      type: object
+      required: [age_confirmed, confirmed_at]
+      properties:
+        age_confirmed: { type: boolean }
+        confirmed_at: { type: ["string", "null"], format: date-time }
+    FilmmakerProposalInput:
+      type: object
+      additionalProperties: false
+      required: [decision, repayment_per100, investor_backend_percent, backend_years, early_filmmaker_percent]
+      properties:
+        decision: { type: string, enum: [standard, negotiation] }
+        repayment_per100: { type: integer, minimum: 125, maximum: 10000 }
+        investor_backend_percent: { type: integer, minimum: 0, maximum: 100 }
+        backend_years: { type: integer, minimum: 1, maximum: 100 }
+        early_filmmaker_percent: { type: integer, minimum: 0, maximum: 99 }
+        note: { type: string, maxLength: 2000 }
+    FilmmakerProposal:
+      allOf:
+        - $ref: "#/components/schemas/FilmmakerProposalInput"
+        - type: object
+          required: [original_repayment_per100, platform_fee_percent, fee_priority, backend_revenue_basis, backend_clock, version]
+          properties:
+            original_repayment_per100: { type: integer }
+            platform_fee_percent: { type: integer }
+            fee_priority: { type: string, enum: [existing_proportional] }
+            backend_revenue_basis: { type: string, enum: [after_processing_and_distribution_fees] }
+            backend_clock: { type: string, enum: [after_investor_target] }
+            version: { type: integer, enum: [1] }
     InvestorMinima:
       type: object
       additionalProperties: false
@@ -2925,6 +3002,10 @@ components:
           additionalProperties: false
           required: [id, title, format, genre, stage, stage_other, logline, budget, budget_from_example, deal_answer, offer_per100, offer_other_text, wants_lower, payback_terms, payback_terms_other, funding_sources, funding_other, reached_goal, funding_experience]
           properties:
+            proposal:
+              anyOf:
+                - $ref: "#/components/schemas/FilmmakerProposal"
+                - type: "null"
             id: { type: integer, minimum: 1 }
             title: { type: ["string", "null"] }
             format: { type: ["string", "null"] }

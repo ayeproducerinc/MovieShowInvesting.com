@@ -5,8 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { FilmmakerProposal } from './filmmakerProposal';
 
 export interface PublicProject {
+  /** @nullable */
+  budget?: number | null;
+  proposal?: FilmmakerProposal | null;
   /** @minimum 1 */
   id: number;
   slug: string;

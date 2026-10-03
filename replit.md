@@ -27,7 +27,7 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 ## Architecture decisions
 
 - Follow `DECISIONS.md` for locked product rules and `PLAN.md` for phase boundaries and open choices. The existing Express/PostgreSQL stack replaces the guides' Flask examples; preserve their intended behavior without adding a second backend.
-- The current Phase 1 allocation uses net project receipts proportionally for investor payback and the platform fee; do not reuse guide copy saying all receipts go to investors. Do not assume a post-payback residual allocation.
+- The Phase 1 allocation uses net project receipts proportionally for investor payback and the platform fee; do not reuse guide copy saying all receipts go to investors. New structured proposals use the owner-approved 15/10/5 stage spreads and 50/50 backend after processing/distribution fees; preserve historical terms and unspecified legacy backend values.
 - A “private” project is unlisted but visible to anyone with its link. Do not describe it as access-controlled.
 
 ## Product

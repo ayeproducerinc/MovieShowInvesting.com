@@ -9,6 +9,7 @@ import {
 } from "../lib/filmmaker-auth";
 import { reconcileReviewCheckouts, reviewCheckoutConfig, startReviewCheckout } from "../lib/pitch-review-payments";
 import { verifyPitchReviewProof } from "../lib/pitch-review-proof";
+import { requireAccountAgeConfirmation } from "../lib/age-confirmation";
 
 const router: IRouter = Router();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -98,6 +99,7 @@ router.post("/filmmakers/review-checkout", async (req, res): Promise<void> => {
   res.set("Cache-Control", "no-store");
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
+  if (!await requireAccountAgeConfirmation(identity, res)) return;
   if (!(await reviewCheckoutConfig()).enabled) {
     res.status(503).json({ error: "We couldn't connect to review checkout. Your pitch is saved. Please try again later." });
     return;

@@ -5,8 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { FilmmakerProposal } from './filmmakerProposal';
 
 export type AdminProjectReviewDetailProject = {
+  proposal?: FilmmakerProposal | null;
   /** @minimum 1 */
   id: number;
   /** @nullable */

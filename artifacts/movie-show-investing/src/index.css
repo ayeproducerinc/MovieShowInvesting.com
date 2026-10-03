@@ -433,3 +433,24 @@ textarea.fm-input { min-height:116px; resize:vertical; }
 .dossier-video iframe { display:block; width:100%; height:100%; border:0; }
 @media(max-width:650px) { .dossier-media-grid { grid-template-columns:1fr; } .dossier-media-tile:first-child { grid-column:auto; } }
 @media(prefers-reduced-motion:reduce) { .dossier-file-label, .dossier-upload-progress div { transition:none; } }
+/* Age acknowledgment & proposal summaries (shared by both onboarding flows) */
+.age-ack { border:1px solid #c9c0b2; background:#f8f4ec; padding:20px; margin:26px 0; color:#202936; }
+.age-ack-intro { font-size:14px; line-height:1.6; margin:0 0 6px; font-weight:600; }
+.age-ack-check { display:flex; gap:13px; align-items:flex-start; padding:12px 0; font-size:15px; font-weight:700; cursor:pointer; }
+.age-ack-check input { width:22px; height:22px; flex:none; margin:0; accent-color:#853c4d; }
+.age-ack-heading { font:700 10px/1.5 var(--app-font-mono); letter-spacing:.15em; text-transform:uppercase; color:#853c4d; margin:14px 0 8px; border-top:1px solid #d1c7b9; padding-top:14px; }
+.age-ack-small { font-size:12px; line-height:1.65; color:#555b5d; margin:0 0 8px; }
+.age-ack-error { color:#833348; background:#f2e0dc; border-left:3px solid #833348; padding:10px 14px; font-size:13px; }
+.age-ack-button { min-height:48px; padding:10px 20px; background:#853c4d; color:#faf5ec; border:1px solid #853c4d; font-weight:700; font-size:13px; margin:4px 0 10px; }
+.age-ack-button:disabled { opacity:.5; }
+.prop-summary { border:1px solid #c0b4a3; background:#ece5d9; padding:18px; margin:16px 0; color:#202936; }
+.prop-summary dl { margin:10px 0 0; }
+.prop-summary dl div { display:flex; justify-content:space-between; gap:16px; border-top:1px solid #c5b9a8; padding:10px 0; font-size:13px; }
+.prop-summary dt { color:#4e5557; }
+.prop-summary dd { margin:0; text-align:right; max-width:60%; font-family:var(--app-font-mono); font-size:12px; }
+.prop-kicker { font:700 10px/1.5 var(--app-font-mono); letter-spacing:.14em; text-transform:uppercase; color:#853c4d; margin:0; }
+.prop-small { font-size:12px; line-height:1.65; color:#5d6163; margin:8px 0 0; }
+@media (max-width:600px) { .prop-summary dl div { flex-direction:column; gap:3px; } .prop-summary dd { text-align:left; max-width:100%; } }
+.fm-calc { display:grid; gap:14px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.fm-calc .fm-field { margin-bottom:6px; }
+@media (max-width:600px) { .fm-calc { grid-template-columns:1fr; } }

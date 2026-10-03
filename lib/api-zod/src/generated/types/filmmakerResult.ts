@@ -5,10 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { FilmmakerProposal } from './filmmakerProposal';
 import type { FilmmakerResultPriceGroup } from './filmmakerResultPriceGroup';
 import type { FilmmakerResultStage } from './filmmakerResultStage';
 
 export interface FilmmakerResult {
+  proposal?: FilmmakerProposal | null;
   completed: true;
   no_project_yet: boolean;
   /**

@@ -475,6 +475,7 @@ router.get("/admin/projects/:projectId/review", async (req, res): Promise<void> 
   ]);
   const response = {
     project: {
+      proposal: project.proposal ?? null,
       id: project.id,
       title: projectAnswers.title,
       format: projectAnswers.format,

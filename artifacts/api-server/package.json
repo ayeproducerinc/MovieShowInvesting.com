@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
-    "start": "pnpm --filter @workspace/db run migrate:filmmaker-activity && node --enable-source-maps ./dist/index.mjs",
+    "start": "pnpm --filter @workspace/db run migrate:filmmaker-activity && pnpm --filter @workspace/db run migrate:onboarding && node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

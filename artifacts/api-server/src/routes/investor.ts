@@ -13,6 +13,7 @@ import {
 } from "@workspace/api-zod";
 import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 import { deliverInterestAlertEmail } from "../lib/interest-alert-email";
+import { requireAccountAgeConfirmation } from "../lib/age-confirmation";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -24,6 +25,8 @@ const SLATES = ["distribution", "production", "idea"] as const;
 type Slate = typeof SLATES[number];
 type Minimums = Record<Slate, number | null>;
 type ProjectRow = {
+  budget: number | null;
+  proposal: import("@workspace/db").Proposal | null;
   id: number;
   slug: string | null;
   title: string | null;
@@ -82,7 +85,7 @@ async function getDiscoverableProjects(
 ): Promise<ProjectRow[]> {
   const { rows } = await pool.query<ProjectRow>(`
     select p.id, p.slug, p.title, p.logline, p.format, p.genre, p.stage,
-      p.poster_url, p.offer_per100 as offer_per_100,
+      p.poster_url, p.offer_per100 as offer_per_100, p.budget, p.proposal,
       coalesce((
         ($1::text = 'firebase' and f.firebase_uid = $2)
         or ($1::text = 'replit' and f.replit_uid = $2)
@@ -110,6 +113,8 @@ function projectCard(project: ProjectRow) {
     stage: project.stage,
     poster_url: safeImageUrl(project.poster_url),
     offer_per_100: project.offer_per_100,
+    budget: project.budget,
+    proposal: project.proposal,
     confirmed_pledge_total: Number(project.confirmed_pledge_total),
     is_owner: project.is_owner,
   };
@@ -165,6 +170,7 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
   const identity = await resolveProtectedIdentity(req, res, true);
   if (!identity) return;
   const data = parsed.data;
+  if (!await requireAccountAgeConfirmation(identity, res)) return;
   const email = data.email.trim().toLowerCase();
   const actualOwner = identity ? `${identity.provider}:${identity.uid}` : "visitor";
   if (data.expected_investor_owner !== actualOwner) {
@@ -670,6 +676,7 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
   res.set("Cache-Control", "private, no-store");
   const identity = await resolveProtectedIdentity(req, res, true);
   if (!identity) return;
+  if (!await requireAccountAgeConfirmation(identity, res)) return;
   const parsed = ConfirmInvestorIntentBody.safeParse(req.body);
   if (!parsed.success || parsed.data.accepted !== true) {
     res.status(400).json({ error: "A valid signature and explicit acknowledgment are required." });

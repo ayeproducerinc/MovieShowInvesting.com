@@ -29,6 +29,7 @@ export const db = drizzle(pool, { schema });
 export * from "./schema";
 export * from "./filmmaker-materials";
 export * from "./filmmaker-activity";
+export * from "./proposal";
 
 export async function ensureVisitor(visitorId: string): Promise<void> {
   await db.insert(visitorsTable).values({ visitorId }).onConflictDoNothing();
@@ -197,6 +198,7 @@ export async function saveVisitorFlowProgress(input: {
 }
 
 export type FilmmakerSubmissionData = {
+  proposal?: import("./proposal").Proposal;
   no_project_yet: boolean;
   stage?: "distribution" | "production" | "idea";
   title?: string;
@@ -445,6 +447,7 @@ export async function createFilmmakerSubmission(input: {
         priceGroup: visitor.priceGroup,
         dealAnswer: input.data.deal_answer,
         offerPer100: input.data.wants_lower ? 125 : input.data.offer_per100,
+        proposal: input.data.proposal ?? null,
         offerOtherText: input.data.offer_other_text,
         wantsLower: input.data.wants_lower,
         paybackTerms: input.data.payback_terms,
@@ -1174,6 +1177,8 @@ export async function removeOwnedFilmmakerImage(input: {
 
 export async function getPublicProjectBySlug(slug: string) {
   const [project] = await db.select({
+    budget: projectsTable.budget,
+    proposal: projectsTable.proposal,
     id: projectsTable.id,
     slug: projectsTable.slug,
     title: projectsTable.title,
@@ -1229,6 +1234,8 @@ export async function getPublicProjectBySlug(slug: string) {
     id: project.id,
     slug: project.slug,
     title: project.title,
+    budget: project.budget,
+    proposal: project.proposal,
     format: project.format,
     genre: project.genre,
     stage: project.stage,

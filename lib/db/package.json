@@ -9,6 +9,7 @@
   },
   "scripts": {
     "migrate:filmmaker-activity": "node migrate-filmmaker-activity.mjs",
+    "migrate:onboarding": "node migrate-onboarding.mjs",
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
   },

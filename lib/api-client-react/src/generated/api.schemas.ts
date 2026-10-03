@@ -243,7 +243,43 @@ export const FilmmakerSubmissionInputPaybackTerms = {
   other: 'other',
 } as const;
 
+export type FilmmakerProposalInputDecision = typeof FilmmakerProposalInputDecision[keyof typeof FilmmakerProposalInputDecision];
+
+
+export const FilmmakerProposalInputDecision = {
+  standard: 'standard',
+  negotiation: 'negotiation',
+} as const;
+
+export interface FilmmakerProposalInput {
+  decision: FilmmakerProposalInputDecision;
+  /**
+     * @minimum 125
+     * @maximum 10000
+     */
+  repayment_per100: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  investor_backend_percent: number;
+  /**
+     * @minimum 1
+     * @maximum 100
+     */
+  backend_years: number;
+  /**
+     * @minimum 0
+     * @maximum 99
+     */
+  early_filmmaker_percent: number;
+  /** @maxLength 2000 */
+  note?: string;
+}
+
 export interface FilmmakerSubmissionInput {
+  age_confirmed?: true;
+  proposal?: FilmmakerProposalInput;
   /** Leave blank. Bot-detection field; never stored with the submission. */
   website?: string;
   no_project_yet: boolean;
@@ -255,7 +291,10 @@ export interface FilmmakerSubmissionInput {
   logline?: string;
   trailer_url?: string;
   pilot_url?: string;
-  /** @minimum 1 */
+  /**
+     * @minimum 1
+     * @maximum 2147483647
+     */
   budget?: number;
   budget_from_example?: boolean;
   deal_answer?: FilmmakerSubmissionInputDealAnswer;
@@ -338,7 +377,45 @@ export const FilmmakerResultPriceGroup = {
   B: 'B',
 } as const;
 
+export type FilmmakerProposalFeePriority = typeof FilmmakerProposalFeePriority[keyof typeof FilmmakerProposalFeePriority];
+
+
+export const FilmmakerProposalFeePriority = {
+  existing_proportional: 'existing_proportional',
+} as const;
+
+export type FilmmakerProposalBackendRevenueBasis = typeof FilmmakerProposalBackendRevenueBasis[keyof typeof FilmmakerProposalBackendRevenueBasis];
+
+
+export const FilmmakerProposalBackendRevenueBasis = {
+  after_processing_and_distribution_fees: 'after_processing_and_distribution_fees',
+} as const;
+
+export type FilmmakerProposalBackendClock = typeof FilmmakerProposalBackendClock[keyof typeof FilmmakerProposalBackendClock];
+
+
+export const FilmmakerProposalBackendClock = {
+  after_investor_target: 'after_investor_target',
+} as const;
+
+export type FilmmakerProposalVersion = typeof FilmmakerProposalVersion[keyof typeof FilmmakerProposalVersion];
+
+
+export const FilmmakerProposalVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type FilmmakerProposal = FilmmakerProposalInput & {
+  original_repayment_per100: number;
+  platform_fee_percent: number;
+  fee_priority: FilmmakerProposalFeePriority;
+  backend_revenue_basis: FilmmakerProposalBackendRevenueBasis;
+  backend_clock: FilmmakerProposalBackendClock;
+  version: FilmmakerProposalVersion;
+};
+
 export interface FilmmakerResult {
+  proposal?: FilmmakerProposal | null;
   completed: true;
   no_project_yet: boolean;
   /**
@@ -628,6 +705,9 @@ export interface FilmmakerImageUpload {
 }
 
 export interface PublicProject {
+  /** @nullable */
+  budget?: number | null;
+  proposal?: FilmmakerProposal | null;
   /** @minimum 1 */
   id: number;
   slug: string;
@@ -670,6 +750,9 @@ export interface PublicProject {
 }
 
 export interface ExploreProject {
+  /** @nullable */
+  budget?: number | null;
+  proposal?: FilmmakerProposal | null;
   /** @minimum 1 */
   id: number;
   slug: string;
@@ -701,6 +784,16 @@ export interface ExploreProject {
 
 export interface ExploreProjects {
   projects: ExploreProject[];
+}
+
+export interface AgeConfirmationInput {
+  age_confirmed: true;
+}
+
+export interface AgeConfirmation {
+  age_confirmed: boolean;
+  /** @nullable */
+  confirmed_at: string | null;
 }
 
 export interface InvestorMinima {
@@ -1087,6 +1180,7 @@ export interface AdminProjectReview {
 }
 
 export type AdminProjectReviewDetailProject = {
+  proposal?: FilmmakerProposal | null;
   /** @minimum 1 */
   id: number;
   /** @nullable */

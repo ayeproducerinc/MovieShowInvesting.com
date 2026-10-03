@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@workspace/replit-auth-web';
 import { getGetCurrentInvestorIntentQueryKey, getGetExploreQueryKey, getGetPublicProjectQueryKey, useConfirmInvestorIntent, useGetCurrentInvestorIntent } from '@workspace/api-client-react';
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
+import { AgeGate } from '@/components/age-acknowledgment';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { trackInvestorEvent } from '@/lib/analytics';
 import '../investor.css';
@@ -122,14 +123,14 @@ export default function LineupConfirm() {
       <aside className="lineup-review-aside">
         <p className="inv-kicker">03 / Your acknowledgment</p><h2>Sign the saved record.</h2>
          <p>The full name saved with this interest is <strong data-testid="confirm-saved-name">{intent.name}</strong>. Type that saved name exactly as your signature for this snapshot; this is not a request to repeat your contact details.</p>
-        <form className="lineup-confirm-form" onSubmit={event => void submit(event)}>
+        <AgeGate role="investor"><form className="lineup-confirm-form" onSubmit={event => void submit(event)}>
            <label htmlFor="signature-name">Signature · type your saved full name</label>
           <input id="signature-name" data-testid="input-confirm-signature" type="text" autoComplete="name" value={signature} onChange={event => { setSignature(event.target.value); setError(''); }} aria-invalid={Boolean(signature && signature !== intent.name)} required disabled={confirm.isPending || current.isFetching}/>
            <p className="lineup-hint">This signature must match the saved name exactly, including spacing and capitalization.</p>
            <label className="lineup-check" htmlFor="confirm-acknowledgment"><input id="confirm-acknowledgment" data-testid="checkbox-confirm-acknowledgment" type="checkbox" checked={accepted} onChange={event => { setAccepted(event.target.checked); setError(''); }} disabled={confirm.isPending || current.isFetching}/><span>I understand this signs only the exact saved snapshot of my non-binding interest. No investment is being made and no money is collected.</span></label>
           {error && <p className="lineup-review-error" role="alert" data-testid="error-confirm">{error}</p>}
            <button type="submit" className="inv-button" data-testid="button-confirm-interest" disabled={signature !== intent.name || !accepted || confirm.isPending || current.isFetching}>{confirm.isPending || current.isFetching ? 'Verifying saved record…' : 'Sign and confirm interest'} <ArrowRight size={16}/></button>
-        </form>
+        </form></AgeGate>
       </aside>
     </div>}
   </div></section>;

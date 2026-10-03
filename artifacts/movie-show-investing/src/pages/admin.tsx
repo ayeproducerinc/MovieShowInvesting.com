@@ -11,6 +11,7 @@ import {
   type AdminSection, type AdminTable,
 } from '@workspace/api-client-react';
 import { ArrowDownToLine, ArrowRight, ArrowUpRight, Clapperboard, Eye, FileText, LockKeyhole, LogOut, ShieldAlert, X } from 'lucide-react';
+import { ProposalSummary } from '@/components/proposal-summary';
 import { AdminConversations } from '@/components/admin-conversations';
 import { useAuth } from '@workspace/replit-auth-web';
 import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-web';
@@ -195,6 +196,7 @@ type AdminPitchReviewResponse = {
     budget_from_example?: boolean | null;
     deal_answer?: string | null;
     offer_per100?: number | null;
+    proposal?: Parameters<typeof ProposalSummary>[0]['proposal'];
     offer_other_text?: string | null;
     wants_lower?: boolean | null;
     payback_terms?: string | null;
@@ -347,6 +349,8 @@ function AdminPitchReview({ projectId }: { projectId: number }) {
                 return <div key={label} className="border-b border-[#c8c0b5] py-3"><dt className="admin-mono text-xs uppercase tracking-wider">{label}</dt><dd className="mt-2 whitespace-pre-wrap break-words">{display}</dd></div>;
               })}
             </dl>
+            <h3 className="admin-overline admin-mono mt-6">Saved proposal</h3>
+            <ProposalSummary proposal={project?.proposal} legacyRepayment={project?.offer_per100} budget={project?.budget} stage={project?.stage} testId="admin-proposal"/>
           </section>
           <section className="mt-8">
             <h3 className="admin-overline admin-mono">Filmmaker contact details</h3>

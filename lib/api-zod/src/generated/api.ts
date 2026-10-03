@@ -8,6 +8,22 @@
 import * as zod from 'zod';
 
 
+export const GetAgeConfirmationResponse = zod.object({
+  "age_confirmed": zod.boolean(),
+  "confirmed_at": zod.coerce.date().nullable()
+})
+
+
+export const ConfirmAgeBody = zod.object({
+  "age_confirmed": zod.literal(true)
+})
+
+export const ConfirmAgeResponse = zod.object({
+  "age_confirmed": zod.boolean(),
+  "confirmed_at": zod.coerce.date().nullable()
+})
+
+
 /**
  * @summary Get the current browser session user
  */
@@ -342,6 +358,20 @@ export const SubmitFilmmakerHeader = zod.object({
   "X-MSI-Draft-Id": zod.number().int().min(1).optional().describe('Required for account-linked visitors; must match the current filmmaker flow_progress.id.')
 })
 
+export const submitFilmmakerBodyProposalRepaymentPer100Min = 125;
+export const submitFilmmakerBodyProposalRepaymentPer100Max = 10000;
+
+export const submitFilmmakerBodyProposalInvestorBackendPercentMin = 0;
+export const submitFilmmakerBodyProposalInvestorBackendPercentMax = 100;
+
+export const submitFilmmakerBodyProposalBackendYearsMax = 100;
+
+export const submitFilmmakerBodyProposalEarlyFilmmakerPercentMin = 0;
+export const submitFilmmakerBodyProposalEarlyFilmmakerPercentMax = 99;
+
+export const submitFilmmakerBodyProposalNoteMax = 2000;
+
+export const submitFilmmakerBodyBudgetMax = 2147483647;
 
 export const submitFilmmakerBodyOfferPer100Min = 125;
 
@@ -352,6 +382,15 @@ export const submitFilmmakerBodyCountryRegExp = new RegExp('^[A-Z]{2}$');
 
 
 export const SubmitFilmmakerBody = zod.object({
+  "age_confirmed": zod.literal(true).optional(),
+  "proposal": zod.object({
+  "decision": zod.enum(['standard', 'negotiation']),
+  "repayment_per100": zod.number().int().min(submitFilmmakerBodyProposalRepaymentPer100Min).max(submitFilmmakerBodyProposalRepaymentPer100Max),
+  "investor_backend_percent": zod.number().int().min(submitFilmmakerBodyProposalInvestorBackendPercentMin).max(submitFilmmakerBodyProposalInvestorBackendPercentMax),
+  "backend_years": zod.number().int().min(1).max(submitFilmmakerBodyProposalBackendYearsMax),
+  "early_filmmaker_percent": zod.number().int().min(submitFilmmakerBodyProposalEarlyFilmmakerPercentMin).max(submitFilmmakerBodyProposalEarlyFilmmakerPercentMax),
+  "note": zod.string().max(submitFilmmakerBodyProposalNoteMax).optional()
+}).optional(),
   "website": zod.string().optional().describe('Leave blank. Bot-detection field; never stored with the submission.'),
   "no_project_yet": zod.boolean(),
   "stage": zod.enum(['distribution', 'production', 'idea']).optional(),
@@ -362,7 +401,7 @@ export const SubmitFilmmakerBody = zod.object({
   "logline": zod.string().optional(),
   "trailer_url": zod.string().optional(),
   "pilot_url": zod.string().optional(),
-  "budget": zod.number().int().min(1).optional(),
+  "budget": zod.number().int().min(1).max(submitFilmmakerBodyBudgetMax).optional(),
   "budget_from_example": zod.boolean().optional(),
   "deal_answer": zod.enum(['yes', 'maybe', 'no']).optional(),
   "offer_per100": zod.number().int().min(submitFilmmakerBodyOfferPer100Min).optional(),
@@ -407,10 +446,38 @@ export const GetFilmmakerSubmissionConfigResponse = zod.object({
  * Unlinked guest results remain cookie-accessible. An account-linked visitor requires a verified Bearer token matching its Firebase UID.
  * @summary Read the current visitor's completed filmmaker result
  */
+export const getFilmmakerResultResponseProposalOneOneRepaymentPer100Min = 125;
+export const getFilmmakerResultResponseProposalOneOneRepaymentPer100Max = 10000;
+
+export const getFilmmakerResultResponseProposalOneOneInvestorBackendPercentMin = 0;
+export const getFilmmakerResultResponseProposalOneOneInvestorBackendPercentMax = 100;
+
+export const getFilmmakerResultResponseProposalOneOneBackendYearsMax = 100;
+
+export const getFilmmakerResultResponseProposalOneOneEarlyFilmmakerPercentMin = 0;
+export const getFilmmakerResultResponseProposalOneOneEarlyFilmmakerPercentMax = 99;
+
+export const getFilmmakerResultResponseProposalOneOneNoteMax = 2000;
+
 
 
 
 export const GetFilmmakerResultResponse = zod.object({
+  "proposal": zod.union([zod.object({
+  "decision": zod.enum(['standard', 'negotiation']),
+  "repayment_per100": zod.number().int().min(getFilmmakerResultResponseProposalOneOneRepaymentPer100Min).max(getFilmmakerResultResponseProposalOneOneRepaymentPer100Max),
+  "investor_backend_percent": zod.number().int().min(getFilmmakerResultResponseProposalOneOneInvestorBackendPercentMin).max(getFilmmakerResultResponseProposalOneOneInvestorBackendPercentMax),
+  "backend_years": zod.number().int().min(1).max(getFilmmakerResultResponseProposalOneOneBackendYearsMax),
+  "early_filmmaker_percent": zod.number().int().min(getFilmmakerResultResponseProposalOneOneEarlyFilmmakerPercentMin).max(getFilmmakerResultResponseProposalOneOneEarlyFilmmakerPercentMax),
+  "note": zod.string().max(getFilmmakerResultResponseProposalOneOneNoteMax).optional()
+}).and(zod.object({
+  "original_repayment_per100": zod.number().int(),
+  "platform_fee_percent": zod.number().int(),
+  "fee_priority": zod.enum(['existing_proportional']),
+  "backend_revenue_basis": zod.enum(['after_processing_and_distribution_fees']),
+  "backend_clock": zod.enum(['after_investor_target']),
+  "version": zod.literal(1)
+})),zod.null()]).optional(),
   "completed": zod.literal(true),
   "no_project_yet": zod.boolean(),
   "project_id": zod.number().int().min(1).nullable(),
@@ -1219,12 +1286,41 @@ export const GetPublicProjectParams = zod.object({
   "slug": zod.coerce.string().min(1).max(getPublicProjectPathSlugMax).regex(getPublicProjectPathSlugRegExp)
 })
 
+export const getPublicProjectResponseProposalOneOneRepaymentPer100Min = 125;
+export const getPublicProjectResponseProposalOneOneRepaymentPer100Max = 10000;
+
+export const getPublicProjectResponseProposalOneOneInvestorBackendPercentMin = 0;
+export const getPublicProjectResponseProposalOneOneInvestorBackendPercentMax = 100;
+
+export const getPublicProjectResponseProposalOneOneBackendYearsMax = 100;
+
+export const getPublicProjectResponseProposalOneOneEarlyFilmmakerPercentMin = 0;
+export const getPublicProjectResponseProposalOneOneEarlyFilmmakerPercentMax = 99;
+
+export const getPublicProjectResponseProposalOneOneNoteMax = 2000;
+
 
 export const getPublicProjectResponseConfirmedPledgeTotalMin = 0;
 
 
 
 export const GetPublicProjectResponse = zod.object({
+  "budget": zod.number().int().nullish(),
+  "proposal": zod.union([zod.object({
+  "decision": zod.enum(['standard', 'negotiation']),
+  "repayment_per100": zod.number().int().min(getPublicProjectResponseProposalOneOneRepaymentPer100Min).max(getPublicProjectResponseProposalOneOneRepaymentPer100Max),
+  "investor_backend_percent": zod.number().int().min(getPublicProjectResponseProposalOneOneInvestorBackendPercentMin).max(getPublicProjectResponseProposalOneOneInvestorBackendPercentMax),
+  "backend_years": zod.number().int().min(1).max(getPublicProjectResponseProposalOneOneBackendYearsMax),
+  "early_filmmaker_percent": zod.number().int().min(getPublicProjectResponseProposalOneOneEarlyFilmmakerPercentMin).max(getPublicProjectResponseProposalOneOneEarlyFilmmakerPercentMax),
+  "note": zod.string().max(getPublicProjectResponseProposalOneOneNoteMax).optional()
+}).and(zod.object({
+  "original_repayment_per100": zod.number().int(),
+  "platform_fee_percent": zod.number().int(),
+  "fee_priority": zod.enum(['existing_proportional']),
+  "backend_revenue_basis": zod.enum(['after_processing_and_distribution_fees']),
+  "backend_clock": zod.enum(['after_investor_target']),
+  "version": zod.literal(1)
+})),zod.null()]).optional(),
   "id": zod.number().int().min(1),
   "slug": zod.string(),
   "title": zod.string(),
@@ -1293,6 +1389,19 @@ export const GetExploreQueryParams = zod.object({
   "search": zod.coerce.string().optional()
 })
 
+export const getExploreResponseProjectsItemProposalOneOneRepaymentPer100Min = 125;
+export const getExploreResponseProjectsItemProposalOneOneRepaymentPer100Max = 10000;
+
+export const getExploreResponseProjectsItemProposalOneOneInvestorBackendPercentMin = 0;
+export const getExploreResponseProjectsItemProposalOneOneInvestorBackendPercentMax = 100;
+
+export const getExploreResponseProjectsItemProposalOneOneBackendYearsMax = 100;
+
+export const getExploreResponseProjectsItemProposalOneOneEarlyFilmmakerPercentMin = 0;
+export const getExploreResponseProjectsItemProposalOneOneEarlyFilmmakerPercentMax = 99;
+
+export const getExploreResponseProjectsItemProposalOneOneNoteMax = 2000;
+
 
 export const getExploreResponseProjectsItemOfferPer100Min = 125;
 
@@ -1302,6 +1411,22 @@ export const getExploreResponseProjectsItemConfirmedPledgeTotalMin = 0;
 
 export const GetExploreResponse = zod.object({
   "projects": zod.array(zod.object({
+  "budget": zod.number().int().nullish(),
+  "proposal": zod.union([zod.object({
+  "decision": zod.enum(['standard', 'negotiation']),
+  "repayment_per100": zod.number().int().min(getExploreResponseProjectsItemProposalOneOneRepaymentPer100Min).max(getExploreResponseProjectsItemProposalOneOneRepaymentPer100Max),
+  "investor_backend_percent": zod.number().int().min(getExploreResponseProjectsItemProposalOneOneInvestorBackendPercentMin).max(getExploreResponseProjectsItemProposalOneOneInvestorBackendPercentMax),
+  "backend_years": zod.number().int().min(1).max(getExploreResponseProjectsItemProposalOneOneBackendYearsMax),
+  "early_filmmaker_percent": zod.number().int().min(getExploreResponseProjectsItemProposalOneOneEarlyFilmmakerPercentMin).max(getExploreResponseProjectsItemProposalOneOneEarlyFilmmakerPercentMax),
+  "note": zod.string().max(getExploreResponseProjectsItemProposalOneOneNoteMax).optional()
+}).and(zod.object({
+  "original_repayment_per100": zod.number().int(),
+  "platform_fee_percent": zod.number().int(),
+  "fee_priority": zod.enum(['existing_proportional']),
+  "backend_revenue_basis": zod.enum(['after_processing_and_distribution_fees']),
+  "backend_clock": zod.enum(['after_investor_target']),
+  "version": zod.literal(1)
+})),zod.null()]).optional(),
   "id": zod.number().int().min(1),
   "slug": zod.string(),
   "title": zod.string(),
@@ -1343,6 +1468,19 @@ export const MatchInvestorBody = zod.object({
 })
 })
 
+export const matchInvestorResponseProjectsItemProposalOneOneRepaymentPer100Min = 125;
+export const matchInvestorResponseProjectsItemProposalOneOneRepaymentPer100Max = 10000;
+
+export const matchInvestorResponseProjectsItemProposalOneOneInvestorBackendPercentMin = 0;
+export const matchInvestorResponseProjectsItemProposalOneOneInvestorBackendPercentMax = 100;
+
+export const matchInvestorResponseProjectsItemProposalOneOneBackendYearsMax = 100;
+
+export const matchInvestorResponseProjectsItemProposalOneOneEarlyFilmmakerPercentMin = 0;
+export const matchInvestorResponseProjectsItemProposalOneOneEarlyFilmmakerPercentMax = 99;
+
+export const matchInvestorResponseProjectsItemProposalOneOneNoteMax = 2000;
+
 
 export const matchInvestorResponseProjectsItemOfferPer100Min = 125;
 
@@ -1352,6 +1490,22 @@ export const matchInvestorResponseProjectsItemConfirmedPledgeTotalMin = 0;
 
 export const MatchInvestorResponse = zod.object({
   "projects": zod.array(zod.object({
+  "budget": zod.number().int().nullish(),
+  "proposal": zod.union([zod.object({
+  "decision": zod.enum(['standard', 'negotiation']),
+  "repayment_per100": zod.number().int().min(matchInvestorResponseProjectsItemProposalOneOneRepaymentPer100Min).max(matchInvestorResponseProjectsItemProposalOneOneRepaymentPer100Max),
+  "investor_backend_percent": zod.number().int().min(matchInvestorResponseProjectsItemProposalOneOneInvestorBackendPercentMin).max(matchInvestorResponseProjectsItemProposalOneOneInvestorBackendPercentMax),
+  "backend_years": zod.number().int().min(1).max(matchInvestorResponseProjectsItemProposalOneOneBackendYearsMax),
+  "early_filmmaker_percent": zod.number().int().min(matchInvestorResponseProjectsItemProposalOneOneEarlyFilmmakerPercentMin).max(matchInvestorResponseProjectsItemProposalOneOneEarlyFilmmakerPercentMax),
+  "note": zod.string().max(matchInvestorResponseProjectsItemProposalOneOneNoteMax).optional()
+}).and(zod.object({
+  "original_repayment_per100": zod.number().int(),
+  "platform_fee_percent": zod.number().int(),
+  "fee_priority": zod.enum(['existing_proportional']),
+  "backend_revenue_basis": zod.enum(['after_processing_and_distribution_fees']),
+  "backend_clock": zod.enum(['after_investor_target']),
+  "version": zod.literal(1)
+})),zod.null()]).optional(),
   "id": zod.number().int().min(1),
   "slug": zod.string(),
   "title": zod.string(),
@@ -1852,11 +2006,39 @@ export const GetAdminProjectReviewParams = zod.object({
   "projectId": zod.coerce.number().int().min(1)
 })
 
+export const getAdminProjectReviewResponseProjectProposalOneOneRepaymentPer100Min = 125;
+export const getAdminProjectReviewResponseProjectProposalOneOneRepaymentPer100Max = 10000;
+
+export const getAdminProjectReviewResponseProjectProposalOneOneInvestorBackendPercentMin = 0;
+export const getAdminProjectReviewResponseProjectProposalOneOneInvestorBackendPercentMax = 100;
+
+export const getAdminProjectReviewResponseProjectProposalOneOneBackendYearsMax = 100;
+
+export const getAdminProjectReviewResponseProjectProposalOneOneEarlyFilmmakerPercentMin = 0;
+export const getAdminProjectReviewResponseProjectProposalOneOneEarlyFilmmakerPercentMax = 99;
+
+export const getAdminProjectReviewResponseProjectProposalOneOneNoteMax = 2000;
+
 
 
 
 export const GetAdminProjectReviewResponse = zod.object({
   "project": zod.object({
+  "proposal": zod.union([zod.object({
+  "decision": zod.enum(['standard', 'negotiation']),
+  "repayment_per100": zod.number().int().min(getAdminProjectReviewResponseProjectProposalOneOneRepaymentPer100Min).max(getAdminProjectReviewResponseProjectProposalOneOneRepaymentPer100Max),
+  "investor_backend_percent": zod.number().int().min(getAdminProjectReviewResponseProjectProposalOneOneInvestorBackendPercentMin).max(getAdminProjectReviewResponseProjectProposalOneOneInvestorBackendPercentMax),
+  "backend_years": zod.number().int().min(1).max(getAdminProjectReviewResponseProjectProposalOneOneBackendYearsMax),
+  "early_filmmaker_percent": zod.number().int().min(getAdminProjectReviewResponseProjectProposalOneOneEarlyFilmmakerPercentMin).max(getAdminProjectReviewResponseProjectProposalOneOneEarlyFilmmakerPercentMax),
+  "note": zod.string().max(getAdminProjectReviewResponseProjectProposalOneOneNoteMax).optional()
+}).and(zod.object({
+  "original_repayment_per100": zod.number().int(),
+  "platform_fee_percent": zod.number().int(),
+  "fee_priority": zod.enum(['existing_proportional']),
+  "backend_revenue_basis": zod.enum(['after_processing_and_distribution_fees']),
+  "backend_clock": zod.enum(['after_investor_target']),
+  "version": zod.literal(1)
+})),zod.null()]).optional(),
   "id": zod.number().int().min(1),
   "title": zod.string().nullable(),
   "format": zod.string().nullable(),

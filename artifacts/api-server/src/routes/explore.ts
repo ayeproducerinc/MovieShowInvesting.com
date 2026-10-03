@@ -6,6 +6,8 @@ import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 const router: IRouter = Router();
 
 type ExploreRow = {
+  budget: number | null;
+  proposal: import("@workspace/db").Proposal | null;
   id: number;
   slug: string | null;
   title: string | null;
@@ -51,7 +53,7 @@ router.get("/explore", async (req, res): Promise<void> => {
   const visitorId = typeof cookieCandidate === "string" && UUID.test(cookieCandidate) ? cookieCandidate : null;
   const { rows: projects } = await pool.query<ExploreRow>(`
     select p.id, p.slug, p.title, p.logline, p.format, p.genre, p.stage,
-      p.poster_url, p.pitch_deck_name, (p.pitch_deck_storage_path is not null) as has_pitch_deck,
+      p.poster_url, p.pitch_deck_name, (p.pitch_deck_storage_path is not null) as has_pitch_deck, p.budget, p.proposal,
       p.offer_per100 as offer_per_100, p.created_at,
       coalesce((
         ($1::text = 'firebase' and f.firebase_uid = $2)
@@ -108,6 +110,8 @@ router.get("/explore", async (req, res): Promise<void> => {
       pitch_deck_url: project.has_pitch_deck ? `/api/projects/${encodeURIComponent(project.slug!)}/pitch-deck` : null,
       pitch_deck_name: project.has_pitch_deck ? project.pitch_deck_name : null,
       offer_per_100: project.offer_per_100,
+      budget: project.budget,
+      proposal: project.proposal,
       confirmed_pledge_total: Number(project.confirmed_pledge_total),
       is_owner: project.is_owner,
     })),

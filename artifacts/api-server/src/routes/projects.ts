@@ -148,6 +148,8 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
     && ["idea", "production", "distribution"].includes(project.stage ?? "");
   const response = {
     id: project.id,
+    budget: listingEligible || isOwner ? project.budget : null,
+    proposal: listingEligible || isOwner ? project.proposal : null,
     slug: project.slug,
     title: project.title,
     format: project.format,
