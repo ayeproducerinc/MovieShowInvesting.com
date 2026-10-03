@@ -12,6 +12,7 @@ import {
   investorsTable,
   projectsTable,
   visitorsTable,
+  ageConfirmationsTable,
   type FlowProgressRecord,
 } from "./schema";
 
@@ -198,6 +199,16 @@ export async function saveVisitorFlowProgress(input: {
 }
 
 export type FilmmakerSubmissionData = {
+  team_info?: string;
+  team_links?: string[];
+  money_use?: string;
+  distribution_plan?: string;
+  crowdfunding_ran?: boolean;
+  crowdfunding_campaign?: string;
+  crowdfunding_same_project?: boolean;
+  crowdfunding_goal?: number;
+  crowdfunding_raised?: number;
+  crowdfunding_obligations?: string;
   proposal?: import("./proposal").Proposal;
   no_project_yet: boolean;
   stage?: "distribution" | "production" | "idea";
@@ -408,6 +419,12 @@ export async function createFilmmakerSubmission(input: {
       ...input.data,
       ...(!input.data.no_project_yet && input.data.wants_lower ? { offer_per100: 125 } : {}),
     };
+    const [ageConfirmation] = provider && identityUid ? await tx.select({
+      confirmed_at: ageConfirmationsTable.confirmedAt,
+    }).from(ageConfirmationsTable).where(and(
+      eq(ageConfirmationsTable.provider, provider),
+      eq(ageConfirmationsTable.uid, identityUid),
+    )) : [];
     let projectId: number | null = null;
     const discardedDraftMaterials = input.data.no_project_yet && stagedMaterials
       ? {
@@ -432,6 +449,11 @@ export async function createFilmmakerSubmission(input: {
         genreOther: input.data.genre_other,
         stage: input.data.stage,
         logline: input.data.logline,
+        teamInfo: input.data.team_info,
+        teamLinks: input.data.team_links,
+        moneyUse: input.data.money_use,
+        distributionPlan: input.data.distribution_plan,
+        crowdfunding: Object.fromEntries(Object.entries(input.data).filter(([key]) => key.startsWith("crowdfunding_"))),
         trailerUrl: stagedMaterials?.trailerUrl ?? input.data.trailer_url,
         pilotUrl: input.data.pilot_url,
         bunnyVideoId: stagedMaterials?.bunnyVideoId ?? null,
@@ -454,6 +476,20 @@ export async function createFilmmakerSubmission(input: {
         paybackTermsOther: input.data.payback_terms_other,
       }).returning({ id: projectsTable.id });
       projectId = project.id;
+      const [savedProject] = await tx.select().from(projectsTable).where(eq(projectsTable.id, project.id));
+      const { submissionSnapshot: _snapshot, reviewNotes: _notes, reviewHistory: _history, ...originalProject } = savedProject;
+      await tx.update(projectsTable).set({ submissionSnapshot: {
+        submitted_at: savedProject.createdAt.toISOString(),
+        answers: submittedAnswers,
+        project: originalProject,
+        filmmaker: {
+          name: input.data.name, email: input.data.email, phone: syncedPhone?.phone ?? input.data.phone ?? null,
+          city: input.data.city, state: input.data.state ?? null, country: input.data.country ?? null,
+          favorite_genres: input.data.favorite_genres, chat_opt_in: input.data.chat_opt_in,
+          email_verified: verifiedEmailMatchesContact, phone_verified: Boolean(syncedPhone),
+        },
+        age_confirmation: ageConfirmation ? { ...ageConfirmation, self_declaration: true } : null,
+      } }).where(eq(projectsTable.id, project.id));
       if (stagedMaterials) {
         await tx.delete(filmmakerDraftMaterialsTable)
           .where(eq(filmmakerDraftMaterialsTable.visitorId, input.visitorId));
@@ -922,6 +958,7 @@ export async function updateProjectReview(
   const [project] = await db.update(schema.projectsTable)
     .set({
       ...changes,
+      reviewHistory: sql`coalesce(${schema.projectsTable.reviewHistory}, '[]'::jsonb) || ${JSON.stringify([{ ...changes, action: "Editorial visibility decision", reviewed_at: new Date().toISOString() }])}::jsonb`,
       ...(changes.approved !== undefined ? { reviewDecision: changes.approved ? "approved" : "declined" } : {}),
     })
     .where(eq(schema.projectsTable.id, projectId))
@@ -984,6 +1021,13 @@ export async function updateOwnedFilmmakerShowcase(input: {
     showcase_requested?: boolean;
     synopsis?: string | null;
     team_links?: string[] | null;
+    team_info?: string | null;
+    crowdfunding_ran?: boolean;
+    crowdfunding_campaign?: string;
+    crowdfunding_same_project?: boolean;
+    crowdfunding_goal?: number;
+    crowdfunding_raised?: number;
+    crowdfunding_obligations?: string;
     money_use?: string | null;
     distribution_plan?: string | null;
     trailer_url?: string | null;
@@ -1001,17 +1045,22 @@ export async function updateOwnedFilmmakerShowcase(input: {
     if (input.changes.showcase_requested !== undefined) changes.showcaseRequested = input.changes.showcase_requested;
     if (input.changes.synopsis !== undefined) changes.synopsis = input.changes.synopsis;
     if (input.changes.team_links !== undefined) changes.teamLinks = input.changes.team_links;
+    if (input.changes.team_info !== undefined) changes.teamInfo = input.changes.team_info;
+    const campaignChanges = Object.fromEntries(Object.entries(input.changes).filter(([key]) => key.startsWith("crowdfunding_")));
+    if (Object.keys(campaignChanges).length) changes.crowdfunding = { ...(project.crowdfunding ?? {}), ...campaignChanges };
     if (input.changes.money_use !== undefined) changes.moneyUse = input.changes.money_use;
     if (input.changes.distribution_plan !== undefined) changes.distributionPlan = input.changes.distribution_plan;
     if (input.changes.trailer_url !== undefined) changes.trailerUrl = input.changes.trailer_url;
     const existingContent = {
       synopsis: project.synopsis,
       team_links: project.teamLinks ?? [],
+      team_info: project.teamInfo,
       money_use: project.moneyUse,
       distribution_plan: project.distributionPlan,
       trailer_url: project.trailerUrl,
     };
-    const hasContentEdit = ["synopsis", "team_links", "money_use", "distribution_plan", "trailer_url"].some((key) => {
+    const hasContentEdit = (changes.crowdfunding !== undefined && JSON.stringify(changes.crowdfunding) !== JSON.stringify(project.crowdfunding))
+      || ["synopsis", "team_links", "team_info", "money_use", "distribution_plan", "trailer_url"].some((key) => {
       if (!Object.prototype.hasOwnProperty.call(input.changes, key)) return false;
       const field = key as keyof typeof existingContent;
       const changeValue = input.changes[field];
@@ -1188,6 +1237,7 @@ export async function getPublicProjectBySlug(slug: string) {
     logline: projectsTable.logline,
     synopsis: projectsTable.synopsis,
     teamLinks: projectsTable.teamLinks,
+    teamInfo: projectsTable.teamInfo,
     moneyUse: projectsTable.moneyUse,
     distributionPlan: projectsTable.distributionPlan,
     trailerUrl: projectsTable.trailerUrl,
@@ -1242,6 +1292,7 @@ export async function getPublicProjectBySlug(slug: string) {
     logline: project.logline,
     synopsis: project.synopsis,
     teamLinks: project.teamLinks,
+    teamInfo: project.teamInfo,
     moneyUse: project.moneyUse,
     distributionPlan: project.distributionPlan,
     trailerUrl: project.trailerUrl,

@@ -32,3 +32,4 @@
 - [Mounted public query observers](mounted-public-query-observers.md) — preserve public aggregate query objects during auth changes; clearing them can leave mounted pages stale.
 - [Proposal consent boundary](proposal-consent-boundary.md) — an unfinished legacy draft must explicitly review new economics; an old acceptance cannot manufacture backend agreement.
 - [Single investor confirmation](investor-single-confirmation.md) — confirm once in the final worksheet before Submit; Screen 3 explains only selected stages for beginners.
+- [Pledge-first MVP boundary](pledge-first-mvp-boundary.md) — compact crowdfunding, preserved pay-later popup, manual review/outreach, and honest original evidence.

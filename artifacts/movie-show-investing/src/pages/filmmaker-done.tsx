@@ -7,7 +7,7 @@ import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-
 import { closeGuestConfirmation, guestConfirmationVisible } from '@/lib/filmmaker-confirmation';
 import { setFilmmakerAction } from '@/lib/filmmaker-intent';
 import { consumePitchReviewChoice, getPitchReviewProof, type PitchReviewChoice } from '@/lib/pitch-review-intent';
-import { ProjectShare } from '@/components/project-share';
+import { ProjectShare, FilmmakerInvite, projectShareUrl } from '@/components/project-share';
 import { ProjectMaterialsEditor } from '@/components/project-materials-editor';
 import { legacyDeal, money, type Stage } from './filmmaker-calculator';
 import { AgeGateForCurrentUser } from '@/components/age-acknowledgment';
@@ -50,6 +50,13 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
   const [links, setLinks] = useState(result.team_links.join('\n'));
   const [moneyUse, setMoneyUse] = useState(result.money_use || '');
   const [distribution, setDistribution] = useState(result.distribution_plan || '');
+  const [teamInfo, setTeamInfo] = useState(result.team_info || '');
+  const [cfRan, setCfRan] = useState<boolean | null>(result.crowdfunding_ran ?? null);
+  const [cfCampaign, setCfCampaign] = useState(result.crowdfunding_campaign || '');
+  const [cfSame, setCfSame] = useState<boolean | null>(result.crowdfunding_same_project ?? null);
+  const [cfGoal, setCfGoal] = useState(result.crowdfunding_goal != null ? String(result.crowdfunding_goal) : '');
+  const [cfRaised, setCfRaised] = useState(result.crowdfunding_raised != null ? String(result.crowdfunding_raised) : '');
+  const [cfObligations, setCfObligations] = useState(result.crowdfunding_obligations || '');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [savedStatus, setSavedStatus] = useState<ShowcaseStatus | null>(null);
@@ -61,6 +68,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
       ? 'Checking this pitch’s payment status before checkout is available…'
       : checkoutUnavailableText;
   const unsavedDetails = JSON.stringify(validLinks(links)) !== JSON.stringify(result.team_links)
+    || (clean(teamInfo) ?? '') !== (result.team_info || '')
     || clean(moneyUse) !== (result.money_use || null)
     || clean(distribution) !== (result.distribution_plan || null);
   useEffect(() => {
@@ -115,6 +123,8 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
     if (checking || update.isPending || needsReselect) return;
     const teamLinks = validLinks(links);
     if (!teamLinks) { setError('Add up to eight full http:// or https:// team links, one per line.'); return; }
+    const nonNeg = (v: string) => !v.trim() || (Number.isFinite(Number(v)) && Number(v) >= 0);
+    if (!nonNeg(cfGoal) || !nonNeg(cfRaised)) { setError('Campaign goal and amount raised must be zero or more.'); return; }
     setError(''); setSaved(false);
     setSavedStatus(null);
     setApprovalMayHavePaused(Boolean(result.approved && result.showcase_requested && !result.hidden));
@@ -123,6 +133,16 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
       team_links: teamLinks,
       money_use: clean(moneyUse),
       distribution_plan: clean(distribution),
+      // Collapsing preserves values; explicitly clearing this editor removes current team text.
+      team_info: clean(teamInfo),
+      crowdfunding_ran: cfRan ?? undefined,
+      ...(cfRan === true ? {
+        crowdfunding_campaign: clean(cfCampaign) ?? undefined,
+        crowdfunding_same_project: cfSame ?? undefined,
+        crowdfunding_goal: cfGoal.trim() ? Number(cfGoal) : undefined,
+        crowdfunding_raised: cfRaised.trim() ? Number(cfRaised) : undefined,
+        crowdfunding_obligations: clean(cfObligations) ?? undefined,
+      } : {}),
     };
     setChecking(true);
     try {
@@ -155,23 +175,36 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
     }
   }
   return <section id="section-showcase" className="dossier-section" data-testid="section-showcase">
-    {!result.showcase_requested && !reviewStatus?.paid && !reviewStatus?.pending && !result.hidden && <div className="dossier-notice mb-8">
+    {!result.showcase_requested && !reviewStatus?.paid && !reviewStatus?.pending && !result.hidden && <div className="dossier-notice mb-4" data-testid="offer-editorial-review">
       <strong>Submit for editorial review · $49 once per pitch</strong>
       <p>The free unlisted page and share link remain yours. If approved, your pitch will join Explore’s public Pitch Collection with no preset expiration date. Investors will be able to browse when they join.</p>
-      <button ref={reviewTriggerRef} type="button" className="dossier-button" data-testid="button-open-review-paywall" onClick={() => { returnFocusRef.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : reviewTriggerRef.current; if (result.project_id) consumePitchReviewChoice(result.project_id); setOfferSource('manual'); setCheckoutError(''); setShowPaywall(true); }}>Submit for review <ArrowRight size={17}/></button>
+      <button ref={reviewTriggerRef} type="button" className="dossier-button" data-testid="button-open-review-paywall" onClick={() => { returnFocusRef.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : reviewTriggerRef.current; if (result.project_id) consumePitchReviewChoice(result.project_id); setOfferSource('manual'); setCheckoutError(''); setShowPaywall(true); }}>Submit for editorial review · $49 <ArrowRight size={17}/></button>
       {!canCheckout && <p role="status">{paymentNotice}</p>}
     </div>}
-    <span className="dossier-kicker">Optional / pitch details</span>
-    <h2>{result.showcase_requested ? 'Your showcase details.' : 'Tell more of the story.'}</h2>
+    <details className="dossier-fold" data-testid="details-edit-pitch" style={{ marginTop: 8 }}><summary style={{ cursor:'pointer', fontWeight:600 }}>Edit pitch details</summary>
+    <span className="dossier-kicker" style={{ marginTop: 16, display:'block' }}>Optional / pitch details</span>
+    <h2 style={{ fontSize: 28 }}>{result.showcase_requested ? 'Your showcase details.' : 'Tell more of the story.'}</h2>
     <p>{result.approved && result.showcase_requested && !result.hidden
       ? 'This project is approved for showcase listing. Saving changes to approved showcase content may pause approval and require another review before it is listed. Share a synopsis, not a full script.'
       : result.showcase_requested
         ? 'Your showcase review is pending; requesting review is not approval. The page remains accessible to anyone with its link. Share a synopsis, not a full script. You can revise these optional details later.'
          : 'Your project is free and unlisted. Save optional details here, then choose Submit for review when you are ready. Saving details alone does not request review. Share a synopsis, not a full script.'}</p>
     <form onSubmit={event => void submit(event)} style={{ marginTop: 30 }}>
+      <div className="dossier-field"><label htmlFor="showcase-team-info">Key team <small>· optional</small></label><textarea id="showcase-team-info" data-testid="input-showcase-team-info" maxLength={3000} value={teamInfo} onChange={e => setTeamInfo(e.target.value)} /></div>
       <div className="dossier-field"><label htmlFor="showcase-links">Team links <small>· optional, one full URL per line, up to 8</small></label><textarea id="showcase-links" data-testid="input-showcase-links" value={links} onChange={e => setLinks(e.target.value)} placeholder={'https://example.com/team'} /></div>
       <div className="dossier-field"><label htmlFor="showcase-money-use">How the money would be used <small>· optional</small></label><textarea id="showcase-money-use" data-testid="input-showcase-money-use" maxLength={3000} value={moneyUse} onChange={e => setMoneyUse(e.target.value)} /></div>
       <div className="dossier-field"><label htmlFor="showcase-distribution">Distribution plan <small>· optional</small></label><textarea id="showcase-distribution" data-testid="input-showcase-distribution" maxLength={3000} value={distribution} onChange={e => setDistribution(e.target.value)} /></div>
+      <fieldset className="dossier-field" data-testid="group-edit-crowdfunding" style={{ border: 0, padding: 0 }}><legend>Crowdfunding campaign <small>· optional, private to review</small></legend>
+        <label><input type="checkbox" data-testid="checkbox-edit-crowdfunding-ran" checked={cfRan === true} onChange={e => setCfRan(e.target.checked ? true : false)} /> I ran a crowdfunding campaign</label>
+        {cfRan === true && <>
+          <input data-testid="input-edit-crowdfunding-campaign" aria-label="Platform or campaign link" placeholder="Platform or link, or explain if none" value={cfCampaign} onChange={e => setCfCampaign(e.target.value)} />
+          <label><input type="checkbox" checked={cfSame === true} onChange={e => setCfSame(e.target.checked)} /> It was for this project</label>
+          <input aria-label="Goal in dollars" inputMode="decimal" placeholder="Goal $" value={cfGoal} onChange={e => setCfGoal(e.target.value)} />
+          <input aria-label="Raised in dollars" inputMode="decimal" placeholder="Raised $" value={cfRaised} onChange={e => setCfRaised(e.target.value)} />
+          <textarea aria-label="Campaign type and anything still owed" placeholder="Rewards still to ship, repayment commitments" value={cfObligations} onChange={e => setCfObligations(e.target.value)} />
+        </>}
+        <small>Unchecking never deletes saved campaign details.</small>
+      </fieldset>
       {error && <p className="dossier-error" role="alert" data-testid="error-showcase">{error}</p>}
       {needsReselect && <Link href="/me/projects?action=manage" onClick={() => setFilmmakerAction('manage')} data-testid="link-reselect-showcase-project" className="dossier-button dossier-button-outline">Open My projects <ArrowRight size={17}/></Link>}
       {saved && savedStatus && <p className="dossier-notice" role="status" data-testid="status-showcase-saved">
@@ -188,6 +221,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
       </p>}
       <button type="submit" data-testid="button-save-showcase" className="dossier-button dossier-button-outline" disabled={checking || update.isPending || needsReselect} style={{ marginTop: 18 }}>{checking || update.isPending ? 'Saving details…' : 'Save pitch details'} <ArrowRight size={17}/></button>
     </form>
+    </details>
     {!result.showcase_requested && !reviewStatus?.paid && !reviewStatus?.pending && !result.hidden && <>
       {showPaywall && <div ref={paywallRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Pitch review checkout" className="fixed inset-0 z-50 flex items-center justify-center bg-[#202936]/75 p-4">
         <div className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col bg-[#f4f0e7] shadow-2xl">
@@ -375,23 +409,24 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
     const reviewEligible = Boolean(!editMaterials && data.project_slug && !activeShowcaseStatus?.hidden && !activeShowcaseStatus?.showcase_requested && !reviewStatus.data?.paid && !reviewStatus.data?.pending);
    return <section className="dossier"><div className="page-wrap">
      <div className="dossier-head"><Link href="/" className="dossier-kicker" data-testid="link-result-home">Movie Show Investing / Filmmakers</Link><span className="dossier-kicker">Final submission received</span></div>
-     <div className="dossier-hero"><p className="dossier-kicker" data-testid="status-final-submission"><Check size={15} style={{ display: 'inline', marginRight: 9 }}/> Final submission received</p><h1 className="dossier-title" data-testid="text-confirmation">The story<br/><em>takes shape.</em></h1><p className="dossier-lead">We received the final submission for {data.title ? <strong>{data.title}</strong> : 'your project'} and your thoughts on illustrative terms. This confirms receipt, not showcase approval, a funding commitment, or an investment opportunity.</p></div>
+     <div className="dossier-hero"><p className="dossier-kicker" data-testid="status-final-submission"><Check size={15} style={{ display: 'inline', marginRight: 9 }}/> Final submission received</p><h1 className="dossier-title" data-testid="text-confirmation" style={{ fontSize: 'clamp(34px, 5vw, 56px)' }}>{data.title || 'Your project'}<em>.</em></h1>{data.logline && <p className="dossier-lead" style={{ fontSize: 18 }}>{data.logline}</p>}<p className="dossier-status">This confirms receipt, not showcase approval, a funding commitment, or an investment opportunity.</p>{data.project_slug && !activeShowcaseStatus?.hidden && <div className="dossier-actions" style={{ marginTop: 16 }} data-testid="recap-actions"><a href="#section-project-share" className="dossier-button" data-testid="link-recap-share">Share project</a><button type="button" className="dossier-button dossier-button-outline" data-testid="button-recap-copy-link" onClick={() => void navigator.clipboard?.writeText(projectShareUrl(data.project_slug!)).catch(() => undefined)}>Copy link</button></div>}</div>
     <div className="dossier-rule" />
     <div className="dossier-grid">
       <div>
          {checkoutReturn === 'cancelled' && <p role="status" className="dossier-notice">You returned without completing this checkout. Your free pitch remains unlisted. If you previously completed another checkout, wait for payment verification before trying again.</p>}
          {checkoutReturn === 'return' && <p role="status" className="dossier-notice">{reviewStatus.isError ? 'We could not verify the payment yet. Please retry status later and do not pay again.' : reviewStatus.data?.paid ? 'Payment verified. Your pitch is pending editorial review, not approved for public listing.' : 'We are verifying your payment. Your pitch stays unlisted until verification completes; do not pay again while it is pending.'}</p>}
-        <section className="dossier-section"><span className="dossier-kicker">01 / Project on file</span><h2 data-testid="text-result-title">{data.title || 'Untitled project'}</h2><p>{[data.format, data.genre === 'Other' ? data.genre_other || data.genre : data.genre, legacyStage ? `${legacyStage === 'other' ? 'Other stage (legacy)' : `Legacy stage: ${legacyStage}`}${legacyStageDetail ? ` — ${legacyStageDetail}` : ''}` : stage].filter(Boolean).join(' · ')}</p>{data.logline && <p data-testid="text-result-logline" style={{ fontSize: 18, color: '#202936' }}>{data.logline}</p>}</section>
+        <section className="dossier-section" data-testid="section-recap-summary"><span className="dossier-kicker">On file</span><p>{[data.format, data.genre === 'Other' ? data.genre_other || data.genre : data.genre, legacyStage ? `Legacy stage: ${legacyStage}` : stage].filter(Boolean).join(' · ')}</p>
+          {(() => { const x = data; const rows: [string, string | null | undefined][] = [['Team', x.team_info || (data.team_links.length ? `${data.team_links.length} link${data.team_links.length === 1 ? '' : 's'}` : null)], ['Distribution plan', data.distribution_plan], ['Planned funding use', data.money_use]]; const shown = rows.filter(([, v]) => v); return shown.length ? <ul className="dossier-links" data-testid="list-recap-specifics">{shown.map(([k, v]) => <li key={k}><strong>{k}:</strong> {v!.length > 120 ? `${v!.slice(0, 117)}...` : v}</li>)}</ul> : null; })()}</section>
           {data.project_slug && !activeShowcaseStatus?.hidden && <ShowcaseForm key={data.project_slug} result={{ ...data, approved: activeShowcaseStatus?.approved ?? data.approved, showcase_requested: activeShowcaseStatus?.showcase_requested ?? data.showcase_requested, hidden: activeShowcaseStatus?.hidden ?? data.hidden }} onSaved={refreshShowcaseStatus} reviewStatus={reviewStatus.data} reviewStatusState={reviewStatus.isSuccess ? 'verified' : reviewStatus.isError ? 'unavailable' : 'checking'} checkoutEnabled={checkoutEnabled} checkoutUnavailableText={checkoutUnavailableText} autoOpenReady={(reviewStatus.isSuccess || reviewStatus.isError) && checkoutReturn === null} reviewTriggerRef={reviewTriggerRef} />}
-        {deal && data.budget && repayment && <section className="dossier-section"><span className="dossier-kicker">02 / Your selected offer</span><h2>The illustrative deal.</h2><div className="fm-receipt" data-testid="receipt-result-deal"><h3>At a glance</h3><dl>
+        {deal && data.budget && repayment && <details className="dossier-section" data-testid="details-proposal"><summary style={{ cursor:'pointer', fontWeight:600 }}>Proposal and illustrative terms</summary><div className="fm-receipt" data-testid="receipt-result-deal"><h3>At a glance</h3><dl>
            <div><dt>{data.budget_from_example ? 'Illustrative example budget' : 'Your estimated project budget'}</dt><dd data-testid="text-result-budget">{money(data.budget)}</dd></div>
           <div><dt>Investor payback target · {money(repayment!)} per $100 of budget</dt><dd data-testid="text-result-investor-target">{money(deal.investorTarget)}</dd></div>
           <div><dt>Platform fee · {money(deal.feeRate)} per $100 of budget</dt><dd data-testid="text-result-platform-fee">{money(deal.platformFee)}</dd></div>
           <div className="fm-total"><dt>Combined payback threshold</dt><dd data-testid="text-result-combined-payback">{money(deal.combinedPayback)}</dd></div>
           {!snapshot && <div><dt>After both targets are satisfied</dt><dd>Backend terms unspecified in this earlier submission</dd></div>}
-        </dl>{snapshot && <ProposalSummary proposal={snapshot} budget={data.budget} stage={stage} testId="result-proposal" />}<p className="fm-small" style={{ marginTop: 18 }}>Illustrative terms for conversation only. The investor target and platform fee are separate amounts. This is not a return forecast or an offer to invest.</p></div><p className="dossier-notice">All available receipts after processing fees go into a pool allocated proportionally between the outstanding investor payback target and separate platform fee. Neither has payment priority. These are examples, not forecasts or guarantees. Actual receipts may differ, and the payback threshold may never be reached.</p></section>}
-        {data.project_slug && !activeShowcaseStatus?.hidden && <ProjectShare slug={data.project_slug} title={data.title || 'Untitled project'} genre={data.genre} logline={data.logline} approved={activeShowcaseStatus?.approved ?? false} showcaseRequested={activeShowcaseStatus?.showcase_requested ?? false} />}
-        {data.project_slug && <div className="dossier-section" data-testid="section-manage-pitch-materials"><span className="dossier-kicker">Your project / saved materials</span><h2>Update your pitch materials.</h2><p>Synopsis, trailer, poster, share image, and pitch deck are managed separately from your project details.</p><Link href="/start/filmmaker/done?edit=materials" className="dossier-button dossier-button-outline" data-testid="link-manage-pitch-materials">Manage pitch materials <ArrowRight size={16}/></Link></div>}
+        </dl>{snapshot && <ProposalSummary proposal={snapshot} budget={data.budget} stage={stage} testId="result-proposal" />}<p className="fm-small" style={{ marginTop: 18 }}>Illustrative terms for conversation only. The investor target and platform fee are separate amounts. This is not a return forecast or an offer to invest.</p></div><p className="dossier-notice">All available receipts after processing fees go into a pool allocated proportionally between the outstanding investor payback target and separate platform fee. Neither has payment priority. These are examples, not forecasts or guarantees. Actual receipts may differ, and the payback threshold may never be reached.</p></details>}
+        {data.project_slug && !activeShowcaseStatus?.hidden && <><div id="section-project-share"><ProjectShare slug={data.project_slug} title={data.title || 'Untitled project'} genre={data.genre} logline={data.logline} approved={activeShowcaseStatus?.approved ?? false} showcaseRequested={activeShowcaseStatus?.showcase_requested ?? false} /></div><FilmmakerInvite/></>}
+        {data.project_slug && <div className="dossier-section" data-testid="section-manage-pitch-materials"><details><summary style={{ cursor:'pointer', fontWeight:600 }}>Pitch materials</summary><p>Synopsis, trailer, poster, share image, and pitch deck are managed separately from your project details.</p><Link href="/start/filmmaker/done?edit=materials" className="dossier-button dossier-button-outline" data-testid="link-manage-pitch-materials">Manage pitch materials <ArrowRight size={16}/></Link></details></div>}
       </div>
           <aside className="dossier-side">
             <div className="dossier-sticky">
@@ -402,8 +437,8 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
                  <p className="dossier-line">Filmmakers are here first. Investor signup and pledges open later, after approved projects are available. No investment money is collected here. Editorial review is optional and costs $49 once per pitch. {!checkoutEnabled && 'Checkout is currently unavailable; your free pitch remains saved.'}</p>
               </div>
               <div className="dossier-actions" style={{ marginTop: 22 }}>
-                <Link href="/me/projects?action=start" onClick={() => setFilmmakerAction('start')} data-testid="link-start-another-project" className="dossier-button">Start another project <ArrowRight size={17}/></Link>
-                <Link href="/me/projects?action=manage" onClick={() => setFilmmakerAction('manage')} data-testid="link-manage-projects" className="dossier-button dossier-button-outline">Manage projects <ArrowRight size={17}/></Link>
+                <Link href="/me/projects?action=manage" onClick={() => setFilmmakerAction('manage')} data-testid="link-manage-projects" className="dossier-button">Manage projects <ArrowRight size={17}/></Link>
+                <details style={{ width:'100%' }}><summary style={{ cursor:'pointer' }}>More</summary><Link href="/me/projects?action=start" onClick={() => setFilmmakerAction('start')} data-testid="link-start-another-project" className="dossier-button dossier-button-outline" style={{ marginTop: 10 }}>Start another project <ArrowRight size={17}/></Link></details>
               </div>
               {!user && !ssoSignedIn && <p className="dossier-status">Your final submission is received. Sign in to manage it later or on another device. Either action above will guide you through sign-in.</p>}
             </div>

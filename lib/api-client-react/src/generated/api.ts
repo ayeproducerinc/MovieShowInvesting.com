@@ -21,11 +21,14 @@ import type {
 
 import type {
   AdminIdentity,
+  AdminInvestorDetail,
+  AdminInvestorList,
   AdminMessageReview,
   AdminMessageReviewInput,
   AdminProjectReview,
   AdminProjectReviewDetail,
   AdminProjectReviewInput,
+  AdminReviewNotesInput,
   AdminSection,
   AdminTable,
   AgeConfirmation,
@@ -44,6 +47,7 @@ import type {
   Conversations,
   DeleteFilmmakerImageParams,
   ExploreProjects,
+  ExportAdminInvestorsParams,
   FilmmakerAccountLeave,
   FilmmakerCommunityInput,
   FilmmakerCommunityResult,
@@ -69,6 +73,7 @@ import type {
   FirebaseConfig,
   Flow,
   FlowProgress,
+  GetAdminInvestorsParams,
   GetExploreParams,
   GetFilmmakerProjectPitchDeckParams,
   GetPitchReviewCheckoutConfig200,
@@ -82,6 +87,8 @@ import type {
   InvestorIntentResult,
   InvestorMatchInput,
   InvestorMatches,
+  InvestorNotificationInput,
+  InvestorNotificationPermission,
   LocationSearchPayload,
   LogoutBrowserSessionParams,
   LogoutSessionEnvelope,
@@ -6498,5 +6505,468 @@ export const useReviewAdminMessage = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getReviewAdminMessageMutationOptions(options));
+    }
+
+export const getGetAdminInvestorsUrl = (params?: GetAdminInvestorsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/investors?${stringifiedParams}` : `/api/admin/investors`
+}
+
+export const getAdminInvestors = async (params?: GetAdminInvestorsParams, options?: Parameters<typeof customFetch>[1]): Promise<AdminInvestorList> => {
+
+  return customFetch<AdminInvestorList>(getGetAdminInvestorsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminInvestorsQueryKey = (params?: GetAdminInvestorsParams,) => {
+    return [
+    `/api/admin/investors`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminInvestorsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminInvestors>>, TError = ErrorType<unknown>>(params?: GetAdminInvestorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminInvestors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminInvestorsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminInvestors>>> = ({ signal }) => getAdminInvestors(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminInvestors>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminInvestorsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminInvestors>>>
+export type GetAdminInvestorsQueryError = ErrorType<unknown>
+
+
+
+export function useGetAdminInvestors<TData = Awaited<ReturnType<typeof getAdminInvestors>>, TError = ErrorType<unknown>>(
+ params?: GetAdminInvestorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminInvestors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminInvestorsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getExportAdminInvestorsUrl = (params?: ExportAdminInvestorsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/investors/export?${stringifiedParams}` : `/api/admin/investors/export`
+}
+
+export const exportAdminInvestors = async (params?: ExportAdminInvestorsParams, options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getExportAdminInvestorsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportAdminInvestorsQueryKey = (params?: ExportAdminInvestorsParams,) => {
+    return [
+    `/api/admin/investors/export`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportAdminInvestorsQueryOptions = <TData = Awaited<ReturnType<typeof exportAdminInvestors>>, TError = ErrorType<unknown>>(params?: ExportAdminInvestorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAdminInvestors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportAdminInvestorsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportAdminInvestors>>> = ({ signal }) => exportAdminInvestors(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportAdminInvestors>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportAdminInvestorsQueryResult = NonNullable<Awaited<ReturnType<typeof exportAdminInvestors>>>
+export type ExportAdminInvestorsQueryError = ErrorType<unknown>
+
+
+
+export function useExportAdminInvestors<TData = Awaited<ReturnType<typeof exportAdminInvestors>>, TError = ErrorType<unknown>>(
+ params?: ExportAdminInvestorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportAdminInvestors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportAdminInvestorsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminInvestorUrl = (recordId: string,) => {
+
+
+
+
+  return `/api/admin/investors/${recordId}`
+}
+
+export const getAdminInvestor = async (recordId: string, options?: Parameters<typeof customFetch>[1]): Promise<AdminInvestorDetail> => {
+
+  return customFetch<AdminInvestorDetail>(getGetAdminInvestorUrl(recordId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminInvestorQueryKey = (recordId: string,) => {
+    return [
+    `/api/admin/investors/${recordId}`
+    ] as const;
+    }
+
+
+export const getGetAdminInvestorQueryOptions = <TData = Awaited<ReturnType<typeof getAdminInvestor>>, TError = ErrorType<unknown>>(recordId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminInvestor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminInvestorQueryKey(recordId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminInvestor>>> = ({ signal }) => getAdminInvestor(recordId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: recordId !== null && recordId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminInvestor>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminInvestorQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminInvestor>>>
+export type GetAdminInvestorQueryError = ErrorType<unknown>
+
+
+
+export function useGetAdminInvestor<TData = Awaited<ReturnType<typeof getAdminInvestor>>, TError = ErrorType<unknown>>(
+ recordId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminInvestor>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminInvestorQueryOptions(recordId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSaveAdminReviewNotesUrl = (projectId: number,) => {
+
+
+
+
+  return `/api/admin/projects/${projectId}/review-notes`
+}
+
+export const saveAdminReviewNotes = async (projectId: number,
+    adminReviewNotesInput: AdminReviewNotesInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminReviewNotesInput> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AdminReviewNotesInput>(getSaveAdminReviewNotesUrl(projectId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminReviewNotesInput)
+  }
+);}
+
+
+
+
+
+export const getSaveAdminReviewNotesMutationKey = () => ['saveAdminReviewNotes'] as const;
+
+export const getSaveAdminReviewNotesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveAdminReviewNotes>>, TError,SaveAdminReviewNotesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveAdminReviewNotes>>, TError,SaveAdminReviewNotesMutationVariables, TContext> => {
+
+const mutationKey = getSaveAdminReviewNotesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveAdminReviewNotes>>, SaveAdminReviewNotesMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  saveAdminReviewNotes(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveAdminReviewNotesMutationResult = NonNullable<Awaited<ReturnType<typeof saveAdminReviewNotes>>>
+    export type SaveAdminReviewNotesMutationBody = BodyType<AdminReviewNotesInput>
+    export type SaveAdminReviewNotesMutationError = ErrorType<unknown>
+    export type SaveAdminReviewNotesMutationVariables = {projectId: number;data: BodyType<AdminReviewNotesInput>}
+
+    export const useSaveAdminReviewNotes = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveAdminReviewNotes>>, TError,SaveAdminReviewNotesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveAdminReviewNotes>>,
+        TError,
+        SaveAdminReviewNotesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveAdminReviewNotesMutationOptions(options));
+    }
+
+export const getGetInvestorNotificationPermissionUrl = () => {
+
+
+
+
+  return `/api/investor/notification-permission`
+}
+
+export const getInvestorNotificationPermission = async ( options?: Parameters<typeof customFetch>[1]): Promise<InvestorNotificationPermission> => {
+
+  return customFetch<InvestorNotificationPermission>(getGetInvestorNotificationPermissionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInvestorNotificationPermissionQueryKey = () => {
+    return [
+    `/api/investor/notification-permission`
+    ] as const;
+    }
+
+
+export const getGetInvestorNotificationPermissionQueryOptions = <TData = Awaited<ReturnType<typeof getInvestorNotificationPermission>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvestorNotificationPermission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInvestorNotificationPermissionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInvestorNotificationPermission>>> = ({ signal }) => getInvestorNotificationPermission({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInvestorNotificationPermission>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInvestorNotificationPermissionQueryResult = NonNullable<Awaited<ReturnType<typeof getInvestorNotificationPermission>>>
+export type GetInvestorNotificationPermissionQueryError = ErrorType<unknown>
+
+
+
+export function useGetInvestorNotificationPermission<TData = Awaited<ReturnType<typeof getInvestorNotificationPermission>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvestorNotificationPermission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInvestorNotificationPermissionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetInvestorNotificationPermissionUrl = () => {
+
+
+
+
+  return `/api/investor/notification-permission`
+}
+
+export const setInvestorNotificationPermission = async (investorNotificationInput: InvestorNotificationInput, options?: Parameters<typeof customFetch>[1]): Promise<InvestorNotificationPermission> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InvestorNotificationPermission>(getSetInvestorNotificationPermissionUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(investorNotificationInput)
+  }
+);}
+
+
+
+
+
+export const getSetInvestorNotificationPermissionMutationKey = () => ['setInvestorNotificationPermission'] as const;
+
+export const getSetInvestorNotificationPermissionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setInvestorNotificationPermission>>, TError,SetInvestorNotificationPermissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setInvestorNotificationPermission>>, TError,SetInvestorNotificationPermissionMutationVariables, TContext> => {
+
+const mutationKey = getSetInvestorNotificationPermissionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setInvestorNotificationPermission>>, SetInvestorNotificationPermissionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  setInvestorNotificationPermission(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetInvestorNotificationPermissionMutationResult = NonNullable<Awaited<ReturnType<typeof setInvestorNotificationPermission>>>
+    export type SetInvestorNotificationPermissionMutationBody = BodyType<InvestorNotificationInput>
+    export type SetInvestorNotificationPermissionMutationError = ErrorType<unknown>
+    export type SetInvestorNotificationPermissionMutationVariables = {data: BodyType<InvestorNotificationInput>}
+
+    export const useSetInvestorNotificationPermission = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setInvestorNotificationPermission>>, TError,SetInvestorNotificationPermissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setInvestorNotificationPermission>>,
+        TError,
+        SetInvestorNotificationPermissionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetInvestorNotificationPermissionMutationOptions(options));
     }
 

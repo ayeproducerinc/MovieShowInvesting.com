@@ -38,3 +38,4 @@ export * from "./filmmaker-submission-attempts";
 export * from "./filmmaker-draft-materials";
 export * from "./conversations";
 export * from "./auth";
+export * from "./investor-notifications";

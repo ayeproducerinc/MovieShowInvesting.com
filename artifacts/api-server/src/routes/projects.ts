@@ -157,6 +157,7 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
     stage: project.stage,
     logline: project.logline,
     synopsis: project.synopsis,
+    team_info: project.teamInfo ?? null,
     team_links: Array.isArray(project.teamLinks)
       ? project.teamLinks.filter((link): link is string => typeof link === "string").map(safeWebUrl).filter((link): link is string => link !== null)
       : [],

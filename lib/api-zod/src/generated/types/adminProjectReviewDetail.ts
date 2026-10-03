@@ -8,9 +8,18 @@
 import type { AdminProjectReviewDetailAnswers } from './adminProjectReviewDetailAnswers';
 import type { AdminProjectReviewDetailFilmmaker } from './adminProjectReviewDetailFilmmaker';
 import type { AdminProjectReviewDetailMaterials } from './adminProjectReviewDetailMaterials';
+import type { AdminProjectReviewDetailOriginalSubmission } from './adminProjectReviewDetailOriginalSubmission';
 import type { AdminProjectReviewDetailProject } from './adminProjectReviewDetailProject';
+import type { AdminProjectReviewDetailReviewHistoryItem } from './adminProjectReviewDetailReviewHistoryItem';
+import type { AdminReviewNotesInput } from './adminReviewNotesInput';
 
 export interface AdminProjectReviewDetail {
+  /** @nullable */
+  original_submission?: AdminProjectReviewDetailOriginalSubmission;
+  submission_provenance?: string;
+  changes_since_submission?: boolean;
+  review_notes?: AdminReviewNotesInput;
+  review_history?: AdminProjectReviewDetailReviewHistoryItem[];
   project: AdminProjectReviewDetailProject;
   /** @nullable */
   filmmaker: AdminProjectReviewDetailFilmmaker;

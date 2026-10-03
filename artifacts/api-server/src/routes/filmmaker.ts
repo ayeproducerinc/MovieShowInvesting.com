@@ -35,9 +35,12 @@ router.use(cookieParser());
 const VISITOR_COOKIE = "msi_visitor_id";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHOWCASE_FIELDS = new Set([
+  "team_info", "crowdfunding_ran", "crowdfunding_campaign", "crowdfunding_same_project", "crowdfunding_goal", "crowdfunding_raised", "crowdfunding_obligations",
   "showcase_requested", "synopsis", "team_links", "money_use", "distribution_plan", "trailer_url",
 ]);
 const INPUT_FIELDS = new Set([
+  "team_info", "team_links", "money_use", "distribution_plan",
+  "crowdfunding_ran", "crowdfunding_campaign", "crowdfunding_same_project", "crowdfunding_goal", "crowdfunding_raised", "crowdfunding_obligations",
   "proposal", "age_confirmed",
   "website",
   "no_project_yet", "stage", "title", "format", "genre", "genre_other",
@@ -121,6 +124,12 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     return;
   }
   const { website, ...data } = parsed.data;
+  if (data.team_links?.some((link) => {
+    try { const url = new URL(link); return !["http:", "https:"].includes(url.protocol) || Boolean(url.username || url.password); }
+    catch { return true; }
+  })) {
+    res.status(400).json({ error: "Team links must be valid HTTP or HTTPS links." }); return;
+  }
   if (website?.trim()) {
     res.status(400).json({ error: "Invalid filmmaker submission." });
     return;
@@ -318,6 +327,8 @@ router.get("/filmmakers/result", async (req, res): Promise<void> => {
     typeof answers[field] === "boolean" ? answers[field] as boolean : null;
   const project = result.project;
   const response = {
+    team_info: project?.teamInfo ?? null,
+    ...(project?.crowdfunding ?? {}),
     completed: true as const,
     no_project_yet: !project,
     project_id: project?.id ?? null,

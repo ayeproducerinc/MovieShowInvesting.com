@@ -1,8 +1,12 @@
-import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 export const investorAccountProgressTable = pgTable("investor_account_progress", {
+  id: serial("id").notNull(),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }),
+  verifiedEmail: text("verified_email"),
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   provider: text("provider").notNull(),
   uid: text("uid").notNull(),
   lastScreen: integer("last_screen").notNull(),

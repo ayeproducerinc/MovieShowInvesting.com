@@ -9,6 +9,8 @@ import type { FilmmakerProposal } from './filmmakerProposal';
 
 export interface PublicProject {
   /** @nullable */
+  team_info?: string | null;
+  /** @nullable */
   budget?: number | null;
   proposal?: FilmmakerProposal | null;
   /** @minimum 1 */

@@ -12,6 +12,9 @@ import {
 } from '@workspace/api-client-react';
 import { ArrowDownToLine, ArrowRight, ArrowUpRight, Clapperboard, Eye, FileText, LockKeyhole, LogOut, ShieldAlert, X } from 'lucide-react';
 import { ProposalSummary } from '@/components/proposal-summary';
+import { AdminInvestors } from '@/components/admin-investors';
+import { PitchProvenance, ReviewNotesForm } from '@/components/admin-pitch-extras';
+import { ReadableValue } from '@/components/admin-readable';
 import { AdminConversations } from '@/components/admin-conversations';
 import { useAuth } from '@workspace/replit-auth-web';
 import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-web';
@@ -37,6 +40,8 @@ function clearPrivateData(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.removeQueries({ queryKey: getGetAdminMeQueryKey() });
   queryClient.removeQueries({ queryKey: getGetAdminConversationsQueryKey() });
   queryClient.removeQueries({ predicate: query => typeof query.queryKey[0] === 'string' && /^\/api\/admin\/conversations\/\d+$/.test(query.queryKey[0]) });
+  queryClient.removeQueries({ predicate: query => typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/api/admin/investors') });
+  queryClient.removeQueries({ queryKey: ['admin-project-pitch-details'] });
   for (const section of SECTIONS) {
     void queryClient.cancelQueries({ queryKey: getGetAdminTableQueryKey(section.id) });
     queryClient.removeQueries({ queryKey: getGetAdminTableQueryKey(section.id) });
@@ -188,6 +193,7 @@ type AdminPitchReviewResponse = {
     stage_other?: string | null;
     logline?: string | null;
     team_links?: string[] | null;
+    team_info?: string | null;
     money_use?: string | null;
     distribution_plan?: string | null;
     pilot_url?: string | null;
@@ -315,7 +321,7 @@ function AdminPitchReview({ projectId }: { projectId: number }) {
   const answerRows: [string, unknown][] = project ? [
     ['Title', project.title], ['Format', project.format], ['Genre', project.genre_other || project.genre],
     ['Stage', project.stage_other ? `${project.stage || 'Other'} — ${project.stage_other}` : project.stage],
-    ['Logline', project.logline], ['Team links', project.team_links],
+    ['Logline', project.logline], ['Team information', project.team_info], ['Team links', project.team_links],
     ['How the money would be used', project.money_use], ['Distribution plan', project.distribution_plan],
     ['Budget', project.budget == null ? null : `${project.budget_from_example ? 'Illustrative example' : 'Submitted'} · ${project.budget}`],
     ['Deal answer', project.deal_answer], ['Offer per $100', project.offer_per100],
@@ -343,14 +349,16 @@ function AdminPitchReview({ projectId }: { projectId: number }) {
           <section className="mt-7">
             <h3 className="admin-overline admin-mono">Submitted answers</h3>
             <dl className="grid gap-4 md:grid-cols-2">
-              {answerRows.map(([label, value]) => {
-                if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
-                const display = Array.isArray(value) ? value.join('\n') : typeof value === 'boolean' ? value ? 'Yes' : 'No' : String(value);
-                return <div key={label} className="border-b border-[#c8c0b5] py-3"><dt className="admin-mono text-xs uppercase tracking-wider">{label}</dt><dd className="mt-2 whitespace-pre-wrap break-words">{display}</dd></div>;
-              })}
+              {answerRows.map(([label, value]) => <div key={label} className="border-b border-[#c8c0b5] py-3"><dt className="admin-mono text-xs uppercase tracking-wider">{label}</dt><dd className="mt-2"><ReadableValue value={value} /></dd></div>)}
             </dl>
             <h3 className="admin-overline admin-mono mt-6">Saved proposal</h3>
             <ProposalSummary proposal={project?.proposal} legacyRepayment={project?.offer_per100} budget={project?.budget} stage={project?.stage} testId="admin-proposal"/>
+            <p className="mt-3" data-testid="text-no-repayment-schedule">
+              {!project?.payback_terms_other && !project?.offer_other_text && !project?.proposal?.note
+                ? 'No fixed repayment schedule provided; repayment is revenue-dependent.'
+                : 'No fixed repayment schedule is recorded in the structured proposal; repayment is revenue-dependent. Any proposed timing in notes is shown verbatim and must be reviewed separately.'}
+              {' '}Backend years are not a repayment deadline.
+            </p>
           </section>
           <section className="mt-8">
             <h3 className="admin-overline admin-mono">Filmmaker contact details</h3>
@@ -361,16 +369,16 @@ function AdminPitchReview({ projectId }: { projectId: number }) {
               })}
             </dl>
           </section>
-          {adminAnswerRows.length > 0 && <section className="mt-8">
-            <h3 className="admin-overline admin-mono">Additional submitted answers</h3>
+          {adminAnswerRows.length > 0 && <details className="admin-evidence-fold mt-8" data-testid="details-admin-raw-answers">
+            <summary>All submitted answers · full record</summary>
             <dl className="grid gap-4 md:grid-cols-2">
-              {adminAnswerRows.map(([key, value]) => <div key={key} className="border-b border-[#c8c0b5] py-3"><dt className="admin-mono text-xs uppercase tracking-wider">{key.replace(/_/g, ' ')}</dt><dd className="mt-2 whitespace-pre-wrap break-words">{Array.isArray(value) ? value.join(', ') : value == null ? 'Not provided' : typeof value === 'boolean' ? value ? 'Yes' : 'No' : String(value)}</dd></div>)}
+              {adminAnswerRows.map(([key, value]) => <div key={key} className="border-b border-[#c8c0b5] py-3"><dt className="admin-mono text-xs uppercase tracking-wider">{key.replace(/_/g, ' ')}</dt><dd className="mt-2"><ReadableValue value={value}/></dd></div>)}
             </dl>
-          </section>}
+          </details>}
           {filmmakerAdditionalRows.length > 0 && <section className="mt-8">
             <h3 className="admin-overline admin-mono">Additional filmmaker details</h3>
             <dl className="grid gap-4 md:grid-cols-2">
-              {filmmakerAdditionalRows.map(([key, value]) => <div key={key} className="border-b border-[#c8c0b5] py-3"><dt className="admin-mono text-xs uppercase tracking-wider">{key.replace(/_/g, ' ')}</dt><dd className="mt-2 whitespace-pre-wrap break-words">{typeof value === 'string' ? value : JSON.stringify(value)}</dd></div>)}
+              {filmmakerAdditionalRows.map(([key, value]) => <div key={key} className="border-b border-[#c8c0b5] py-3"><dt className="admin-mono text-xs uppercase tracking-wider">{key.replace(/_/g, ' ')}</dt><dd className="mt-2"><ReadableValue value={value}/></dd></div>)}
             </dl>
           </section>}
           <section className="mt-8">
@@ -391,6 +399,8 @@ function AdminPitchReview({ projectId }: { projectId: number }) {
               <AdminImageAttachment label="Trailer preview image" value={materials?.trailer_thumbnail_url}/>
             </div>
           </section>
+          <PitchProvenance projectId={projectId} data={data as unknown as Record<string, unknown>}/>
+          <ReviewNotesForm key={projectId} projectId={projectId} notes={((data as unknown as Record<string, unknown>).review_notes as Record<string, unknown> | null) ?? null}/>
         </>}
       </div>
     </div>}
@@ -438,6 +448,7 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
 function Dashboard({ userId, email, onSignOut }: { userId: string; email: string; onSignOut: () => void }) {
   const [active, setActive] = useState<AdminSection>('summary');
   const [conversationMode, setConversationMode] = useState(false);
+  const [investorMode, setInvestorMode] = useState(false);
   const section = SECTIONS.find(item => item.id === active)!;
   // The active table is read here for the export control; SectionData shares its query cache.
   const { data, isFetching } = useGetAdminTable(active, {
@@ -446,12 +457,13 @@ function Dashboard({ userId, email, onSignOut }: { userId: string; email: string
   return <Frame email={email} onSignOut={onSignOut}>
     <div className="admin-stage">
       <aside className="admin-sidebar" aria-label="Administration sections">
-        <div className="admin-sidebar-label admin-mono">Index / 10 views</div>
+        <div className="admin-sidebar-label admin-mono">Index / 12 views</div>
         <nav className="admin-nav" aria-label="Data sections">
-          {SECTIONS.map((item, i) => <button key={item.id} type="button" aria-current={!conversationMode && active === item.id ? 'page' : undefined} onClick={() => { setActive(item.id); setConversationMode(false); }} data-testid={`button-section-${item.id}`}>
+          {SECTIONS.map((item, i) => <button key={item.id} type="button" aria-current={!conversationMode && active === item.id ? 'page' : undefined} onClick={() => { setActive(item.id); setConversationMode(false); setInvestorMode(false); }} data-testid={`button-section-${item.id}`}>
             <span className="admin-nav-number">{String(i + 1).padStart(2, '0')}</span>{item.label}
           </button>)}
-          <button type="button" aria-current={conversationMode ? 'page' : undefined} onClick={() => setConversationMode(true)} data-testid="button-section-conversations"><span className="admin-nav-number">11</span>Conversations</button>
+          <button type="button" aria-current={conversationMode ? 'page' : undefined} onClick={() => { setConversationMode(true); setInvestorMode(false); }} data-testid="button-section-conversations"><span className="admin-nav-number">11</span>Conversations</button>
+          <button type="button" aria-current={investorMode ? 'page' : undefined} onClick={() => { setInvestorMode(true); setConversationMode(false); }} data-testid="button-section-investors"><span className="admin-nav-number">12</span>Investors</button>
         </nav>
           <div className="admin-sidebar-foot">Private administration<br />{email}<br /><br />No payments are collected here.</div>
       </aside>
@@ -459,15 +471,15 @@ function Dashboard({ userId, email, onSignOut }: { userId: string; email: string
         <div className="admin-main-inner">
           <div className="admin-title-row">
             <div>
-               <div className="admin-overline admin-mono">Administration / {conversationMode ? '11' : String(SECTIONS.indexOf(section) + 1).padStart(2, '0')}</div>
-               <h1 className="admin-page-title" data-testid="text-section-heading">{conversationMode ? 'Conversations' : section.label}</h1>
-               <p className="admin-lede">{conversationMode ? 'Project threads, reports, and auditable moderation actions.' : section.description}</p>
+               <div className="admin-overline admin-mono">Administration / {investorMode ? '12' : conversationMode ? '11' : String(SECTIONS.indexOf(section) + 1).padStart(2, '0')}</div>
+               <h1 className="admin-page-title" data-testid="text-section-heading">{investorMode ? 'Investors' : conversationMode ? 'Conversations' : section.label}</h1>
+               <p className="admin-lede">{investorMode ? 'Private self-reported intake and non-binding interest. Not KYC, accreditation verification or approval to invest.' : conversationMode ? 'Project threads, reports, and auditable moderation actions.' : section.description}</p>
             </div>
-             {!conversationMode && <button type="button" className="admin-button" disabled={!data || isFetching} onClick={() => data && downloadCsv(data, active)} data-testid={`button-download-${active}`} title={!data ? 'Available when this section loads' : `Download ${section.label} as CSV`}>
+             {!conversationMode && !investorMode && <button type="button" className="admin-button" disabled={!data || isFetching} onClick={() => data && downloadCsv(data, active)} data-testid={`button-download-${active}`} title={!data ? 'Available when this section loads' : `Download ${section.label} as CSV`}>
               <ArrowDownToLine size={16} /> Download CSV
              </button>}
           </div>
-            {conversationMode ? <AdminConversations uid={userId}/> : <SectionData key={`${active}-${userId}`} section={section} userId={userId} />}
+            {investorMode ? <AdminInvestors key={userId} userId={userId}/> : conversationMode ? <AdminConversations uid={userId}/> : <SectionData key={`${active}-${userId}`} section={section} userId={userId} />}
         </div>
       </main>
     </div>

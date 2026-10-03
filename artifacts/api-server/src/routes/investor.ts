@@ -35,6 +35,8 @@ type ProjectRow = {
   genre: string | null;
   stage: string | null;
   poster_url: string | null;
+  pitch_deck_name: string | null;
+  has_pitch_deck: boolean;
   offer_per_100: number | null;
   confirmed_pledge_total: number;
   is_owner: boolean;
@@ -85,7 +87,8 @@ async function getDiscoverableProjects(
 ): Promise<ProjectRow[]> {
   const { rows } = await pool.query<ProjectRow>(`
     select p.id, p.slug, p.title, p.logline, p.format, p.genre, p.stage,
-      p.poster_url, p.offer_per100 as offer_per_100, p.budget, p.proposal,
+      p.poster_url, p.pitch_deck_name, (p.pitch_deck_storage_path is not null) as has_pitch_deck,
+      p.offer_per100 as offer_per_100, p.budget, p.proposal,
       coalesce((
         ($1::text = 'firebase' and f.firebase_uid = $2)
         or ($1::text = 'replit' and f.replit_uid = $2)
@@ -112,6 +115,8 @@ function projectCard(project: ProjectRow) {
     genre: project.genre,
     stage: project.stage,
     poster_url: safeImageUrl(project.poster_url),
+    pitch_deck_url: project.has_pitch_deck ? `/api/projects/${encodeURIComponent(project.slug!)}/pitch-deck` : null,
+    pitch_deck_name: project.has_pitch_deck ? project.pitch_deck_name : null,
     offer_per_100: project.offer_per_100,
     budget: project.budget,
     proposal: project.proposal,
@@ -170,6 +175,10 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
   const identity = await resolveProtectedIdentity(req, res, true);
   if (!identity) return;
   const data = parsed.data;
+  if (data.ground_rules_accepted !== true) {
+    res.status(400).json({ error: "Acknowledge the ground rules in your worksheet before saving interest." });
+    return;
+  }
   if (!await requireAccountAgeConfirmation(identity, res)) return;
   const email = data.email.trim().toLowerCase();
   const actualOwner = identity ? `${identity.provider}:${identity.uid}` : "visitor";
@@ -444,6 +453,18 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
         investorId = inserted.rows[0].id;
       }
 
+      const { expected_investor_owner: _owner, ...submittedQuestionnaire } = data;
+      const snapshot = JSON.stringify({
+        ...submittedQuestionnaire,
+        saved_at: new Date().toISOString(),
+        verified_account_email: identity.email,
+        ground_rules_version: "investor-ground-rules-v1",
+      });
+      if (adding) {
+        await client.query("update interest_entries set submitted_answers = $1::jsonb where id = $2 and confirmed_at is null", [snapshot, savedEntryId]);
+      } else {
+        await client.query("update investors set submitted_answers = $1::jsonb where id = $2 and confirmed_at is null", [snapshot, investorId]);
+      }
       if (!adding) {
         await client.query("delete from pledges where investor_id = $1 and entry_id is null and confirmed = false", [investorId]);
         for (const allocation of allocations) {
@@ -794,6 +815,28 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
     // The investor confirms the exact saved choices, not a new public listing.
     // An already-saved project may later be hidden; public totals still exclude
     // hidden projects, while deleted projects are refused above (null project_id).
+    const evidenceResult = await client.query(
+      `select submitted_answers from ${active ? "interest_entries" : "investors"} where id = $1`,
+      [active?.id ?? investor.id],
+    );
+    const ageResult = await client.query("select confirmed_at from age_confirmations where provider = $1 and uid = $2", [identity.provider, identity.uid]);
+    const termResult = await client.query(
+      "select id, title, stage, budget, proposal, offer_per100 from projects where id = any($1::int[]) order by id", [projectIds],
+    );
+    const confirmationEvidence = JSON.stringify({
+      accepted: true, notice_version: "nonbinding-interest-v1",
+      notice: "Non-binding indication of interest only. No investment or payment occurs now. Returns, invitations and eligibility are not guaranteed.",
+      signed_at: new Date().toISOString(), signature_name: signature, amount,
+      allocations: pledges.map(p => ({ project_id: p.project_id, amount: p.amount })),
+      questionnaire: evidenceResult.rows[0]?.submitted_answers ?? null,
+      age_confirmation: ageResult.rows[0] ? { confirmed_at: ageResult.rows[0].confirmed_at, self_declaration: true } : null,
+      project_terms_at_confirmation: termResult.rows,
+      verified_account_email: identity.email,
+    });
+    await client.query(
+      `update ${active ? "interest_entries" : "investors"} set confirmation_evidence = $1::jsonb where id = $2 and confirmed_at is null`,
+      [confirmationEvidence, active?.id ?? investor.id],
+    );
     await client.query(
       "update pledges set confirmed = true where investor_id = $1 and entry_id is not distinct from $2 and confirmed = false",
       [investor.id, active?.id ?? null],

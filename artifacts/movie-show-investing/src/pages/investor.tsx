@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { InvestorNotificationPermissionControl } from '@/components/investor-notification-permission';
 import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
@@ -330,6 +331,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoadi
     }
   }
   function validate(step:number) {
+    if(step===5 && !a.terms_read) return 'Acknowledge the ground rules below before submitting your non-binding interest.';
     if(step===1 && (!Number.isSafeInteger(a.amount) || a.amount<100)) return 'Enter a whole-dollar amount of at least $100.';
     if(step===1 && !a.terms_read) return 'Please acknowledge the ground rules before continuing.';
     if(step===1 && !(ageStatus.confirmed || ageChecked)) return 'Confirm that you are 18 years of age or older to continue.';
@@ -397,6 +399,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoadi
       if (!pendingSaved.current || pendingSaved.current.reviewKey !== reviewKey || pendingSaved.current.draftKey !== draftKey) {
         const saved = await submit.mutateAsync({data:{
           ...input, minima:minimaForSelectedStages(a.minima,a.stages),
+          ground_rules_accepted: a.terms_read === true ? true : undefined,
           expected_investor_owner:expectedOwner,new_entry:!startFresh && (newEntry || current.data?.intent?.entry_id != null && current.data.intent.status==='saved'),
           start_fresh:startFresh,name:reviewed.name,email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,
           allocations:reviewed.allocations,unallocated:reviewed.unallocated,
@@ -534,6 +537,8 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoadi
           <div className="inv-section"><p className="inv-label">What experience do you bring? · choose any</p><div className="inv-options">{['New to investing','Invested in creative projects','Invested in private companies','Work in film or media'].map(value=><Option key={value} label={value} checked={a.experience.includes(value)} onChange={()=>change('experience',toggle(a.experience,value))}/>)}</div></div>
           <div className="inv-section"><p className="inv-label">What brings you here? · choose any</p><div className="inv-options">{['Support independent filmmakers','Discover stories early','Connect with creators','Learn about future opportunities'].map(value=><Option key={value} label={value} checked={a.motivations.includes(value)} onChange={()=>change('motivations',toggle(a.motivations,value))}/>)}</div></div>
            <label className="fm-check inv-section inv-contact-opt-in"><input type="checkbox" data-testid="checkbox-invest-chat-opt-in" checked={a.call_opt_in} onChange={e=>change('call_opt_in',e.target.checked)}/><span>I’m open to a quick 15-minute chat about my interests.</span></label>
+            <InvestorNotificationPermissionControl/>
+            {!a.terms_read && <label className="fm-check inv-section"><input type="checkbox" checked={a.terms_read} onChange={event => change('terms_read', event.target.checked)} data-testid="checkbox-restored-ground-rules"/><span>I understand this is non-binding interest, not an investment or payment. Any future investment requires its own offering documents and eligibility checks; returns are not guaranteed.</span></label>}
             <section className="inv-section" data-testid="section-final-interest-confirmation">
               <p className="inv-kicker">One confirmation · before submission</p>
               <h2>Review and confirm your interest.</h2>

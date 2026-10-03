@@ -454,3 +454,24 @@ textarea.fm-input { min-height:116px; resize:vertical; }
 .fm-calc { display:grid; gap:14px; grid-template-columns:repeat(2,minmax(0,1fr)); }
 .fm-calc .fm-field { margin-bottom:6px; }
 @media (max-width:600px) { .fm-calc { grid-template-columns:1fr; } }
+
+.admin-missing { font-style: italic; opacity: .72; }
+.admin-list { margin: 0; padding-left: 1.2rem; list-style: decimal; }
+.admin-nested { margin-left: .25rem; padding-left: .8rem; border-left: 2px solid #c8c0b5; }
+.admin-badge { display: inline-block; margin-top: .5rem; padding: 4px 10px; border: 1px solid var(--admin-ink); font-size: 12px; }
+.admin-room, .admin-stage, .admin-sidebar, .admin-main-inner { min-width: 0; max-width: 100%; }
+.admin-main-inner form > label { min-width: 0; max-width: 100%; }
+.admin-main-inner form :is(input, select) { width: 100%; min-width: 0; max-width: 100%; }
+.admin-main-inner form > label:has(select) { flex: 0 1 260px; }
+.admin-table-wrap { max-width: 100%; }
+.admin-investor-table { min-width: 1280px; table-layout: auto; }
+.admin-investor-table :is(th, td) { padding: 14px; }
+.admin-investor-table :is(th, td):last-child { position: sticky; right: 0; background: var(--admin-panel); }
+.admin-investor-table th:last-child { background: #eae4d8; }
+.admin-room [role="dialog"] { overflow-x: hidden; }
+.admin-room [role="dialog"] :is(h2, p, dd, li, a, time) { overflow-wrap: anywhere; }
+.admin-room [role="dialog"] :is(.grid, .flex) > * { min-width: 0; }
+.admin-room [role="dialog"] .admin-page-title { font-size: clamp(28px, 4vw, 48px); line-height: 1.1; }
+.admin-evidence-fold { border: 1px solid var(--admin-line); padding: 14px; }
+.admin-evidence-fold > summary { cursor: pointer; font-weight: 600; line-height: 1.5; }
+.admin-evidence-fold[open] > summary { margin-bottom: 18px; }

@@ -10,6 +10,20 @@ import type { FilmmakerResultPriceGroup } from './filmmakerResultPriceGroup';
 import type { FilmmakerResultStage } from './filmmakerResultStage';
 
 export interface FilmmakerResult {
+  /** @nullable */
+  team_info?: string | null;
+  /** @nullable */
+  crowdfunding_ran?: boolean | null;
+  /** @nullable */
+  crowdfunding_campaign?: string | null;
+  /** @nullable */
+  crowdfunding_same_project?: boolean | null;
+  /** @nullable */
+  crowdfunding_goal?: number | null;
+  /** @nullable */
+  crowdfunding_raised?: number | null;
+  /** @nullable */
+  crowdfunding_obligations?: string | null;
   proposal?: FilmmakerProposal | null;
   completed: true;
   no_project_yet: boolean;

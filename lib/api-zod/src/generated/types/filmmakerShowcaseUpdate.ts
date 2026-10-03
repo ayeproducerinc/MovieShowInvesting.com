@@ -7,6 +7,27 @@
  */
 
 export interface FilmmakerShowcaseUpdate {
+  /**
+     * @maxLength 3000
+     * @nullable
+     */
+  team_info?: string | null;
+  crowdfunding_ran?: boolean;
+  /** @maxLength 2000 */
+  crowdfunding_campaign?: string;
+  crowdfunding_same_project?: boolean;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     */
+  crowdfunding_goal?: number;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     */
+  crowdfunding_raised?: number;
+  /** @maxLength 3000 */
+  crowdfunding_obligations?: string;
   showcase_requested?: boolean;
   /**
      * @maxLength 5000

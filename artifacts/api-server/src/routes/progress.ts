@@ -110,6 +110,16 @@ router.get("/progress/:flow", async (req, res): Promise<void> => {
         };
       }
     }
+    // Preserve securely linked legacy progress before registering the investor-specific start.
+    await pool.query(
+      `insert into investor_account_progress
+       (provider, uid, last_screen, answers, completed, first_seen_at, verified_email, email_verified_at)
+       values ($1,$2,$3,$4::jsonb,$5,$6,$7,now())
+       on conflict (provider, uid) do update set verified_email=excluded.verified_email,
+       email_verified_at=excluded.email_verified_at`,
+      [identity.provider, identity.uid, record?.last_screen ?? 1, JSON.stringify(record?.answers ?? {}),
+        record?.completed ?? false, record ? null : new Date(), identity.email],
+    );
     if (!record) {
       res.status(404).json({ error: "No progress saved." });
       return;
@@ -174,14 +184,15 @@ router.post("/progress", async (req, res): Promise<void> => {
       return;
     }
     const { rows } = await pool.query<AccountProgressRow>(
-      `insert into investor_account_progress (provider, uid, last_screen, answers, completed)
-       values ($1, $2, $3, $4::jsonb, $5)
+      `insert into investor_account_progress (provider, uid, last_screen, answers, completed, first_seen_at, verified_email, email_verified_at)
+       values ($1, $2, $3, $4::jsonb, $5, now(), $6, now())
        on conflict (provider, uid) do update set
          last_screen = excluded.last_screen, answers = excluded.answers,
-         completed = excluded.completed, updated_at = now()
+         completed = excluded.completed, updated_at = now(),
+         verified_email = excluded.verified_email, email_verified_at = excluded.email_verified_at
        returning last_screen, answers, completed, updated_at`,
       [identity.provider, identity.uid, parsed.data.last_screen,
-        JSON.stringify(parsed.data.answers), parsed.data.completed ?? false],
+        JSON.stringify(parsed.data.answers), parsed.data.completed ?? false, identity.email],
     );
     const record = rows[0];
     res.json(SaveFlowProgressResponse.parse({

@@ -32,6 +32,8 @@ type Answers = {
   funding_sources: string[]; funding_other: string; reached_goal: boolean | null; funding_experience: string;
   flow_version:number; age_confirmed:boolean; decision:'standard'|'negotiation'|null; p_repayment:string; p_investor:string; p_years:string; p_early_on:boolean; p_early:string; p_note:string; original_suggestion:number|null;
   name: string; email: string; phone: string; city: string; state: string; country: string; location_manual: boolean; favorite_genres: string[]; chat_opt_in: boolean;
+  team_info: string; team_links_text: string; distribution_plan: string; money_use: string; show_team: boolean | null; show_dist: boolean | null; show_money: boolean | null;
+  crowdfunding_ran: boolean | null; crowdfunding_campaign: string; crowdfunding_same_project: boolean | null; crowdfunding_goal: string; crowdfunding_raised: string; crowdfunding_obligations: string;
 };
 const initial: Answers = {
   stage:null, no_project_yet:false, title:'', format:'movie', genre:'', genre_other:'', logline:'', trailer_url:'', pilot_url:'',
@@ -39,10 +41,15 @@ const initial: Answers = {
   payback_terms:null, payback_terms_other:'', funding_sources:[], funding_other:'', reached_goal:null, funding_experience:'',
   flow_version:FLOW_VERSION, age_confirmed:false, decision:null, p_repayment:'', p_investor:'50', p_years:'5', p_early_on:false, p_early:String(EARLY_EXAMPLE), p_note:'', original_suggestion:null,
   name:'', email:'', phone:'', city:'', state:'', country:'', location_manual:false, favorite_genres:[], chat_opt_in:false,
+  team_info:'', team_links_text:'', distribution_plan:'', money_use:'', show_team:null, show_dist:null, show_money:null,
+  crowdfunding_ran:null, crowdfunding_campaign:'', crowdfunding_same_project:null, crowdfunding_goal:'', crowdfunding_raised:'', crowdfunding_obligations:'',
 };
 const genres = ['Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Other'] as const;
 const funding = ['Own money','Friends & family','Kickstarter / Indiegogo / Seed&Spark','Grants','Investors','Studios','Haven’t yet','Other'];
 const headings = ['Project stage','Project & pitch','Budget & suggested repayment terms','Funding experience','Your details & submit'];
+const isCrowd = (s:string) => s.startsWith('Kickstarter');
+const teamLinkList = (v:string) => v.split('\n').map(x=>x.trim()).filter(Boolean);
+const nonNeg = (v:string) => !v.trim() || (Number.isFinite(Number(v)) && Number(v) >= 0);
 const hasFundingHistoryFor = (sources:string[]) => !(sources.length === 1 && sources.includes('Haven’t yet'));
 const descriptions = [
   'Every project starts in a different place. Tell us where yours stands today.',
@@ -77,8 +84,17 @@ function payload(a:Answers):FilmmakerSubmissionInput {
   const contact = { no_project_yet:a.no_project_yet, age_confirmed:true as const, name:a.name.trim(), email:a.email.trim(), phone:a.phone.trim() || undefined, city:a.city.trim(), state:a.state.trim() || undefined, country:a.country || undefined, favorite_genres:a.favorite_genres, chat_opt_in:a.chat_opt_in };
   if (a.no_project_yet) return contact;
   const proposal = buildProposal(a) ?? undefined;
+  const links = teamLinkList(a.team_links_text);
+  const crowd = a.funding_sources.some(isCrowd) && a.crowdfunding_ran === true;
+  const opt = (v:string) => v.trim() || undefined;
+  const num = (v:string) => v.trim() ? Number(v) : undefined;
+  const extra = {
+    team_info:opt(a.team_info), team_links:links.length ? links : undefined, money_use:opt(a.money_use), distribution_plan:opt(a.distribution_plan),
+    crowdfunding_ran:a.funding_sources.some(isCrowd) && a.crowdfunding_ran !== null ? a.crowdfunding_ran : undefined,
+    ...(crowd ? { crowdfunding_campaign:opt(a.crowdfunding_campaign), crowdfunding_same_project:a.crowdfunding_same_project ?? undefined, crowdfunding_goal:num(a.crowdfunding_goal), crowdfunding_raised:num(a.crowdfunding_raised), crowdfunding_obligations:opt(a.crowdfunding_obligations) } : {}),
+  };
   return {
-    ...contact, stage:a.stage ?? undefined,
+    ...contact, ...extra, stage:a.stage ?? undefined,
     title:a.title.trim(), format:a.format, genre:a.genre || undefined, genre_other:a.genre === 'Other' ? a.genre_other.trim() : undefined,
     logline:a.logline.trim(), pilot_url:a.stage === 'production' ? a.pilot_url.trim() || undefined : undefined,
     budget:a.budget, budget_from_example:a.budget_mode === 'example',
@@ -88,6 +104,23 @@ function payload(a:Answers):FilmmakerSubmissionInput {
     reached_goal:hasFundingHistoryFor(a.funding_sources) ? a.reached_goal ?? undefined : undefined,
     funding_experience:hasFundingHistoryFor(a.funding_sources) ? a.funding_experience.trim() : undefined,
   };
+}
+
+function OptionalSpecifics({ a, change }: { a:Answers; change:<K extends keyof Answers>(key:K, value:Answers[K])=>void }) {
+  const items = [
+    { key:'show_team' as const, id:'team', label:'Do you have team information to share?', filled:Boolean(a.team_info || a.team_links_text) },
+    { key:'show_dist' as const, id:'distribution', label:'Do you have a distribution plan?', filled:Boolean(a.distribution_plan) },
+    { key:'show_money' as const, id:'money', label:'Do you know how the funding would be used?', filled:Boolean(a.money_use) },
+  ];
+  return <div className="fm-section" data-testid="section-optional-specifics">{items.map(item => {
+    const open = a[item.key] ?? item.filled;
+    return <div key={item.id}>
+      <label className="fm-check"><input type="checkbox" data-testid={`checkbox-${item.id}`} checked={open} onChange={e=>change(item.key, e.target.checked)}/><span>{item.label}<small style={{display:'block'}} className="fm-small">Optional.{item.filled && !open ? ' Your saved details are kept; check this to see them.' : ' Unchecking hides these fields but does not delete what you saved.'}</small></span></label>
+      {open && item.id==='team' && <><Field id="team-info" label="Key team" value={a.team_info} onChange={v=>change('team_info',v)} multiline placeholder="Who is attached, and what they have done"/><Field id="team-links" label="Relevant links, one per line, up to 8" value={a.team_links_text} onChange={v=>change('team_links_text',v)} multiline placeholder="https://"/></>}
+      {open && item.id==='distribution' && <Field id="distribution-plan" label="Distribution plan" value={a.distribution_plan} onChange={v=>change('distribution_plan',v)} multiline/>}
+      {open && item.id==='money' && <Field id="money-use" label="Planned funding use" value={a.money_use} onChange={v=>change('money_use',v)} multiline placeholder="Separate from funding you already have"/>}
+    </div>;
+  })}</div>;
 }
 
 export default function Filmmaker() {
@@ -430,11 +463,14 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoadin
     if (step === 2 && !a.no_project_yet) {
       if (!a.title.trim() || !a.genre || !a.logline.trim() || (a.genre === 'Other' && !a.genre_other.trim())) return 'Add a title, genre and logline to continue.';
       if (!validUrl(a.pilot_url)) return 'Use a full http:// or https:// link for your video URL.';
+      if (teamLinkList(a.team_links_text).some(l=>!validUrl(l)) || teamLinkList(a.team_links_text).length > 8) return 'Add up to eight full http:// or https:// team links, one per line.';
     }
     if (step === 3 && !budgetValid) return a.budget > MAX_BUDGET ? `Budget can be at most ${money(MAX_BUDGET)}. Enter a smaller whole-dollar amount.` : 'Enter a positive whole-dollar budget to continue.';
     if (step === 3 && !a.decision) return 'Choose Looks good to me or Open to negotiation.';
     if (step === 3 && negotiating && !parsedCustom.ok) return 'Fix the highlighted terms in Propose my terms, or switch back to Looks good to me.';
     if (step === 4 && (a.funding_sources.length === 0 || (a.funding_sources.includes('Other') && !a.funding_other.trim()) || (hasFundingHistory && (a.reached_goal === null || !a.funding_experience.trim())))) return 'Tell us where you have looked for funding and, when relevant, whether you reached your goal and what happened.';
+    if (step === 4 && a.funding_sources.some(isCrowd) && a.crowdfunding_ran === true && (!nonNeg(a.crowdfunding_goal) || !nonNeg(a.crowdfunding_raised))) return 'Campaign goal and amount raised must be zero or more.';
+    if (step === 4 && a.funding_sources.some(isCrowd) && a.crowdfunding_ran === null) return 'Tell us whether you actually ran a crowdfunding campaign.';
     if (step === 5 && (!a.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim()) || !a.city.trim() || !a.country)) return 'Add your name, a valid email, city and country. Choose a city from the suggestions or enter your location manually.';
     return '';
   }
@@ -637,6 +673,7 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoadin
                onErrorChange={error=>setMaterialsError(error ?? '')}
              />
              {materialsError && <p className="fm-error" role="alert" data-testid="error-draft-materials">{materialsError}</p>}
+            <OptionalSpecifics a={a} change={change}/>
             {a.stage==='production' && <Field id="pilot-url" label="Short or pilot URL" value={a.pilot_url} onChange={v=>change('pilot_url',v)} type="url" placeholder="https://"/>}
           </>}
         </>}
@@ -663,6 +700,15 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoadin
          </>}
          {screen === 4 && <><p className="fm-label">Where have you looked for funding, or what best describes you? Select all that apply.</p><div className="fm-choice-list">{funding.map(source=><Choice id={`funding-${source.replace(/\W+/g,'-').toLowerCase()}`} name="funding-source" multiple key={source} selected={a.funding_sources.includes(source)} onClick={()=>toggleArray('funding_sources',source)}>{source}</Choice>)}</div>
           {a.funding_sources.includes('Other') && <div className="fm-section"><Field id="funding-other" label="Other funding source" value={a.funding_other} onChange={v=>change('funding_other',v)} required/></div>}
+            {a.funding_sources.some(isCrowd) && <div className="fm-section" data-testid="section-crowdfunding"><p className="fm-label">Did you actually run a campaign?</p><p className="fm-small">Looking for crowdfunding is not the same as running a campaign.</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}><Choice id="crowd-yes" name="crowd-ran" selected={a.crowdfunding_ran===true} onClick={()=>change('crowdfunding_ran',true)}>Yes</Choice><Choice id="crowd-no" name="crowd-ran" selected={a.crowdfunding_ran===false} onClick={()=>change('crowdfunding_ran',false)}>No</Choice></div>
+              {a.crowdfunding_ran===true && <div className="fm-section" data-testid="group-crowdfunding-details">
+                <Field id="crowd-campaign" label="Platform or campaign link" value={a.crowdfunding_campaign} onChange={v=>change('crowdfunding_campaign',v)} placeholder="Kickstarter link, or explain if you no longer have one"/>
+                <div className="fm-field"><p className="fm-label">Was it for this project? <span className="fm-small">· optional</span></p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}><Choice id="crowd-same-yes" name="crowd-same" selected={a.crowdfunding_same_project===true} onClick={()=>change('crowdfunding_same_project',true)}>Yes</Choice><Choice id="crowd-same-no" name="crowd-same" selected={a.crowdfunding_same_project===false} onClick={()=>change('crowdfunding_same_project',false)}>No</Choice></div></div>
+                <div className="fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:12}}><Field id="crowd-goal" label="Goal · $" value={a.crowdfunding_goal} onChange={v=>change('crowdfunding_goal',v)}/><Field id="crowd-raised" label="Raised · $" value={a.crowdfunding_raised} onChange={v=>change('crowdfunding_raised',v)}/></div>
+                <Field id="crowd-obligations" label="Campaign type and anything still owed" value={a.crowdfunding_obligations} onChange={v=>change('crowdfunding_obligations',v)} multiline placeholder="For example: rewards still to ship, or repayment commitments"/>
+                <p className="fm-small">Other campaigns can go in your experience notes below. We may follow up manually. This is not shown publicly.</p>
+              </div>}
+            </div>}
             {hasFundingHistory ? <><div className="fm-section"><p className="fm-label">Did you reach your goal?</p><div className="fm-choice-list fm-grid" style={{gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}><Choice id="goal-yes" name="funding-goal" selected={a.reached_goal===true} onClick={()=>change('reached_goal',true)}>Yes</Choice><Choice id="goal-no" name="funding-goal" selected={a.reached_goal===false} onClick={()=>change('reached_goal',false)}>No</Choice></div></div>
              <div className="fm-section"><Field id="funding-experience" label="What was your experience?" value={a.funding_experience} onChange={v=>change('funding_experience',v)} required multiline placeholder="What worked, what didn’t, or what you wish had been different"/></div></>
              : <div className="fm-note" role="status" style={{marginTop:18}}>No past funding experience needed. We’ll skip the goal and experience questions.</div>}

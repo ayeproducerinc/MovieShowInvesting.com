@@ -13,6 +13,33 @@ import type { FilmmakerSubmissionInputPaybackTerms } from './filmmakerSubmission
 import type { FilmmakerSubmissionInputStage } from './filmmakerSubmissionInputStage';
 
 export interface FilmmakerSubmissionInput {
+  /** @maxLength 3000 */
+  team_info?: string;
+  /**
+     * @maxItems 10
+     * @items.maxLength 2048
+     */
+  team_links?: string[];
+  /** @maxLength 5000 */
+  money_use?: string;
+  /** @maxLength 5000 */
+  distribution_plan?: string;
+  crowdfunding_ran?: boolean;
+  /** @maxLength 2000 */
+  crowdfunding_campaign?: string;
+  crowdfunding_same_project?: boolean;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     */
+  crowdfunding_goal?: number;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     */
+  crowdfunding_raised?: number;
+  /** @maxLength 3000 */
+  crowdfunding_obligations?: string;
   age_confirmed?: true;
   proposal?: FilmmakerProposalInput;
   /** Leave blank. Bot-detection field; never stored with the submission. */

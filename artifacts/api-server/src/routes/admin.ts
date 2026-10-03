@@ -435,6 +435,8 @@ router.get("/admin/projects/:projectId/review", async (req, res): Promise<void> 
   const filmmaker = pitch.filmmaker;
   const projectAnswers = {
     ...answers,
+    ...(project.crowdfunding ?? {}),
+    team_info: project.teamInfo ?? null,
     stage: project.stage ?? answerString("stage"),
     stage_other: project.stageOther ?? answerString("stage_other"),
     title: project.title ?? answerString("title"),
@@ -450,10 +452,10 @@ router.get("/admin/projects/:projectId/review", async (req, res): Promise<void> 
     wants_lower: project.wantsLower ?? answerBoolean("wants_lower"),
     payback_terms: project.paybackTerms ?? answerString("payback_terms"),
     payback_terms_other: project.paybackTermsOther ?? answerString("payback_terms_other"),
-    funding_sources: filmmaker?.fundingSources ?? answerStrings("funding_sources"),
-    funding_other: filmmaker?.fundingOther ?? answerString("funding_other"),
-    reached_goal: filmmaker?.reachedGoal ?? answerBoolean("reached_goal"),
-    funding_experience: filmmaker?.fundingExperience ?? answerString("funding_experience"),
+    funding_sources: answerStrings("funding_sources"),
+    funding_other: answerString("funding_other"),
+    reached_goal: answerBoolean("reached_goal"),
+    funding_experience: answerString("funding_experience"),
     team_links: Array.isArray(project.teamLinks) && project.teamLinks.length
       ? project.teamLinks.map(safeAdminWebUrl).filter((value): value is string => value !== null)
       : answerStrings("team_links").map(safeAdminWebUrl).filter((value): value is string => value !== null),
@@ -474,7 +476,16 @@ router.get("/admin/projects/:projectId/review", async (req, res): Promise<void> 
     trailerThumbnail(project.trailerUrl),
   ]);
   const response = {
+    original_submission: publicSubmissionSnapshot(project),
+    submission_provenance: pitch.provenance,
+    changes_since_submission: hasSubmissionChanges(project),
+    review_notes: { notes: "", obligations_checked: false, authority_checked: false, questions_resolved: false, updated_at: null, ...(project.reviewNotes ?? {}) },
+    review_history: project.reviewHistory ?? [],
     project: {
+      team_info: projectAnswers.team_info,
+      team_links: projectAnswers.team_links,
+      money_use: projectAnswers.money_use,
+      distribution_plan: projectAnswers.distribution_plan,
       proposal: project.proposal ?? null,
       id: project.id,
       title: projectAnswers.title,
@@ -522,6 +533,32 @@ router.get("/admin/projects/:projectId/review", async (req, res): Promise<void> 
       trailer_thumbnail_url: thumbnail,
     },
   };
+
+function publicSubmissionSnapshot(project: typeof projectsTable.$inferSelect) {
+  if (!project.submissionSnapshot) return null;
+  const saved = project.submissionSnapshot;
+  const original = saved.project as Record<string, unknown> | undefined;
+  const safeProject = Object.fromEntries(Object.entries(original ?? {}).filter(([key]) =>
+    !["filmmakerId", "posterStoragePath", "shareImageStoragePath", "pitchDeckStoragePath", "bunnyVideoId", "pendingBunnyVideoId"].includes(key)));
+  return {
+    ...saved, project: safeProject,
+    materials: {
+      synopsis: original?.synopsis ?? null,
+      poster_url: safeAdminWebUrl(typeof original?.posterUrl === "string" ? original.posterUrl : null),
+      share_image_url: safeAdminWebUrl(typeof original?.shareImageUrl === "string" ? original.shareImageUrl : null),
+      trailer_url: safeAdminWebUrl(typeof original?.trailerUrl === "string" ? original.trailerUrl : null),
+      pilot_url: safeAdminWebUrl(typeof original?.pilotUrl === "string" ? original.pilotUrl : null),
+      deck_name: original?.pitchDeckName ?? null,
+      deck_url: original?.pitchDeckStoragePath ? `/api/filmmakers/project-materials/pitch-deck?project_id=${project.id}&original=1` : null,
+    },
+  };
+}
+function hasSubmissionChanges(project: typeof projectsTable.$inferSelect): boolean {
+  const original = project.submissionSnapshot?.project as Record<string, unknown> | undefined;
+  if (!original) return false;
+  const fields = ["title", "logline", "format", "genre", "genreOther", "stage", "budget", "proposal", "synopsis", "teamInfo", "teamLinks", "moneyUse", "distributionPlan", "trailerUrl", "pilotUrl", "posterUrl", "shareImageUrl", "pitchDeckStoragePath", "crowdfunding"] as const;
+  return fields.some(key => JSON.stringify(original[key] ?? null) !== JSON.stringify(project[key] ?? null));
+}
   res.json(GetAdminProjectReviewResponse.parse(response));
 });
 

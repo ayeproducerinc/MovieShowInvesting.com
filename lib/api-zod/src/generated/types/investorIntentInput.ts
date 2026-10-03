@@ -9,6 +9,7 @@ import type { InvestorAllocationInput } from './investorAllocationInput';
 import type { InvestorMinima } from './investorMinima';
 
 export interface InvestorIntentInput {
+  ground_rules_accepted?: true;
   /** @minLength 1 */
   name: string;
   email: string;

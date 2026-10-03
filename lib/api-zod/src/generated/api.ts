@@ -358,6 +358,26 @@ export const SubmitFilmmakerHeader = zod.object({
   "X-MSI-Draft-Id": zod.number().int().min(1).optional().describe('Required for account-linked visitors; must match the current filmmaker flow_progress.id.')
 })
 
+export const submitFilmmakerBodyTeamInfoMax = 3000;
+
+export const submitFilmmakerBodyTeamLinksItemMax = 2048;
+
+export const submitFilmmakerBodyTeamLinksMax = 10;
+
+export const submitFilmmakerBodyMoneyUseMax = 5000;
+
+export const submitFilmmakerBodyDistributionPlanMax = 5000;
+
+export const submitFilmmakerBodyCrowdfundingCampaignMax = 2000;
+
+export const submitFilmmakerBodyCrowdfundingGoalMin = 0;
+export const submitFilmmakerBodyCrowdfundingGoalMax = 2147483647;
+
+export const submitFilmmakerBodyCrowdfundingRaisedMin = 0;
+export const submitFilmmakerBodyCrowdfundingRaisedMax = 2147483647;
+
+export const submitFilmmakerBodyCrowdfundingObligationsMax = 3000;
+
 export const submitFilmmakerBodyProposalRepaymentPer100Min = 125;
 export const submitFilmmakerBodyProposalRepaymentPer100Max = 10000;
 
@@ -382,6 +402,16 @@ export const submitFilmmakerBodyCountryRegExp = new RegExp('^[A-Z]{2}$');
 
 
 export const SubmitFilmmakerBody = zod.object({
+  "team_info": zod.string().max(submitFilmmakerBodyTeamInfoMax).optional(),
+  "team_links": zod.array(zod.string().url().max(submitFilmmakerBodyTeamLinksItemMax)).max(submitFilmmakerBodyTeamLinksMax).optional(),
+  "money_use": zod.string().max(submitFilmmakerBodyMoneyUseMax).optional(),
+  "distribution_plan": zod.string().max(submitFilmmakerBodyDistributionPlanMax).optional(),
+  "crowdfunding_ran": zod.boolean().optional(),
+  "crowdfunding_campaign": zod.string().max(submitFilmmakerBodyCrowdfundingCampaignMax).optional(),
+  "crowdfunding_same_project": zod.boolean().optional(),
+  "crowdfunding_goal": zod.number().min(submitFilmmakerBodyCrowdfundingGoalMin).max(submitFilmmakerBodyCrowdfundingGoalMax).optional(),
+  "crowdfunding_raised": zod.number().min(submitFilmmakerBodyCrowdfundingRaisedMin).max(submitFilmmakerBodyCrowdfundingRaisedMax).optional(),
+  "crowdfunding_obligations": zod.string().max(submitFilmmakerBodyCrowdfundingObligationsMax).optional(),
   "age_confirmed": zod.literal(true).optional(),
   "proposal": zod.object({
   "decision": zod.enum(['standard', 'negotiation']),
@@ -463,6 +493,13 @@ export const getFilmmakerResultResponseProposalOneOneNoteMax = 2000;
 
 
 export const GetFilmmakerResultResponse = zod.object({
+  "team_info": zod.string().nullish(),
+  "crowdfunding_ran": zod.boolean().nullish(),
+  "crowdfunding_campaign": zod.string().nullish(),
+  "crowdfunding_same_project": zod.boolean().nullish(),
+  "crowdfunding_goal": zod.number().nullish(),
+  "crowdfunding_raised": zod.number().nullish(),
+  "crowdfunding_obligations": zod.string().nullish(),
   "proposal": zod.union([zod.object({
   "decision": zod.enum(['standard', 'negotiation']),
   "repayment_per100": zod.number().int().min(getFilmmakerResultResponseProposalOneOneRepaymentPer100Min).max(getFilmmakerResultResponseProposalOneOneRepaymentPer100Max),
@@ -693,6 +730,18 @@ export const UpdateFilmmakerShowcaseHeader = zod.object({
   "X-MSI-Project-Id": zod.number().int().min(1).optional().describe('Required for account-linked visitors; must match the completed project resolved from the current visitor cookie.')
 })
 
+export const updateFilmmakerShowcaseBodyTeamInfoMax = 3000;
+
+export const updateFilmmakerShowcaseBodyCrowdfundingCampaignMax = 2000;
+
+export const updateFilmmakerShowcaseBodyCrowdfundingGoalMin = 0;
+export const updateFilmmakerShowcaseBodyCrowdfundingGoalMax = 2147483647;
+
+export const updateFilmmakerShowcaseBodyCrowdfundingRaisedMin = 0;
+export const updateFilmmakerShowcaseBodyCrowdfundingRaisedMax = 2147483647;
+
+export const updateFilmmakerShowcaseBodyCrowdfundingObligationsMax = 3000;
+
 export const updateFilmmakerShowcaseBodySynopsisMax = 5000;
 
 export const updateFilmmakerShowcaseBodyTeamLinksItemMax = 500;
@@ -712,6 +761,13 @@ export const updateFilmmakerShowcaseBodyTrailerUrlRegExp = new RegExp('^https?:/
 
 
 export const UpdateFilmmakerShowcaseBody = zod.object({
+  "team_info": zod.string().max(updateFilmmakerShowcaseBodyTeamInfoMax).nullish(),
+  "crowdfunding_ran": zod.boolean().optional(),
+  "crowdfunding_campaign": zod.string().max(updateFilmmakerShowcaseBodyCrowdfundingCampaignMax).optional(),
+  "crowdfunding_same_project": zod.boolean().optional(),
+  "crowdfunding_goal": zod.number().min(updateFilmmakerShowcaseBodyCrowdfundingGoalMin).max(updateFilmmakerShowcaseBodyCrowdfundingGoalMax).optional(),
+  "crowdfunding_raised": zod.number().min(updateFilmmakerShowcaseBodyCrowdfundingRaisedMin).max(updateFilmmakerShowcaseBodyCrowdfundingRaisedMax).optional(),
+  "crowdfunding_obligations": zod.string().max(updateFilmmakerShowcaseBodyCrowdfundingObligationsMax).optional(),
   "showcase_requested": zod.boolean().optional(),
   "synopsis": zod.string().max(updateFilmmakerShowcaseBodySynopsisMax).nullish(),
   "team_links": zod.array(zod.string().max(updateFilmmakerShowcaseBodyTeamLinksItemMax).regex(updateFilmmakerShowcaseBodyTeamLinksItemRegExp)).max(updateFilmmakerShowcaseBodyTeamLinksMax).nullish(),
@@ -1305,6 +1361,7 @@ export const getPublicProjectResponseConfirmedPledgeTotalMin = 0;
 
 
 export const GetPublicProjectResponse = zod.object({
+  "team_info": zod.string().nullish(),
   "budget": zod.number().int().nullish(),
   "proposal": zod.union([zod.object({
   "decision": zod.enum(['standard', 'negotiation']),
@@ -1548,6 +1605,7 @@ export const saveInvestorIntentBodyCountryRegExp = new RegExp('^[A-Z]{2}$');
 
 
 export const SaveInvestorIntentBody = zod.object({
+  "ground_rules_accepted": zod.literal(true).optional(),
   "name": zod.string().min(1),
   "email": zod.string().email(),
   "expected_investor_owner": zod.string().optional().describe('Investor worksheet identity captured on opening; the API rejects a save if the signed-in account changed'),
@@ -2010,6 +2068,8 @@ export const GetAdminProjectReviewParams = zod.object({
   "projectId": zod.coerce.number().int().min(1)
 })
 
+export const getAdminProjectReviewResponseReviewNotesNotesMax = 8000;
+
 export const getAdminProjectReviewResponseProjectProposalOneOneRepaymentPer100Min = 125;
 export const getAdminProjectReviewResponseProjectProposalOneOneRepaymentPer100Max = 10000;
 
@@ -2027,6 +2087,17 @@ export const getAdminProjectReviewResponseProjectProposalOneOneNoteMax = 2000;
 
 
 export const GetAdminProjectReviewResponse = zod.object({
+  "original_submission": zod.record(zod.string(), zod.unknown()).nullish(),
+  "submission_provenance": zod.string().optional(),
+  "changes_since_submission": zod.boolean().optional(),
+  "review_notes": zod.object({
+  "notes": zod.string().max(getAdminProjectReviewResponseReviewNotesNotesMax),
+  "obligations_checked": zod.boolean(),
+  "authority_checked": zod.boolean(),
+  "questions_resolved": zod.boolean(),
+  "updated_at": zod.string().nullish()
+}).optional(),
+  "review_history": zod.array(zod.record(zod.string(), zod.unknown())).optional(),
   "project": zod.object({
   "proposal": zod.union([zod.object({
   "decision": zod.enum(['standard', 'negotiation']),
@@ -2044,6 +2115,10 @@ export const GetAdminProjectReviewResponse = zod.object({
   "version": zod.literal(1)
 })),zod.null()]).optional(),
   "id": zod.number().int().min(1),
+  "team_links": zod.array(zod.string()).optional(),
+  "team_info": zod.string().nullish(),
+  "money_use": zod.string().nullish(),
+  "distribution_plan": zod.string().nullish(),
   "title": zod.string().nullable(),
   "format": zod.string().nullable(),
   "genre": zod.string().nullable(),
@@ -2096,6 +2171,126 @@ export const ReviewAdminMessageBody = zod.object({
 export const ReviewAdminMessageResponse = zod.object({
   "id": zod.number().int(),
   "hidden": zod.boolean()
+})
+
+
+export const getAdminInvestorsQuerySearchMax = 200;
+
+
+export const getAdminInvestorsQueryOffsetDefault = 0;
+export const getAdminInvestorsQueryOffsetMin = 0;
+
+export const getAdminInvestorsQueryLimitDefault = 50;
+export const getAdminInvestorsQueryLimitMax = 250;
+
+
+
+export const GetAdminInvestorsQueryParams = zod.object({
+  "search": zod.coerce.string().max(getAdminInvestorsQuerySearchMax).optional(),
+  "status": zod.enum(['signup', 'draft', 'saved', 'confirmed']).optional(),
+  "project_id": zod.coerce.number().int().min(1).optional(),
+  "offset": zod.coerce.number().int().min(getAdminInvestorsQueryOffsetMin).default(getAdminInvestorsQueryOffsetDefault),
+  "limit": zod.coerce.number().int().min(1).max(getAdminInvestorsQueryLimitMax).default(getAdminInvestorsQueryLimitDefault)
+})
+
+export const GetAdminInvestorsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string().nullable(),
+  "email": zod.string().nullable(),
+  "status": zod.enum(['signup', 'draft', 'saved', 'confirmed']),
+  "first_seen_at": zod.string().nullable(),
+  "last_activity_at": zod.string().nullable(),
+  "confirmed_amount": zod.number().int(),
+  "notification_allowed": zod.boolean().nullable(),
+  "project_ids": zod.array(zod.number().int())
+})),
+  "total": zod.number().int(),
+  "projects": zod.array(zod.object({
+  "id": zod.number().int(),
+  "title": zod.string().nullable(),
+  "eligible": zod.boolean()
+}))
+})
+
+
+export const exportAdminInvestorsQuerySearchMax = 200;
+
+
+
+
+export const ExportAdminInvestorsQueryParams = zod.object({
+  "search": zod.coerce.string().max(exportAdminInvestorsQuerySearchMax).optional(),
+  "status": zod.enum(['signup', 'draft', 'saved', 'confirmed']).optional(),
+  "project_id": zod.coerce.number().int().min(1).optional()
+})
+
+export const ExportAdminInvestorsResponse = zod.unknown()
+
+
+export const GetAdminInvestorParams = zod.object({
+  "recordId": zod.coerce.string()
+})
+
+export const GetAdminInvestorResponse = zod.object({
+  "id": zod.string(),
+  "profile": zod.record(zod.string(), zod.unknown()),
+  "draft": zod.record(zod.string(), zod.unknown()).nullable(),
+  "entries": zod.array(zod.record(zod.string(), zod.unknown())),
+  "verification": zod.record(zod.string(), zod.unknown()),
+  "age_confirmation": zod.record(zod.string(), zod.unknown()).nullable(),
+  "notification_history": zod.array(zod.record(zod.string(), zod.unknown()))
+})
+
+
+
+
+
+export const SaveAdminReviewNotesParams = zod.object({
+  "projectId": zod.coerce.number().int().min(1)
+})
+
+export const saveAdminReviewNotesBodyNotesMax = 8000;
+
+
+
+export const SaveAdminReviewNotesBody = zod.object({
+  "notes": zod.string().max(saveAdminReviewNotesBodyNotesMax),
+  "obligations_checked": zod.boolean(),
+  "authority_checked": zod.boolean(),
+  "questions_resolved": zod.boolean(),
+  "updated_at": zod.string().nullish()
+})
+
+export const saveAdminReviewNotesResponseNotesMax = 8000;
+
+
+
+export const SaveAdminReviewNotesResponse = zod.object({
+  "notes": zod.string().max(saveAdminReviewNotesResponseNotesMax),
+  "obligations_checked": zod.boolean(),
+  "authority_checked": zod.boolean(),
+  "questions_resolved": zod.boolean(),
+  "updated_at": zod.string().nullish()
+})
+
+
+export const GetInvestorNotificationPermissionResponse = zod.object({
+  "allowed": zod.boolean().nullable(),
+  "recorded_at": zod.string().nullable(),
+  "version": zod.string()
+})
+
+
+export const SetInvestorNotificationPermissionBody = zod.object({
+  "allowed": zod.boolean(),
+  "expected_owner": zod.string()
+})
+
+export const SetInvestorNotificationPermissionResponse = zod.object({
+  "allowed": zod.boolean().nullable(),
+  "recorded_at": zod.string().nullable(),
+  "version": zod.string()
 })
 
 

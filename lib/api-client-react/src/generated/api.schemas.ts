@@ -5,6 +5,99 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface InvestorNotificationInput {
+  allowed: boolean;
+  expected_owner: string;
+}
+
+export interface InvestorNotificationPermission {
+  /** @nullable */
+  allowed: boolean | null;
+  /** @nullable */
+  recorded_at: string | null;
+  version: string;
+}
+
+export type AdminInvestorSummaryStatus = typeof AdminInvestorSummaryStatus[keyof typeof AdminInvestorSummaryStatus];
+
+
+export const AdminInvestorSummaryStatus = {
+  signup: 'signup',
+  draft: 'draft',
+  saved: 'saved',
+  confirmed: 'confirmed',
+} as const;
+
+export interface AdminInvestorSummary {
+  id: string;
+  /** @nullable */
+  name: string | null;
+  /** @nullable */
+  email: string | null;
+  status: AdminInvestorSummaryStatus;
+  /** @nullable */
+  first_seen_at: string | null;
+  /** @nullable */
+  last_activity_at: string | null;
+  confirmed_amount: number;
+  /** @nullable */
+  notification_allowed: boolean | null;
+  project_ids: number[];
+}
+
+export interface AdminWaitlistProject {
+  id: number;
+  /** @nullable */
+  title: string | null;
+  eligible: boolean;
+}
+
+export interface AdminInvestorList {
+  items: AdminInvestorSummary[];
+  total: number;
+  projects: AdminWaitlistProject[];
+}
+
+export type AdminInvestorDetailProfile = { [key: string]: unknown };
+
+/**
+ * @nullable
+ */
+export type AdminInvestorDetailDraft = { [key: string]: unknown } | null;
+
+export type AdminInvestorDetailEntriesItem = { [key: string]: unknown };
+
+export type AdminInvestorDetailVerification = { [key: string]: unknown };
+
+/**
+ * @nullable
+ */
+export type AdminInvestorDetailAgeConfirmation = { [key: string]: unknown } | null;
+
+export type AdminInvestorDetailNotificationHistoryItem = { [key: string]: unknown };
+
+export interface AdminInvestorDetail {
+  id: string;
+  profile: AdminInvestorDetailProfile;
+  /** @nullable */
+  draft: AdminInvestorDetailDraft;
+  entries: AdminInvestorDetailEntriesItem[];
+  verification: AdminInvestorDetailVerification;
+  /** @nullable */
+  age_confirmation: AdminInvestorDetailAgeConfirmation;
+  notification_history: AdminInvestorDetailNotificationHistoryItem[];
+}
+
+export interface AdminReviewNotesInput {
+  /** @maxLength 8000 */
+  notes: string;
+  obligations_checked: boolean;
+  authority_checked: boolean;
+  questions_resolved: boolean;
+  /** @nullable */
+  updated_at?: string | null;
+}
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -278,6 +371,33 @@ export interface FilmmakerProposalInput {
 }
 
 export interface FilmmakerSubmissionInput {
+  /** @maxLength 3000 */
+  team_info?: string;
+  /**
+     * @maxItems 10
+     * @items.maxLength 2048
+     */
+  team_links?: string[];
+  /** @maxLength 5000 */
+  money_use?: string;
+  /** @maxLength 5000 */
+  distribution_plan?: string;
+  crowdfunding_ran?: boolean;
+  /** @maxLength 2000 */
+  crowdfunding_campaign?: string;
+  crowdfunding_same_project?: boolean;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     */
+  crowdfunding_goal?: number;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     */
+  crowdfunding_raised?: number;
+  /** @maxLength 3000 */
+  crowdfunding_obligations?: string;
   age_confirmed?: true;
   proposal?: FilmmakerProposalInput;
   /** Leave blank. Bot-detection field; never stored with the submission. */
@@ -415,6 +535,20 @@ export type FilmmakerProposal = FilmmakerProposalInput & {
 };
 
 export interface FilmmakerResult {
+  /** @nullable */
+  team_info?: string | null;
+  /** @nullable */
+  crowdfunding_ran?: boolean | null;
+  /** @nullable */
+  crowdfunding_campaign?: string | null;
+  /** @nullable */
+  crowdfunding_same_project?: boolean | null;
+  /** @nullable */
+  crowdfunding_goal?: number | null;
+  /** @nullable */
+  crowdfunding_raised?: number | null;
+  /** @nullable */
+  crowdfunding_obligations?: string | null;
   proposal?: FilmmakerProposal | null;
   completed: true;
   no_project_yet: boolean;
@@ -566,6 +700,27 @@ export interface FilmmakerAccountLeave {
 }
 
 export interface FilmmakerShowcaseUpdate {
+  /**
+     * @maxLength 3000
+     * @nullable
+     */
+  team_info?: string | null;
+  crowdfunding_ran?: boolean;
+  /** @maxLength 2000 */
+  crowdfunding_campaign?: string;
+  crowdfunding_same_project?: boolean;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     */
+  crowdfunding_goal?: number;
+  /**
+     * @minimum 0
+     * @maximum 2147483647
+     */
+  crowdfunding_raised?: number;
+  /** @maxLength 3000 */
+  crowdfunding_obligations?: string;
   showcase_requested?: boolean;
   /**
      * @maxLength 5000
@@ -705,6 +860,8 @@ export interface FilmmakerImageUpload {
 }
 
 export interface PublicProject {
+  /** @nullable */
+  team_info?: string | null;
   /** @nullable */
   budget?: number | null;
   proposal?: FilmmakerProposal | null;
@@ -857,6 +1014,7 @@ export interface InvestorAllocationView {
 }
 
 export interface InvestorIntentInput {
+  ground_rules_accepted?: true;
   /** @minLength 1 */
   name: string;
   email: string;
@@ -1189,10 +1347,24 @@ export interface AdminProjectReview {
   hidden: boolean;
 }
 
+/**
+ * @nullable
+ */
+export type AdminProjectReviewDetailOriginalSubmission = { [key: string]: unknown } | null;
+
+export type AdminProjectReviewDetailReviewHistoryItem = { [key: string]: unknown };
+
 export type AdminProjectReviewDetailProject = {
   proposal?: FilmmakerProposal | null;
   /** @minimum 1 */
   id: number;
+  team_links?: string[];
+  /** @nullable */
+  team_info?: string | null;
+  /** @nullable */
+  money_use?: string | null;
+  /** @nullable */
+  distribution_plan?: string | null;
   /** @nullable */
   title: string | null;
   /** @nullable */
@@ -1267,6 +1439,12 @@ export type AdminProjectReviewDetailMaterials = {
 };
 
 export interface AdminProjectReviewDetail {
+  /** @nullable */
+  original_submission?: AdminProjectReviewDetailOriginalSubmission;
+  submission_provenance?: string;
+  changes_since_submission?: boolean;
+  review_notes?: AdminReviewNotesInput;
+  review_history?: AdminProjectReviewDetailReviewHistoryItem[];
   project: AdminProjectReviewDetailProject;
   /** @nullable */
   filmmaker: AdminProjectReviewDetailFilmmaker;
@@ -1411,4 +1589,57 @@ export type SaveInvestorIntent409 = {
   error: string;
   code?: SaveInvestorIntent409Code;
 };
+
+export type GetAdminInvestorsParams = {
+/**
+ * @maxLength 200
+ */
+search?: string;
+status?: GetAdminInvestorsStatus;
+/**
+ * @minimum 1
+ */
+project_id?: number;
+/**
+ * @minimum 0
+ */
+offset?: number;
+/**
+ * @minimum 1
+ * @maximum 250
+ */
+limit?: number;
+};
+
+export type GetAdminInvestorsStatus = typeof GetAdminInvestorsStatus[keyof typeof GetAdminInvestorsStatus];
+
+
+export const GetAdminInvestorsStatus = {
+  signup: 'signup',
+  draft: 'draft',
+  saved: 'saved',
+  confirmed: 'confirmed',
+} as const;
+
+export type ExportAdminInvestorsParams = {
+/**
+ * @maxLength 200
+ */
+search?: string;
+status?: ExportAdminInvestorsStatus;
+/**
+ * @minimum 1
+ */
+project_id?: number;
+};
+
+export type ExportAdminInvestorsStatus = typeof ExportAdminInvestorsStatus[keyof typeof ExportAdminInvestorsStatus];
+
+
+export const ExportAdminInvestorsStatus = {
+  signup: 'signup',
+  draft: 'draft',
+  saved: 'saved',
+  confirmed: 'confirmed',
+} as const;
 

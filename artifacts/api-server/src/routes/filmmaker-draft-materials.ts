@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import express, { Router, type IRouter, type NextFunction, type Request, type Response as ExpressResponse } from "express";
 import sharp from "sharp";
 import {
+  pool,
   findVisitorFlowProgress,
   getAdminFilmmakerPitch,
   getFilmmakerDraftMaterials,
@@ -174,6 +175,12 @@ async function providerRequest(url: string, init: RequestInit, timeoutMs = 12000
 
 async function deleteStoredObject(config: BunnyConfig, path: string, owner: UploadContext): Promise<boolean> {
   if (!storagePathIsSafe(path, owner)) return false;
+  const evidence = await pool.query(
+    `select 1 from projects where submission_snapshot->'project'->>'posterStoragePath'=$1
+     or submission_snapshot->'project'->>'shareImageStoragePath'=$1
+     or submission_snapshot->'project'->>'pitchDeckStoragePath'=$1 limit 1`, [path],
+  );
+  if (evidence.rows.length) return true; // Remove from current UI, retain protected original review evidence.
   const response = await providerRequest(storageUrl(config, path), {
     method: "DELETE",
     headers: { AccessKey: config.storageKey },
@@ -193,6 +200,8 @@ async function deleteCreatedObject(config: BunnyConfig, path: string, owner: Upl
 
 async function deleteCreatedVideo(config: BunnyConfig, videoId: string): Promise<void> {
   if (!UUID.test(videoId)) return;
+  const evidence = await pool.query("select 1 from projects where submission_snapshot->'project'->>'bunnyVideoId'=$1 limit 1", [videoId]);
+  if (evidence.rows.length) return;
   try {
     const response = await providerRequest(
       `https://video.bunnycdn.com/library/${encodeURIComponent(config.libraryId)}/videos/${encodeURIComponent(videoId)}`,
@@ -1201,6 +1210,22 @@ router.get("/filmmakers/project-materials/pitch-deck", async (req, res): Promise
   }
   let project = await getFilmmakerProjectMaterials(identity.provider, identity.uid, projectId);
   let adminAccess = false;
+  if (req.query.original === "1") {
+    const admin = await authorizeAdminIdentity(req, res);
+    if (!admin) return;
+    const pitch = await getAdminFilmmakerPitch(projectId);
+    if (!pitch) { res.status(404).json({ error: "Project not found." }); return; }
+    const original = pitch.project.submissionSnapshot?.project as Record<string, unknown> | undefined;
+    if (typeof original?.pitchDeckStoragePath !== "string") {
+      res.status(404).json({ error: "No original pitch deck evidence was preserved." }); return;
+    }
+    const config = readConfig().storage;
+    if (!config) { res.status(503).json({ error: "Bunny Storage is not configured." }); return; }
+    res.set("Cache-Control", "private, no-store");
+    await readDeckFromStorage(req, res, config, original.pitchDeckStoragePath,
+      typeof original.pitchDeckName === "string" ? original.pitchDeckName : null, undefined);
+    return;
+  }
   if (!project) {
     const admin = await authorizeAdminIdentity(req, res);
     if (!admin) return;

@@ -351,5 +351,14 @@ export async function getAdminFilmmakerPitch(projectId: number) {
       eq(flowProgressTable.flow, "filmmaker"),
     ))
     : [];
-  return { project: result.project, filmmaker: result.filmmaker, answers: progress?.answers ?? {} };
+  const reference = progress?.answers?._submission as { project_id?: unknown } | undefined;
+  const original = result.project.submissionSnapshot?.answers as Record<string, unknown> | undefined;
+  const matchingLegacyAnswers = reference?.project_id === result.project.id ? progress?.answers : null;
+  return {
+    project: result.project, filmmaker: result.filmmaker,
+    answers: original ?? matchingLegacyAnswers ?? {},
+    provenance: original ? "Preserved project-specific submission" : matchingLegacyAnswers
+      ? "Legacy answers linked to this pitch; original edit history was not recorded"
+      : "Historical project-specific answers unavailable; current project fields only",
+  };
 }

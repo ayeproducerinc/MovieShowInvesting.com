@@ -11,6 +11,13 @@ export type AdminProjectReviewDetailProject = {
   proposal?: FilmmakerProposal | null;
   /** @minimum 1 */
   id: number;
+  team_links?: string[];
+  /** @nullable */
+  team_info?: string | null;
+  /** @nullable */
+  money_use?: string | null;
+  /** @nullable */
+  distribution_plan?: string | null;
   /** @nullable */
   title: string | null;
   /** @nullable */

@@ -2071,6 +2071,83 @@ paths:
           description: Not an admin
         "404":
           description: Message not found
+  /admin/investors:
+    get:
+      operationId: getAdminInvestors
+      parameters:
+        - { name: search, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: status, in: query, schema: { type: string, enum: [signup, draft, saved, confirmed] } }
+        - { name: project_id, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 250, default: 50 } }
+      responses:
+        "200":
+          description: Protected investor intake and confirmed waitlist records
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminInvestorList" }
+  /admin/investors/export:
+    get:
+      operationId: exportAdminInvestors
+      parameters:
+        - { name: search, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: status, in: query, schema: { type: string, enum: [signup, draft, saved, confirmed] } }
+        - { name: project_id, in: query, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Consent-aware confirmed waitlist CSV for manual outreach
+          content:
+            text/csv:
+              schema: { type: string }
+  /admin/investors/{recordId}:
+    get:
+      operationId: getAdminInvestor
+      parameters:
+        - { name: recordId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Private complete investor review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminInvestorDetail" }
+  /admin/projects/{projectId}/review-notes:
+    put:
+      operationId: saveAdminReviewNotes
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminReviewNotesInput" }
+      responses:
+        "200":
+          description: Saved manual review notes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminReviewNotesInput" }
+  /investor/notification-permission:
+    get:
+      operationId: getInvestorNotificationPermission
+      responses:
+        "200":
+          description: Current verified-account offering notification choice
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvestorNotificationPermission" }
+    put:
+      operationId: setInvestorNotificationPermission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvestorNotificationInput" }
+      responses:
+        "200":
+          description: Dated permission or withdrawal saved without changing signed interest
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvestorNotificationPermission" }
 components:
   securitySchemes:
     firebaseBearer:
@@ -2078,6 +2155,76 @@ components:
       scheme: bearer
       bearerFormat: Firebase ID token
   schemas:
+    InvestorNotificationInput:
+      type: object
+      additionalProperties: false
+      required: [allowed, expected_owner]
+      properties:
+        allowed: { type: boolean }
+        expected_owner: { type: string }
+    InvestorNotificationPermission:
+      type: object
+      required: [allowed, recorded_at, version]
+      properties:
+        allowed: { type: ["boolean", "null"] }
+        recorded_at: { type: ["string", "null"] }
+        version: { type: string }
+    AdminInvestorSummary:
+      type: object
+      required: [id, name, email, status, first_seen_at, last_activity_at, confirmed_amount, notification_allowed, project_ids]
+      properties:
+        id: { type: string }
+        name: { type: ["string", "null"] }
+        email: { type: ["string", "null"] }
+        status: { type: string, enum: [signup, draft, saved, confirmed] }
+        first_seen_at: { type: ["string", "null"] }
+        last_activity_at: { type: ["string", "null"] }
+        confirmed_amount: { type: integer }
+        notification_allowed: { type: ["boolean", "null"] }
+        project_ids: { type: array, items: { type: integer } }
+    AdminWaitlistProject:
+      type: object
+      required: [id, title, eligible]
+      properties:
+        id: { type: integer }
+        title: { type: ["string", "null"] }
+        eligible: { type: boolean }
+    AdminInvestorList:
+      type: object
+      required: [items, total, projects]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminInvestorSummary" }
+        total: { type: integer }
+        projects:
+          type: array
+          items: { $ref: "#/components/schemas/AdminWaitlistProject" }
+    AdminInvestorDetail:
+      type: object
+      required: [id, profile, draft, entries, verification, age_confirmation, notification_history]
+      properties:
+        id: { type: string }
+        profile: { type: object, additionalProperties: true }
+        draft: { type: ["object", "null"], additionalProperties: true }
+        entries:
+          type: array
+          items: { type: object, additionalProperties: true }
+        verification: { type: object, additionalProperties: true }
+        age_confirmation: { type: ["object", "null"], additionalProperties: true }
+        notification_history:
+          type: array
+          items: { type: object, additionalProperties: true }
+    AdminReviewNotesInput:
+      type: object
+      additionalProperties: false
+      required: [notes, obligations_checked, authority_checked, questions_resolved]
+      properties:
+        notes: { type: string, maxLength: 8000 }
+        obligations_checked: { type: boolean }
+        authority_checked: { type: boolean }
+        questions_resolved: { type: boolean }
+        updated_at: { type: ["string", "null"] }
     AuthUser:
       type: object
       additionalProperties: false
@@ -2256,6 +2403,16 @@ components:
       additionalProperties: false
       required: [no_project_yet, name, email, city, favorite_genres, chat_opt_in]
       properties:
+        team_info: { type: string, maxLength: 3000 }
+        team_links: { type: array, maxItems: 10, items: { type: string, format: uri, maxLength: 2048 } }
+        money_use: { type: string, maxLength: 5000 }
+        distribution_plan: { type: string, maxLength: 5000 }
+        crowdfunding_ran: { type: boolean }
+        crowdfunding_campaign: { type: string, maxLength: 2000 }
+        crowdfunding_same_project: { type: boolean }
+        crowdfunding_goal: { type: number, minimum: 0, maximum: 2147483647 }
+        crowdfunding_raised: { type: number, minimum: 0, maximum: 2147483647 }
+        crowdfunding_obligations: { type: string, maxLength: 3000 }
         age_confirmed: { type: boolean, enum: [true] }
         proposal:
           $ref: "#/components/schemas/FilmmakerProposalInput"
@@ -2328,6 +2485,13 @@ components:
       additionalProperties: false
       required: [completed, no_project_yet, project_id, project_slug, checkout_proof, stage, stage_other, title, format, genre, genre_other, logline, offer_per100, offer_other_text, wants_lower, budget, budget_from_example, price_group, deal_answer, payback_terms, payback_terms_other, showcase_requested, approved, hidden, synopsis, team_links, money_use, distribution_plan, trailer_url, poster_url, share_image_url]
       properties:
+        team_info: { type: ["string", "null"] }
+        crowdfunding_ran: { type: ["boolean", "null"] }
+        crowdfunding_campaign: { type: ["string", "null"] }
+        crowdfunding_same_project: { type: ["boolean", "null"] }
+        crowdfunding_goal: { type: ["number", "null"] }
+        crowdfunding_raised: { type: ["number", "null"] }
+        crowdfunding_obligations: { type: ["string", "null"] }
         proposal:
           anyOf:
             - $ref: "#/components/schemas/FilmmakerProposal"
@@ -2449,6 +2613,13 @@ components:
       additionalProperties: false
       minProperties: 1
       properties:
+        team_info: { type: ["string", "null"], maxLength: 3000 }
+        crowdfunding_ran: { type: boolean }
+        crowdfunding_campaign: { type: string, maxLength: 2000 }
+        crowdfunding_same_project: { type: boolean }
+        crowdfunding_goal: { type: number, minimum: 0, maximum: 2147483647 }
+        crowdfunding_raised: { type: number, minimum: 0, maximum: 2147483647 }
+        crowdfunding_obligations: { type: string, maxLength: 3000 }
         showcase_requested: { type: boolean }
         synopsis: { type: ["string", "null"], maxLength: 5000 }
         team_links:
@@ -2546,6 +2717,7 @@ components:
       additionalProperties: false
       required: [id, slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, pitch_deck_url, pitch_deck_name, confirmed_pledge_total, approved, showcase_requested, phone_verified, is_owner]
       properties:
+        team_info: { type: ["string", "null"] }
         budget: { type: ["integer", "null"] }
         proposal:
           anyOf:
@@ -2694,6 +2866,7 @@ components:
       additionalProperties: false
       required: [name, email, city, country, amount, allocations, unallocated, accredited, experience, motivations, favorite_genres, stages, minima, call_opt_in]
       properties:
+        ground_rules_accepted: { type: boolean, const: true }
         name: { type: string, minLength: 1 }
         email: { type: string, format: email }
         expected_investor_owner: { type: string, description: Investor worksheet identity captured on opening; the API rejects a save if the signed-in account changed }
@@ -2999,6 +3172,13 @@ components:
       additionalProperties: false
       required: [project, filmmaker, answers, materials]
       properties:
+        original_submission: { type: ["object", "null"], additionalProperties: true }
+        submission_provenance: { type: string }
+        changes_since_submission: { type: boolean }
+        review_notes: { $ref: "#/components/schemas/AdminReviewNotesInput" }
+        review_history:
+          type: array
+          items: { type: object, additionalProperties: true }
         project:
           type: object
           additionalProperties: false
@@ -3009,6 +3189,10 @@ components:
                 - $ref: "#/components/schemas/FilmmakerProposal"
                 - type: "null"
             id: { type: integer, minimum: 1 }
+            team_links: { type: array, items: { type: string } }
+            team_info: { type: ["string", "null"] }
+            money_use: { type: ["string", "null"] }
+            distribution_plan: { type: ["string", "null"] }
             title: { type: ["string", "null"] }
             format: { type: ["string", "null"] }
             genre: { type: ["string", "null"] }

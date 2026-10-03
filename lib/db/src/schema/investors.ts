@@ -35,6 +35,8 @@ export const investorsTable = pgTable("investors", {
   signatureName: text("signature_name"),
   signedAt: timestamp("signed_at", { withTimezone: true }),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  submittedAnswers: jsonb("submitted_answers").$type<Record<string, unknown>>(),
+  confirmationEvidence: jsonb("confirmation_evidence").$type<Record<string, unknown>>(),
   firebaseUid: text("firebase_uid"),
   replitUid: text("replit_uid"),
   visitorId: text("visitor_id").references(() => visitorsTable.visitorId, { onDelete: "set null" }),

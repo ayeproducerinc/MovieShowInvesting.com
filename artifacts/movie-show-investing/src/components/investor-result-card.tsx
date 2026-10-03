@@ -43,7 +43,7 @@ export function InvestorResultCard({ entry }: { entry: InvestorInterestHistoryIt
     if (!selected || publicProjects.isFetching || publicProjects.isError) return;
     if (!navigator.share) { await copy(); return; }
     try {
-      await navigator.share({ url });
+      await navigator.share({ title: `${selected.title} | Movie Show Investing`, text: `${selected.title}${selected.genre ? ` (${selected.genre})` : ''}: view the project and pledge non-binding interest. No investment or payment happens now.`, url });
       trackInvestorEvent('inv_share_click', { method: 'share', project_slug: selected.slug });
       setFeedback('Public project page shared.');
     } catch (error) {
@@ -73,10 +73,10 @@ export function InvestorResultCard({ entry }: { entry: InvestorInterestHistoryIt
        <p>Only the public project URL is shared—not your private interest, amount, or contact details. A project’s current public-listing eligibility can change, so availability to share may change too.</p>
       {publicProjects.isPending || publicProjects.isFetching ? <div role="status" aria-label="Checking public projects"><div className="inv-skeleton" style={{ height: 43, maxWidth: 290 }}/></div> :
         publicProjects.isError ? <div><p role="alert" className="investor-result__feedback">We couldn’t check which projects are public. Sharing is unavailable for now.</p><button type="button" className="inv-button secondary" onClick={() => void publicProjects.refetch()}><RotateCcw size={15}/> Try again</button></div> :
-        shareable.length === 0 ? <p className="investor-result__feedback">No project from this entry is currently public to share.</p> :
+        shareable.length === 0 ? <div><p className="investor-result__feedback" data-testid="text-share-none">{entry.unallocated ? 'This interest is not allocated to a project, so there is no project to share. You can share Explore instead.' : 'No project from this entry is currently public to share.'}</p>{entry.unallocated && <button type="button" className="inv-button secondary" data-testid="button-share-explore" onClick={() => { const u = new URL(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/explore`, window.location.origin).href; if (navigator.share) void navigator.share({ title: 'Explore projects | Movie Show Investing', url: u }).catch(() => undefined); else void navigator.clipboard?.writeText(u); }}><Share2 size={16}/> Share Explore</button>}</div> :
         <>
           {shareable.length > 1 && <div className="investor-result__share-options" role="group" aria-label="Choose a public project to share">{shareable.map(project => <button type="button" key={project.id} className="investor-result__share-option" aria-pressed={selected?.id === project.id} onClick={() => { setSelectedId(project.id); setFeedback(''); setShowCopyFallback(false); }}>{project.title}</button>)}</div>}
-          {shareable.length === 1 && <p className="investor-result__feedback">Public page: {selected.title}</p>}
+          {shareable.length === 1 && <p className="investor-result__feedback">Sharing: {selected.title}</p>}
           <div className="investor-result__share-actions">
             <button type="button" className="inv-button" data-testid="button-share-public-project" onClick={() => void share()}><Share2 size={16}/> Share project page</button>
             <button type="button" className="inv-button secondary" data-testid="button-copy-public-project" onClick={() => void copy()}><Copy size={16}/> Copy public link</button>
