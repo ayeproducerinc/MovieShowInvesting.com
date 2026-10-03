@@ -2731,9 +2731,10 @@ components:
     InvestorIntentResult:
       type: object
       additionalProperties: false
-      required: [investor_id, status]
+      required: [investor_id, entry_id, status]
       properties:
         investor_id: { type: integer, minimum: 1 }
+        entry_id: { type: ["integer", "null"], minimum: 1 }
         status: { type: string, const: saved }
     InvestorIntentClaimResult:
       type: object
@@ -2747,6 +2748,7 @@ components:
       additionalProperties: false
       required: [signature_name, accepted, amount, allocations]
       properties:
+        investor_id: { type: integer, minimum: 1, description: Exact investor record reviewed by the caller; when supplied it must belong to the signed-in account. }
         signature_name: { type: string, minLength: 2, maxLength: 120 }
         accepted: { type: boolean, const: true }
         amount: { type: integer, minimum: 100, maximum: 2147483647 }

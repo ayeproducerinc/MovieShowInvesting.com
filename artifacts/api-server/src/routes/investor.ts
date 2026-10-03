@@ -242,6 +242,7 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
   };
   const client = await pool.connect();
   let investorId: number | null = null;
+  let savedEntryId: number | null = null;
   let conflict: string | null = null;
   let conflictCode: string | null = null;
   try {
@@ -408,6 +409,7 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
           );
           entryId = created.rows[0].id;
         }
+        savedEntryId = entryId;
         for (const allocation of allocations) {
           await client.query(
             "insert into pledges (investor_id, entry_id, project_id, amount, confirmed) values ($1, $2, $3, $4, false)",
@@ -485,6 +487,7 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
   }
   res.status(201).json(SaveInvestorIntentResponse.parse({
     investor_id: investorId,
+    entry_id: savedEntryId,
     status: "saved",
   }));
 });
@@ -704,6 +707,11 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
     if (!investor) {
       await client.query("rollback");
       res.status(404).json({ error: "No saved investor interest is linked to this account. Link your guest interest in its original browser first." });
+      return;
+    }
+    if (submitted.investor_id !== undefined && submitted.investor_id !== investor.id) {
+      await client.query("rollback");
+      res.status(409).json({ error: "The signed-in account no longer matches the investor record you reviewed. Nothing was signed." });
       return;
     }
     if (investor.email?.trim().toLowerCase() !== identity.email) {

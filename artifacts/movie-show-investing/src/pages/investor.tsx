@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { getGetCurrentInvestorIntentQueryKey, getGetExploreQueryKey, getGetFlowProgressQueryKey, useConfirmAge, useGetCurrentInvestorIntent, useGetExplore, useGetFlowProgress, useGetPriceGroup, useMatchInvestor, useSaveFlowProgress, useSaveInvestorIntent } from '@workspace/api-client-react';
+import { getGetCurrentInvestorIntentQueryKey, getGetExploreQueryKey, getGetPublicProjectQueryKey, getGetFlowProgressQueryKey, useConfirmInvestorIntent, useConfirmAge, useGetCurrentInvestorIntent, useGetExplore, useGetFlowProgress, useGetPriceGroup, useMatchInvestor, useSaveFlowProgress, useSaveInvestorIntent } from '@workspace/api-client-react';
 import type { ExploreProject, InvestorIntentInput } from '@workspace/api-client-react';
 import { InvestorProjectCard } from '@/components/investor-project-card';
 import { AgeAcknowledgment, useAgeStatus } from '@/components/age-acknowledgment';
@@ -11,6 +11,7 @@ import { InvestorResultCard } from '@/components/investor-result-card';
 import { trackInvestorEvent } from '@/lib/analytics';
 import { LocationPicker } from '@/components/location-picker';
 import { cap, selectAutoBuildProjects, split } from '@/lib/investor-lineup';
+import { investorReviewKey, minimaForSelectedStages } from '@/lib/investor-review';
 import { useAuth } from '@workspace/replit-auth-web';
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
@@ -25,9 +26,9 @@ const mapStep = (ans:Record<string,unknown>, step:number) => { const n=Math.max(
 const descriptions = [
   'Start with the total you might consider, read the ground rules, and confirm your age. This is a conversation, not a payment.',
   'Tell us what draws you to independent stories. We’ll use these preferences to find possible matches, not recommendations.',
-  'Choose the total repayment you would want per $100 invested, including original capital, for each slate.',
+  'See the proposed repayment target for each stage you selected, then choose the minimum you would consider.',
   'A starting point, not a recommendation. Adjust the lineup or leave your interest unallocated.',
-  'Check your choices, add a few details, and save. Signing the exact saved record is a separate step afterward.'
+  'Review your amount and projects, add your details, then sign and submit once. Your interest is non-binding and no money is collected.'
 ];
 const genres = ['Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Other'];
 const stages = [['distribution','Finished film / distribution'],['production','Short or pilot / production'],['idea','Script or idea']] as const;
@@ -103,12 +104,12 @@ export function InvestorDone() {
     current.isError ? <ErrorState retry={()=>void current.refetch()}/> :
     current.data?.intent ? <div className="inv-state" style={{maxWidth:850}}>
       <p className="inv-kicker">{current.data.intent.status === 'confirmed' ? 'Interest confirmed / Private record' : 'Interest saved / The next chapter'}</p><h1>{current.data.intent.status === 'confirmed' ? 'Your interest is confirmed.' : `Thank you, ${current.data.intent.name.split(' ')[0]}.`}</h1>
-      <p data-testid="text-intent-saved">Your non-binding interest of {dollars(current.data.intent.amount)} is {current.data.intent.status === 'confirmed' ? 'confirmed' : 'saved, but not confirmed'}. Returns aren’t guaranteed. You may get back less, or nothing.</p>
+      <p data-testid="text-intent-saved">Your non-binding interest of {dollars(current.data.intent.status === 'confirmed' ? latestConfirmedEntry?.amount ?? current.data.intent.amount : current.data.intent.amount)} is {current.data.intent.status === 'confirmed' ? 'confirmed' : 'saved, but not confirmed'}. Returns aren’t guaranteed. You may get back less, or nothing.</p>
       <p>No money has been collected, and you have not made an investment.</p>
       {latestConfirmedEntry && <InvestorResultCard entry={latestConfirmedEntry}/>}
       {current.data.history.length > 0 && <div className="lineup-done-allocations" data-testid="done-interest-history"><p className="inv-kicker">Your signed entries</p><p>{current.data.history.length} separate confirmed {current.data.history.length === 1 ? 'entry' : 'entries'} · {dollars(current.data.history.reduce((total, entry) => total + entry.amount, 0))} cumulative non-binding interest. Saved, unsigned interest is not included.</p><ul>{[...current.data.history].reverse().map((entry, index)=><li key={entry.entry_id ?? 'original'}><span>Entry {current.data.history.length-index} · {entry.unallocated ? 'Unallocated' : entry.allocations.map(row=>row.project_title ?? `Project #${row.project_id}`).join(', ') || 'Project no longer listed'} · {new Date(entry.confirmed_at).toLocaleDateString('en-US')}</span><strong>{dollars(entry.amount)}</strong></li>)}</ul></div>}
       <p>Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.</p>
-      <div className="inv-actions">{current.data.intent.status === 'saved' && (signedIn ? <Link href="/lineup/confirm" className="inv-button" data-testid="link-done-confirm">Review & confirm <ArrowRight size={16}/></Link> : <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-done-sign-in" label="Sign in to confirm" />)}<Link href="/lineup" className={`inv-button ${current.data.intent.status === 'saved' ? 'secondary' : ''}`} data-testid="link-done-lineup">View my {current.data.intent.status === 'confirmed' ? 'confirmed' : 'saved'} lineup <ArrowRight size={16}/></Link><Link href="/explore" className="inv-button secondary" data-testid="link-done-explore">Explore projects</Link></div>
+      <div className="inv-actions">{current.data.intent.status === 'saved' && (signedIn ? <Link href="/invest?revise=1" className="inv-button" data-testid="link-done-confirm">Finish my worksheet <ArrowRight size={16}/></Link> : <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-done-sign-in" label="Sign in to finish" />)}<Link href="/lineup" className={`inv-button ${current.data.intent.status === 'saved' ? 'secondary' : ''}`} data-testid="link-done-lineup">View my {current.data.intent.status === 'confirmed' ? 'confirmed' : 'saved'} lineup <ArrowRight size={16}/></Link><Link href="/explore" className="inv-button secondary" data-testid="link-done-explore">Explore projects</Link></div>
       {!signedIn && current.data.intent.status === 'saved' && <p className="inv-small">If this is guest interest, sign in and explicitly claim it from this original browser on your lineup if it is not linked to your account.</p>}
     </div> : latestConfirmedEntry ? <div className="inv-state" style={{maxWidth:850}}><p className="inv-kicker">Interest confirmed / Private record</p><h1>Your interest is confirmed.</h1><InvestorResultCard entry={latestConfirmedEntry}/><div className="inv-actions"><Link href="/lineup" className="inv-button">View my confirmed lineup <ArrowRight size={16}/></Link><Link href="/explore" className="inv-button secondary">Explore projects</Link></div></div> : <div className="inv-state"><p className="inv-kicker">Nothing linked yet</p><h1>Your story starts here.</h1><p>There is no saved investor interest associated with this {signedIn ? 'account' : 'visit'}. {signedIn ? 'If you saved as a guest in this browser, choose to claim it from your lineup.' : ''}</p><div className="inv-actions">{signedIn && <Link className="inv-button" href="/lineup" data-testid="link-done-claim">Check for guest interest <ArrowRight size={16}/></Link>}<Link className="inv-button secondary" href="/invest" data-testid="link-done-invest">Start the worksheet <ArrowRight size={16}/></Link></div></div>}
   </div></section>;
@@ -159,10 +160,20 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoadi
   const match = useMatchInvestor();
   const save = useSaveFlowProgress();
   const submit = useSaveInvestorIntent();
+  const confirmInterest = useConfirmInvestorIntent();
+  const [signature, setSignature] = useState('');
+  const [interestAccepted, setInterestAccepted] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const finishingRef = useRef(false);
+  const pendingSaved = useRef<{ investor_id:number; entry_id:number|null; reviewKey:string; draftKey:string } | null>(null);
   const ageStatus = useAgeStatus();
   const confirmAge = useConfirmAge();
   const [ageChecked,setAgeChecked] = useState(false);
   const [a,setA] = useState<Answers>(blank);
+  useEffect(() => {
+    setInterestAccepted(false);
+    setSignature('');
+  }, [JSON.stringify(a)]);
   const [screen,setScreen] = useState(1);
   const [ready,setReady] = useState(false);
   const [selectionNeeded,setSelectionNeeded] = useState(false);
@@ -302,7 +313,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoadi
     setMatchState('loading');
     setShowAllAvailable(false);
     try {
-      const result=await match.mutateAsync({data:{amount:value.amount,favorite_genres:value.favorite_genres,stages:value.stages,minima:value.minima}});
+      const result=await match.mutateAsync({data:{amount:value.amount,favorite_genres:value.favorite_genres,stages:value.stages,minima:minimaForSelectedStages(value.minima,value.stages)}});
       const realIds=new Set(available.map(p=>p.id));
       const candidates=result.projects.filter(p=>realIds.has(p.id));
       setMatches(candidates);
@@ -323,8 +334,8 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoadi
     if(step===1 && !a.terms_read) return 'Please acknowledge the ground rules before continuing.';
     if(step===1 && !(ageStatus.confirmed || ageChecked)) return 'Confirm that you are 18 years of age or older to continue.';
     if(step===2 && (!a.favorite_genres.length || !a.stages.length)) return 'Choose at least one genre and one project stage.';
-    if(step===3 && stages.some(([stage])=>otherMinimumSelected[stage] && !isValidCustomMinimum(customMinimumValue(stage)))) return 'Enter a whole-dollar custom minimum of at least $125 for each stage where Other is selected.';
-    if(step===3 && Object.values(a.minima).some(value=>value!==null && (!Number.isSafeInteger(value) || value<125))) return 'Minimum preferences must be whole-dollar amounts of at least $125.';
+    if(step===3 && stages.some(([stage])=>a.stages.includes(stage) && otherMinimumSelected[stage] && !isValidCustomMinimum(customMinimumValue(stage)))) return 'Enter a whole-dollar custom minimum of at least $125 for each selected stage where Other is selected.';
+    if(step===3 && Object.values(minimaForSelectedStages(a.minima,a.stages)).some(value=>value!==null && (!Number.isSafeInteger(value) || value<125))) return 'Minimum preferences must be whole-dollar amounts of at least $125.';
     if(step===4 && !a.unallocated) {
       if(!a.lineup.length) return 'Choose projects, or select Just pledge to leave your interest unallocated.';
       if(a.lineup.length>cap(a.amount)) return a.amount<150 ? 'Pledges under $150 can include up to 4 projects.' : 'Pledges of $150 or more can include up to 5 projects.';
@@ -360,27 +371,91 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoadi
   }
   async function back() {setError('');setCanStartFresh(false);try{await persist(screen-1,a);setScreen(screen-1);window.scrollTo({top:0,behavior:'smooth'});}catch {/* error shown by persist */}}
   async function finish(startFresh=false) {
-    const issue=validate(5) || validate(4);
+    if (finishingRef.current) return;
+    const issue=validate(5) || validate(4) || validate(3) || validate(2);
     if(issue){setError(issue);return;}
-    if(!await ensureAge()) return;
-    setCheckLineup(false);
-    setCanStartFresh(false);
-    try { await persist(5,a); } catch { return; }
-    const {terms_read: _terms, lineup: _lineup, location_manual: _manual, flow_version: _fv, ...input}=a;
-    void _terms; void _lineup; void _manual; void _fv;
-    try {
-      if(!active.current) return;
-      await submit.mutateAsync({data:{...input,expected_investor_owner:expectedOwner,new_entry:!startFresh && (newEntry || current.data?.intent?.entry_id != null && current.data.intent.status==='saved'),start_fresh:startFresh,name:a.name.trim(),email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,allocations:a.unallocated?[]:a.lineup,unallocated:a.unallocated}});
-    } catch (cause) {
-      const failure=submissionFailure(cause);
-      setError(failure.message);
-      setCheckLineup(failure.checkLineup);
-      setCanStartFresh(failure.canStartFresh);
+    if (!interestAccepted || signature !== a.name.trim()) {
+      setError('Review your amount and projects, type your full name exactly as shown, and check the confirmation before submitting.');
       return;
     }
-    trackInvestorEvent('inv_complete', { path: newEntry ? 'new_entry' : revise ? 'revise' : 'initial', total: a.amount, accredited: a.accredited });
-    void queryClient.invalidateQueries({queryKey:getGetCurrentInvestorIntentQueryKey()});
-    navigate('/invest/done');
+    const reviewed = {
+      name:a.name.trim(), amount:a.amount, unallocated:a.unallocated,
+      allocations:a.unallocated ? [] : a.lineup.map(row=>({...row})),
+    };
+    const reviewKey = investorReviewKey(reviewed);
+    const draftKey = JSON.stringify(a);
+    finishingRef.current = true;
+    setFinishing(true);
+    setCheckLineup(false);
+    setCanStartFresh(false);
+    try {
+      if(!await ensureAge()) return;
+      await persist(5,a);
+      const {terms_read: _terms, lineup: _lineup, location_manual: _manual, flow_version: _fv, ...input}=a;
+      void _terms; void _lineup; void _manual; void _fv;
+      if(!active.current) return;
+      if (!pendingSaved.current || pendingSaved.current.reviewKey !== reviewKey || pendingSaved.current.draftKey !== draftKey) {
+        const saved = await submit.mutateAsync({data:{
+          ...input, minima:minimaForSelectedStages(a.minima,a.stages),
+          expected_investor_owner:expectedOwner,new_entry:!startFresh && (newEntry || current.data?.intent?.entry_id != null && current.data.intent.status==='saved'),
+          start_fresh:startFresh,name:reviewed.name,email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,
+          allocations:reviewed.allocations,unallocated:reviewed.unallocated,
+        }});
+        pendingSaved.current = { ...saved, reviewKey, draftKey };
+      }
+      if(!active.current) return;
+      const saved = pendingSaved.current;
+      const fresh = await current.refetch();
+      const latest = fresh.data?.intent;
+      if (fresh.isError || !latest || latest.investor_id !== saved.investor_id
+        || latest.entry_id !== saved.entry_id || investorReviewKey(latest) !== reviewKey) {
+        setCheckLineup(true);
+        pendingSaved.current = null;
+        setInterestAccepted(false);
+        setSignature('');
+        setError('Your saved interest could not be matched to this review. Nothing was signed. Your answers are saved; review the latest details before submitting again.');
+        return;
+      }
+      if(!active.current) return;
+      await confirmInterest.mutateAsync({data:{
+        investor_id:saved.investor_id, signature_name:signature, accepted:true, entry_id:saved.entry_id,
+        amount:reviewed.amount, allocations:reviewed.allocations,
+      }});
+      trackInvestorEvent('inv_confirmed');
+      await Promise.all([
+        queryClient.invalidateQueries({queryKey:getGetCurrentInvestorIntentQueryKey()}),
+        queryClient.invalidateQueries({queryKey:getGetExploreQueryKey()}),
+        ...latest.allocations.filter(row=>row.project_slug).map(row=>queryClient.invalidateQueries({queryKey:getGetPublicProjectQueryKey(row.project_slug!)})),
+      ]);
+      trackInvestorEvent('inv_complete', { path: newEntry ? 'new_entry' : revise ? 'revise' : 'initial', total:a.amount, accredited:a.accredited });
+      if(active.current) navigate('/invest/done');
+    } catch (cause) {
+      // If confirmation committed but its response was lost, reconcile only this
+      // exact entry, never an earlier signed indication with similar values.
+      const saved = pendingSaved.current;
+      if (saved?.reviewKey === reviewKey && saved.draftKey === draftKey) {
+        const fresh = await current.refetch();
+        const exact = [fresh.data?.intent, ...(fresh.data?.history ?? [])].find(row=>fresh.data?.intent?.investor_id === saved.investor_id && row
+          && row.entry_id === saved.entry_id && investorReviewKey(row) === reviewKey
+          && ('status' in row ? row.status === 'confirmed' : Boolean(row.confirmed_at)));
+        if(!fresh.isError && exact) {
+          await Promise.all([
+            queryClient.invalidateQueries({queryKey:getGetCurrentInvestorIntentQueryKey()}),
+            queryClient.invalidateQueries({queryKey:getGetExploreQueryKey()}),
+            ...exact.allocations.filter(row=>row.project_slug).map(row=>queryClient.invalidateQueries({queryKey:getGetPublicProjectQueryKey(row.project_slug!)})),
+          ]);
+          if(active.current) navigate('/invest/done');
+          return;
+        }
+      }
+      const failure=submissionFailure(cause);
+      setError(saved?.draftKey === draftKey ? 'Your interest is saved, but we could not verify confirmation. Retry Submit to check and finish this same record; no money has been collected.' : failure.message);
+      setCheckLineup(failure.checkLineup);
+      setCanStartFresh(failure.canStartFresh);
+    } finally {
+      finishingRef.current = false;
+      if(active.current) setFinishing(false);
+    }
   }
   function add(project:ExploreProject) {
     if(project.is_owner || a.lineup.some(x=>x.project_id===project.id) || a.lineup.length>=cap(a.amount)) return;
@@ -402,11 +477,36 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoadi
     <div className="inv-top"><Link href="/explore" className="inv-kicker" data-testid="link-invest-explore">Movie Show Investing / Explore</Link><span className="inv-kicker" data-testid="text-invest-step">Step {screen} / 5</span></div>
     <div className="inv-progress" aria-label={`Step ${screen} of 5`}>{headings.map((h,i)=><span key={h} className={i<screen?'active':''} title={h}/>)}</div>
     <div className="inv-layout"><div className="inv-intro" key={screen}><p className="inv-kicker">Investor worksheet / 0{screen}</p><h1>{headings[screen-1]}<em>.</em></h1><p>{descriptions[screen-1]}</p><div className="inv-note"><p>Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.</p><p>Your interest is non-binding. No money is collected and nothing here is an offer to sell securities.</p></div></div>
-      <div className="inv-panel">
+      <div className="inv-panel" inert={finishing} aria-busy={finishing}>
         {screen===1 && <><p className="inv-label">How much might you be interested in? · USD</p><div className="inv-amount"><span>$</span>{a.amount || '—'}</div><p className="inv-small">A pledge is a non-binding indication of interest only; it does not reserve a project, require payment, or make an investment.</p><p className="inv-small">Returns aren’t guaranteed. You may get back less, or nothing.</p><div className="inv-options">{[100,250,500,1000].map(value=><Option key={value} type="radio" checked={a.amount===value} label={dollars(value)} onChange={()=>change('amount',value)}/>)}</div><div className="inv-field"><label htmlFor="invest-amount">Or enter an amount</label><input id="invest-amount" data-testid="input-invest-amount" className="inv-input" type="number" min="100" step="1" value={a.amount || ''} onChange={e=>change('amount',Number(e.target.value))}/></div><p className="inv-small">Minimum total interest: $100. You can adjust your project choices later.</p>
         <div className="inv-section"><h2>Per $100 invested</h2><p className="inv-small">Repayment preferences later are stated as total repayment per $100 including original capital. Project terms, backend splits and platform fees are shown with each project at the lineup step.</p></div><p className="inv-kicker">General understanding · not a signature</p><div className="inv-section"><h2>Interest is not an investment.</h2><p>This worksheet records what you may want to explore. Your pledge is non-binding. No money is collected, and you are not committing to fund a project.</p></div><div className="inv-section"><h2>Returns aren’t guaranteed.</h2><p>Films and shows can create exciting possibilities, but budgets, timelines, and audiences can change. If an investment becomes available in the future, it could lose some or all of its value.</p><p>For now, a pledge only expresses interest—no money changes hands. Any future opportunity would come with separate details to review and a separate decision to make.</p></div><div className="inv-section"><p>This general acknowledgment is not a signature or confirmation of any saved amount or project allocations. Later, you can review the exact saved record and sign it separately.</p><Option label="I understand this is non-binding interest, not an investment or an offer." checked={a.terms_read} onChange={()=>change('terms_read',!a.terms_read)}/></div><AgeAcknowledgment role="investor" checked={ageStatus.confirmed || ageChecked} disabled={ageStatus.confirmed} savedAt={ageStatus.confirmedAt} onChange={setAgeChecked}/></>}
           {screen===2 && <><p className="inv-label">Genres you return to · choose any</p><div className="inv-grid">{genres.map(g=><Option key={g} label={g} checked={a.favorite_genres.includes(g)} onChange={()=>change('favorite_genres',toggle(a.favorite_genres,g))}/>)}</div><div className="inv-section"><p className="inv-label">Where in the process?</p><div className="inv-options">{stages.map(([value,label])=><Option key={value} label={label} checked={a.stages.includes(value)} onChange={()=>change('stages',toggle(a.stages,value))}/>)}</div></div></>}
-          {screen===3 && <><div className="inv-section"><h2>Your minimum preferences</h2><p>Choose one minimum per slate. Each number is the total repayment per $100 invested, including original capital. These are illustrative preferences, not promises of a return. Not interested means you do not want matches for that slate.</p><div className="inv-grid">{stages.map(([stage,label])=><fieldset className="inv-minimum-stage" key={stage}><legend>{label}</legend><div className="inv-options">{[...fixedMinimumOptions.map(([amount,text])=>({value:String(amount),label:text})),{value:'other',label:'Other (custom)'},{value:'not-interested',label:'Not interested'}].map(option=><label className="inv-option" key={option.value}><input type="radio" name={`minimum-${stage}`} data-testid={`input-minimum-${stage}-${option.value}`} checked={minimumChoice(stage)===option.value} onChange={()=>chooseMinimum(stage,option.value)}/><span>{option.label}</span></label>)}</div>{minimumChoice(stage)==='other' && <div className="inv-field"><label htmlFor={`minimum-${stage}-custom`}>Custom minimum for {label} · whole dollars, at least $125</label><input id={`minimum-${stage}-custom`} className="inv-input" data-testid={`input-minimum-${stage}-custom`} type="number" min="125" step="1" placeholder="Enter a whole-dollar minimum" value={customMinimumValue(stage)} onChange={e=>updateCustomMinimum(stage,e.target.value)}/></div>}</fieldset>)}</div></div></>}
+          {screen===3 && <div className="inv-section" data-testid="section-repayment-preferences">
+            <h2>What does repayment mean?</h2>
+            <p>Total repayment includes the money you originally invested—not just the additional return.</p>
+            <p className="inv-small">These are the standard suggestions for your selected stages. Individual filmmakers may propose different terms, which you can review with each project.</p>
+            <div className="inv-grid">{stages.filter(([stage])=>a.stages.includes(stage)).map(([stage,label])=>{
+              const target = stage==='distribution' ? 125 : stage==='production' ? 150 : 175;
+              return <fieldset className="inv-minimum-stage" key={stage} data-testid={`repayment-stage-${stage}`}>
+                <legend>{label}</legend>
+                <p className="inv-kicker">Proposed total repayment target</p>
+                <h3 data-testid={`repayment-target-${stage}`}>$100 invested → {dollars(target)} total repayment</h3>
+                <p>Your original <strong>$100 back, plus {dollars(target-100)}</strong>—if the project earns enough revenue to reach that target.</p>
+                <p className="inv-label">What is the minimum total repayment you would consider for every $100 invested?</p>
+                <div className="inv-options">{[
+                  ...fixedMinimumOptions.map(([amount])=>({value:String(amount),label:`${dollars(amount)} total ($100 back + ${dollars(amount-100)})`})),
+                  {value:'other',label:'Other amount (custom)'},{value:'not-interested',label:'Not interested in this stage'},
+                ].map(option=><label className="inv-option" key={option.value}>
+                  <input type="radio" name={`minimum-${stage}`} data-testid={`input-minimum-${stage}-${option.value}`} checked={minimumChoice(stage)===option.value} onChange={()=>chooseMinimum(stage,option.value)}/><span>{option.label}</span>
+                </label>)}</div>
+                {minimumChoice(stage)==='other' && <div className="inv-field"><label htmlFor={`minimum-${stage}-custom`}>Your minimum total repayment per $100 · whole dollars, at least $125</label><input id={`minimum-${stage}-custom`} className="inv-input" data-testid={`input-minimum-${stage}-custom`} type="number" min="125" step="1" placeholder="For example, 180 means $100 back plus $80" value={customMinimumValue(stage)} onChange={e=>updateCustomMinimum(stage,e.target.value)}/></div>}
+              </fieldset>;
+            })}</div>
+            {!a.stages.length && <p role="alert">Choose at least one stage on Page 2 to see its proposed repayment target.</p>}
+            <p>Your minimum helps us find matching projects. It does not change a filmmaker’s proposed terms or guarantee a return. A higher minimum can mean fewer matches. “Not interested” excludes that stage from matching.</p>
+            <p className="inv-small">Any later revenue sharing is separate from this first repayment target. The project’s actual backend split, duration and fees are shown with its proposal—not added to the target here.</p>
+            <div className="inv-note"><p>Repayment depends on project revenue. Returns and repayment dates are not guaranteed, and a future investment could lose some or all of your money. No money is collected during onboarding.</p></div>
+          </div>}
           {screen===4 && <><p className="inv-kicker">Your possible lineup</p><h2 className="serif" style={{fontSize:'clamp(38px,4vw,58px)',lineHeight:1,margin:'15px 0'}}>Choose where your interest goes.</h2><p className="inv-small">Up to {cap(a.amount)} projects. Each allocation must be at least $25. Your total is {dollars(a.amount)}.</p><p className="inv-small">Returns aren’t guaranteed. You may get back less, or nothing.</p><p className="inv-small">When matches are available and you have not chosen projects, we start with an even split across up to {cap(a.amount)} matches. You can edit each amount, split evenly again, or manually choose other available projects.</p><p className="inv-small">“Matches your preferences” means a project fits your selected genres, stages, and minimum preferences; it is not a recommendation or endorsement. Project listing approval is not investment approval.</p>
           <div className="inv-options"><Option type="radio" checked={!a.unallocated} label="Choose projects" description="Adjust amounts across a lineup of approved projects." onChange={()=>change('unallocated',false)}/><Option type="radio" checked={a.unallocated} label="Just pledge" description="Save your interest without selecting projects yet." onChange={()=>change('unallocated',true)}/></div>
            <div className="inv-spread" data-testid="text-allocation-spread">{a.unallocated ? <><strong>Allocation spread: None</strong><span>Your interest is unallocated.</span></> : rating ? <><strong>Allocation spread: {rating}</strong><span>Based on the number of projects and largest allocation share. This describes allocation only—not safety, performance, or expected return.</span></> : <><strong>Allocation spread: None</strong><span>No project allocations are currently selected.</span></>}</div>
@@ -434,11 +534,21 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoadi
           <div className="inv-section"><p className="inv-label">What experience do you bring? · choose any</p><div className="inv-options">{['New to investing','Invested in creative projects','Invested in private companies','Work in film or media'].map(value=><Option key={value} label={value} checked={a.experience.includes(value)} onChange={()=>change('experience',toggle(a.experience,value))}/>)}</div></div>
           <div className="inv-section"><p className="inv-label">What brings you here? · choose any</p><div className="inv-options">{['Support independent filmmakers','Discover stories early','Connect with creators','Learn about future opportunities'].map(value=><Option key={value} label={value} checked={a.motivations.includes(value)} onChange={()=>change('motivations',toggle(a.motivations,value))}/>)}</div></div>
            <label className="fm-check inv-section inv-contact-opt-in"><input type="checkbox" data-testid="checkbox-invest-chat-opt-in" checked={a.call_opt_in} onChange={e=>change('call_opt_in',e.target.checked)}/><span>I’m open to a quick 15-minute chat about my interests.</span></label>
-            <p className="inv-small">Saving records your non-binding indication of interest; it does not reserve a project, require payment, or make an investment. Saving is not the separate signature confirming the exact saved record. See our <Link href="/privacy" className="underline" data-testid="link-invest-privacy">privacy policy</Link>.</p>
+            <section className="inv-section" data-testid="section-final-interest-confirmation">
+              <p className="inv-kicker">One confirmation · before submission</p>
+              <h2>Review and confirm your interest.</h2>
+              <p><strong data-testid="review-interest-total">{dollars(a.amount)}</strong> in non-binding interest.</p>
+              {a.unallocated ? <p data-testid="review-interest-unallocated">The full amount is unallocated; you have not selected projects.</p> : <ul>{a.lineup.map(row=><li key={row.project_id} data-testid={`review-allocation-${row.project_id}`}>{available.find(project=>project.id===row.project_id)?.title ?? `Project #${row.project_id}`} — {dollars(row.amount)}</li>)}</ul>}
+              <p>This confirmation applies only to the amount and project allocations shown here. You can change your mind; this is not a contract, investment or authorization to charge you.</p>
+              <Field id="interest-signature" label={`Signature · type your full name exactly: ${a.name.trim() || 'enter your name above'}`} value={signature} onChange={setSignature} required/>
+              <label className="lineup-check"><input type="checkbox" data-testid="checkbox-final-interest-confirmation" checked={interestAccepted} onChange={event=>setInterestAccepted(event.target.checked)}/><span>I confirm this non-binding interest for the amount and project selections shown above. No investment is being made and no money is collected.</span></label>
+              <p className="inv-small">Submit saves and confirms this reviewed record together. There is no additional confirmation screen afterward. Editing your answers clears this confirmation so you can review the changed details.</p>
+            </section>
+            <p className="inv-small">Your interest does not reserve a project, require payment, or make an investment. See our <Link href="/privacy" className="underline" data-testid="link-invest-privacy">privacy policy</Link>.</p>
         </>}
         {error && <div className="inv-error" role="alert" data-testid="error-investor"><p>{error}</p>{checkLineup && <Link href="/lineup" data-testid="link-investor-conflict-lineup">Check my saved interest</Link>}</div>}
         {screen===5 && canStartFresh && identityId!=='visitor' && <div className="inv-section" data-testid="investor-start-fresh-choice"><p><strong>Start a separate form?</strong> This will leave two separate records under the same email. The older guest interest stays unchanged and will not appear in this account. Linking it here later would require a separate review.</p><button type="button" className="inv-button secondary" data-testid="button-investor-start-fresh" disabled={saving || submit.isPending} onClick={()=>void finish(true)}>Start fresh and save this interest <ArrowRight size={16}/></button></div>}
-        <div className="inv-foot"><div>{screen>1 && <button type="button" className="inv-button secondary" data-testid="button-invest-back" disabled={saving || match.isPending || submit.isPending} onClick={()=>void back()}><ArrowLeft size={16}/> Back</button>}</div><button type="button" className="inv-button" data-testid={screen===5?'button-save-interest':'button-invest-next'} disabled={saving || match.isPending || submit.isPending} onClick={()=>void (screen===5?finish():next())}>{submit.isPending?'Saving interest…':match.isPending?'Finding projects…':saving?'Saving…':screen===5?'Save non-binding interest':'Continue'} <ArrowRight size={16}/></button></div>
+        <div className="inv-foot"><div>{screen>1 && <button type="button" className="inv-button secondary" data-testid="button-invest-back" disabled={saving || match.isPending || finishing} onClick={()=>void back()}><ArrowLeft size={16}/> Back</button>}</div><button type="button" className="inv-button" data-testid={screen===5?'button-save-interest':'button-invest-next'} disabled={saving || match.isPending || finishing || screen===5 && (!interestAccepted || signature!==a.name.trim() || !a.name.trim())} onClick={()=>void (screen===5?finish():next())}>{finishing?'Submitting your confirmed interest…':match.isPending?'Finding projects…':saving?'Saving…':screen===5?'Submit non-binding interest':'Continue'} <ArrowRight size={16}/></button></div>
       </div>
     </div>
   </div></section>;

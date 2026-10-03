@@ -1580,8 +1580,10 @@ export const SaveInvestorIntentBody = zod.object({
 
 
 
+
 export const SaveInvestorIntentResponse = zod.object({
   "investor_id": zod.number().int().min(1),
+  "entry_id": zod.number().int().min(1).nullable(),
   "status": zod.literal("saved")
 })
 
@@ -1678,6 +1680,7 @@ export const ClaimInvestorIntentResponse = zod.object({
  * Confirmation is idempotent for the same saved interest. No money is collected. Project allocations become public-count eligible only on successful confirmation. Pending interest cannot be confirmed for a project owned by the provider-qualified verified account or associated with the original visitor cookie; email alone does not establish ownership.
  * @summary Sign and confirm the account's saved non-binding interest
  */
+
 export const confirmInvestorIntentBodySignatureNameMin = 2;
 export const confirmInvestorIntentBodySignatureNameMax = 120;
 
@@ -1694,6 +1697,7 @@ export const confirmInvestorIntentBodyAllocationsMax = 5;
 
 
 export const ConfirmInvestorIntentBody = zod.object({
+  "investor_id": zod.number().int().min(1).optional().describe('Exact investor record reviewed by the caller; when supplied it must belong to the signed-in account.'),
   "signature_name": zod.string().min(confirmInvestorIntentBodySignatureNameMin).max(confirmInvestorIntentBodySignatureNameMax),
   "accepted": zod.literal(true),
   "amount": zod.number().int().min(confirmInvestorIntentBodyAmountMin).max(confirmInvestorIntentBodyAmountMax),

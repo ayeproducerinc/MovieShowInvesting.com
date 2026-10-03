@@ -9,6 +9,11 @@ import type { InvestorAllocationInput } from './investorAllocationInput';
 
 export interface InvestorIntentConfirmationInput {
   /**
+     * Exact investor record reviewed by the caller; when supplied it must belong to the signed-in account.
+     * @minimum 1
+     */
+  investor_id?: number;
+  /**
      * @minLength 2
      * @maxLength 120
      */

@@ -76,7 +76,8 @@ The owner approved these terms for new proposals. They supersede the historical 
 - One lineup per investor email. Default allocation is an equal split; any remainder goes to the first project.
 - Investor minimum ladder, per $100: $125, $150, $175, $200, $250+, Other, or Not interested for each slate.
 - An offer matches an investor’s selected minimum only when it meets or exceeds that minimum. “Not interested” is never a match.
-- Market figures are hidden until at least 20 answers exist for the applicable slate. Never show market figures or filmmaker offers on the investor terms page.
+- Market figures are hidden until at least 20 answers exist for the applicable slate. The investor repayment page shows platform-standard targets for selected stages, not market figures or individual filmmaker offers. Explain original money back plus additional return, and distinguish matching preferences from project terms.
+- Investors review, sign, and confirm their non-binding interest once in the final worksheet before Submit. The normal journey has no post-submit confirmation screen. Age and introductory ground-rules acknowledgment remain separate; exact-record ownership, freshness, retry safeguards and immutable earlier signatures remain required.
 
 ## Data, authentication, and implementation
 

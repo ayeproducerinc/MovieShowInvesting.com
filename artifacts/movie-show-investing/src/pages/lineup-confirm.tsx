@@ -62,6 +62,7 @@ export default function LineupConfirm() {
         return;
       }
       await confirm.mutateAsync({ data: {
+        investor_id: latest.investor_id,
         signature_name: signature,
         accepted: true,
          entry_id: latest.entry_id,

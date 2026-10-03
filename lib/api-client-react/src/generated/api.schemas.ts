@@ -898,6 +898,11 @@ export interface InvestorIntentInput {
 export interface InvestorIntentResult {
   /** @minimum 1 */
   investor_id: number;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  entry_id: number | null;
   status: 'saved';
 }
 
@@ -908,6 +913,11 @@ export interface InvestorIntentClaimResult {
 }
 
 export interface InvestorIntentConfirmationInput {
+  /**
+     * Exact investor record reviewed by the caller; when supplied it must belong to the signed-in account.
+     * @minimum 1
+     */
+  investor_id?: number;
   /**
      * @minLength 2
      * @maxLength 120
