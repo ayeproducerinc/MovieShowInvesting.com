@@ -44,7 +44,7 @@ const initial: Answers = {
   team_info:'', team_links_text:'', distribution_plan:'', money_use:'', show_team:null, show_dist:null, show_money:null,
   crowdfunding_ran:null, crowdfunding_campaign:'', crowdfunding_same_project:null, crowdfunding_goal:'', crowdfunding_raised:'', crowdfunding_obligations:'',
 };
-const genres = ['Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Other'] as const;
+const genres = ['Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Romance','Action','Animation','Other'] as const;
 const funding = ['Own money','Friends & family','Kickstarter / Indiegogo / Seed&Spark','Grants','Investors','Studios','Haven’t yet','Other'];
 const headings = ['Project stage','Project & pitch','Budget & suggested repayment terms','Funding experience','Your details & submit'];
 const isCrowd = (s:string) => s.startsWith('Kickstarter');

@@ -31,7 +31,7 @@ const descriptions = [
   'A starting point, not a recommendation. Adjust the lineup or leave your interest unallocated.',
   'Review your amount and projects, add your details, then sign and submit once. Your interest is non-binding and no money is collected.'
 ];
-const genres = ['Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Other'];
+const genres = ['Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Romance','Action','Animation','Other'];
 const stages = [['distribution','Finished film / distribution'],['production','Short or pilot / production'],['idea','Script or idea']] as const;
 type MinimumStage = typeof stages[number][0];
 const fixedMinimumOptions = [[125,'$125'],[150,'$150'],[175,'$175'],[200,'$200'],[250,'$250+']] as const;

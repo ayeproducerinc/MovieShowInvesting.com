@@ -2421,7 +2421,7 @@ components:
         stage: { type: string, enum: [distribution, production, idea] }
         title: { type: string }
         format: { type: string, enum: [movie, show] }
-        genre: { type: string, enum: [Horror, Drama, Comedy, Thriller, Documentary, Sci-Fi, Other] }
+        genre: { type: string, enum: [Horror, Drama, Comedy, Thriller, Documentary, Sci-Fi, Romance, Action, Animation, Other] }
         genre_other: { type: string }
         logline: { type: string }
         trailer_url: { type: string }

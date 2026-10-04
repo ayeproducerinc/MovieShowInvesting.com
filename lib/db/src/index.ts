@@ -214,7 +214,7 @@ export type FilmmakerSubmissionData = {
   stage?: "distribution" | "production" | "idea";
   title?: string;
   format?: "movie" | "show";
-  genre?: "Horror" | "Drama" | "Comedy" | "Thriller" | "Documentary" | "Sci-Fi" | "Other";
+  genre?: "Horror" | "Drama" | "Comedy" | "Thriller" | "Documentary" | "Sci-Fi" | "Romance" | "Action" | "Animation" | "Other";
   genre_other?: string;
   logline?: string;
   trailer_url?: string;

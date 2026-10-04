@@ -426,7 +426,7 @@ export const SubmitFilmmakerBody = zod.object({
   "stage": zod.enum(['distribution', 'production', 'idea']).optional(),
   "title": zod.string().optional(),
   "format": zod.enum(['movie', 'show']).optional(),
-  "genre": zod.enum(['Horror', 'Drama', 'Comedy', 'Thriller', 'Documentary', 'Sci-Fi', 'Other']).optional(),
+  "genre": zod.enum(['Horror', 'Drama', 'Comedy', 'Thriller', 'Documentary', 'Sci-Fi', 'Romance', 'Action', 'Animation', 'Other']).optional(),
   "genre_other": zod.string().optional(),
   "logline": zod.string().optional(),
   "trailer_url": zod.string().optional(),

@@ -10,7 +10,7 @@ import '../investor.css';
 import './explore.css';
 
 const stages = [['','All stages'],['distribution','Distribution'],['production','Production'],['idea','Idea']] as const;
-const genres = ['','Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Other'];
+const genres = ['','Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Romance','Action','Animation','Other'];
 const securitiesNotice = "Project profiles are not investment offers. Expressing interest is non-binding, and no money is collected here. If an investment opportunity opens, full offering documents will be available before you decide. Returns aren’t guaranteed.";
 type ExploreProjectWithPitchDeck = ExploreProject & { pitch_deck_url?: string | null; pitch_deck_name?: string | null };
 

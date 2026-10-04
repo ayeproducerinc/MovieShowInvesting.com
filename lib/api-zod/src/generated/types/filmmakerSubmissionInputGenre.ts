@@ -16,5 +16,8 @@ export const FilmmakerSubmissionInputGenre = {
   Thriller: 'Thriller',
   Documentary: 'Documentary',
   'Sci-Fi': 'Sci-Fi',
+  Romance: 'Romance',
+  Action: 'Action',
+  Animation: 'Animation',
   Other: 'Other',
 } as const;
