@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { youtubeEmbedUrl } from './youtube-embed.js';
 
-const player = 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0';
+const player = 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0&autoplay=0';
 
 test('normalizes supported YouTube video links to a trusted player', () => {
   for (const url of [
@@ -13,6 +13,7 @@ test('normalizes supported YouTube video links to a trusted player', () => {
     'https://youtube.com/live/dQw4w9WgXcQ',
     'https://www.youtube.com/embed/dQw4w9WgXcQ',
     'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1',
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ&autoplay=1&autoplay=true',
   ]) assert.equal(youtubeEmbedUrl(url), player);
 });
 

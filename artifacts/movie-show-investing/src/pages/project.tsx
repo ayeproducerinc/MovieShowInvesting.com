@@ -10,6 +10,7 @@ import { ProjectContactDialog } from '@/components/project-contact-dialog';
 import { money } from './filmmaker-calculator';
 import { ProposalSummary } from '@/components/proposal-summary';
 import { youtubeEmbedUrl } from '@/lib/youtube-embed';
+import { bunnyEmbedUrl } from '@/lib/bunny-embed';
 import './project.css';
 
 const securitiesNotice = "Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.";
@@ -18,12 +19,6 @@ function safeUrl(value: string | null | undefined) {
   if (!value) return null;
   try { const parsed = new URL(value); return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : null; }
   catch { return null; }
-}
-function safeBunnyEmbed(value: string | null | undefined) {
-  const href = safeUrl(value);
-  if (!href) return null;
-  const url = new URL(href);
-  return url.hostname === 'iframe.mediadelivery.net' && url.pathname.startsWith('/embed/') ? href : null;
 }
 function SecuritiesNotice() {
   return <div className="dossier-notice" role="note" data-testid="text-securities-notice" style={{ marginTop: 0 }}>{securitiesNotice}</div>;
@@ -88,7 +83,7 @@ export default function Project() {
   const poster = safeUrl(data.poster_url);
   const thumbnail = safeUrl(data.trailer_thumbnail_url);
   const trailer = safeUrl(data.trailer_url);
-  const bunnyEmbed = safeBunnyEmbed(data.trailer_url);
+   const bunnyEmbed = bunnyEmbedUrl(data.trailer_url);
   const youtubeEmbed = youtubeEmbedUrl(data.trailer_url);
   const trailerEmbed = bunnyEmbed || youtubeEmbed;
   const filmmakerName = data.public_filmmaker_name?.trim() || null;
@@ -108,7 +103,7 @@ export default function Project() {
     <div className="pj-nav"><Link href="/explore" className="pj-back" data-testid="link-project-back"><ArrowLeft size={15}/> Back to Explore</Link>{eligible && !data.is_owner && <a href="#section-project-share" className="pj-share" data-testid="link-project-share-anchor"><Share2 size={14}/> Share</a>}</div>
     <header className="pj-head"><p className="dossier-kicker">{labels || 'Independent project'} / Prelaunch</p><h1 className="pj-title" data-testid="text-project-title">{data.title}</h1>{data.logline && <p className="pj-logline" data-testid="text-project-logline">{data.logline}</p>}<div className="pj-by" data-testid="row-project-filmmaker">{filmmakerName ? <p className="pj-by-name" data-testid="text-project-filmmaker">Filmmaker: <strong>{filmmakerName}</strong></p> : <p className="pj-by-name pj-by-missing" data-testid="text-project-filmmaker-missing">Filmmaker: public name not provided</p>}{data.is_owner ? <Link href="/messages" className="dossier-button dossier-button-outline pj-contact-btn" data-testid="link-project-messages">View messages <ArrowUpRight size={16}/></Link> : <ProjectContactDialog key={`${data.slug}:${identityId}`} resetKey={`${data.slug}:${identityId}`} slug={data.slug} title={data.title} filmmakerName={filmmakerName}/>}</div>{data.is_owner && <p className="dossier-status" data-testid="badge-owned-project">Your project · This is how visitors see its public page.</p>}{data.is_owner && <div style={{ marginTop: 14 }}><Link href="/me/projects" className="dossier-button" data-testid="link-project-manage">Manage project <ArrowUpRight size={16}/></Link></div>}</header>
     <div className="pj-media">
-      {trailerEmbed ? <><div className="dossier-video"><iframe src={trailerEmbed} title={`${data.title} trailer`} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen data-testid="iframe-project-trailer" /></div><p className="dossier-status">Player not working? <a href={youtubeEmbed ? trailer! : bunnyEmbed!} target="_blank" rel="noopener noreferrer" data-testid="link-project-trailer">{youtubeEmbed ? 'Open on YouTube' : 'Open the trailer in a new tab'} <ArrowUpRight size={14} style={{ display: 'inline' }}/></a></p></>
+      {trailerEmbed ? <><div className="dossier-video"><iframe key={trailerEmbed} src={trailerEmbed} title={`${data.title} trailer`} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" allow="accelerometer; gyroscope; encrypted-media; picture-in-picture; fullscreen" allowFullScreen data-testid="iframe-project-trailer" /></div><p className="dossier-status">Player not working? <a href={youtubeEmbed ? trailer! : bunnyEmbed!} target="_blank" rel="noopener noreferrer" data-testid="link-project-trailer">{youtubeEmbed ? 'Open on YouTube' : 'Open the trailer in a new tab'} <ArrowUpRight size={14} style={{ display: 'inline' }}/></a></p></>
       : trailer ? <a className="pj-external" href={trailer} target="_blank" rel="noopener noreferrer" data-testid="link-project-trailer"><span className="dossier-kicker">The trailer</span><strong>Watch the trailer in a new tab <ArrowUpRight size={15} style={{ display: 'inline' }}/></strong><small>This trailer can’t be played on this page.</small></a>
       : (poster || thumbnail) ? <img className="pj-poster" src={poster || thumbnail || ''} alt={`${data.title} project artwork`} data-testid="img-project-artwork" loading="lazy"/> : null}
     </div>

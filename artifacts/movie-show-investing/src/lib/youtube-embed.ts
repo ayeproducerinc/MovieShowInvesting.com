@@ -16,7 +16,7 @@ export function youtubeEmbedUrl(value: string | null | undefined): string | null
         : url.pathname.match(/^\/(?:embed|shorts|live)\/([A-Za-z0-9_-]{11})\/?$/)?.[1] ?? null;
     }
     return id && /^[A-Za-z0-9_-]{11}$/.test(id)
-      ? `https://www.youtube-nocookie.com/embed/${id}?rel=0`
+      ? `https://www.youtube-nocookie.com/embed/${id}?rel=0&autoplay=0`
       : null;
   } catch {
     return null;
