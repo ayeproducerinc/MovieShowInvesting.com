@@ -31,6 +31,7 @@ export * from "./schema";
 export * from "./filmmaker-materials";
 export * from "./filmmaker-activity";
 export * from "./proposal";
+export * from "./test-project-cleanup";
 
 export async function ensureVisitor(visitorId: string): Promise<void> {
   await db.insert(visitorsTable).values({ visitorId }).onConflictDoNothing();

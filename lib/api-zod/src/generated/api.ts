@@ -2041,6 +2041,29 @@ export const GetAdminTableResponse = zod.object({
 })
 
 
+export const cleanupAdminTestProjectsBodyCleanupMediaDefault = false;
+
+export const CleanupAdminTestProjectsBody = zod.object({
+  "environment": zod.enum(['preview', 'published']),
+  "dry_run": zod.boolean(),
+  "cleanup_media": zod.boolean().default(cleanupAdminTestProjectsBodyCleanupMediaDefault),
+  "confirmation": zod.enum(['DELETE CONFIRMED TEST PROJECTS'])
+})
+
+export const CleanupAdminTestProjectsResponse = zod.object({
+  "environment": zod.enum(['preview', 'published']),
+  "candidate_count": zod.number().int(),
+  "deleted_count": zod.number().int(),
+  "deleted_ids": zod.array(zod.number().int()),
+  "archived_pledges": zod.number().int(),
+  "archived_checkouts": zod.number().int(),
+  "remaining_projects": zod.number().int(),
+  "media_deleted": zod.number().int().optional(),
+  "media_retained_shared": zod.number().int().optional(),
+  "media_pending": zod.number().int().optional()
+})
+
+
 /**
  * @summary Approve or hide a project
  */

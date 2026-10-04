@@ -22,6 +22,7 @@ export * from "./visitors";
 export * from "./filmmakers";
 export * from "./filmmaker-activity";
 export * from "./projects";
+export * from "./test-project-archive";
 export * from "./pitch-review-checkouts";
 export * from "./investors";
 export * from "./pledges";

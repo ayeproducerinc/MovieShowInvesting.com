@@ -1357,6 +1357,49 @@ export interface AdminTable {
   total: number;
 }
 
+export type AdminTestProjectCleanupInputEnvironment = typeof AdminTestProjectCleanupInputEnvironment[keyof typeof AdminTestProjectCleanupInputEnvironment];
+
+
+export const AdminTestProjectCleanupInputEnvironment = {
+  preview: 'preview',
+  published: 'published',
+} as const;
+
+export type AdminTestProjectCleanupInputConfirmation = typeof AdminTestProjectCleanupInputConfirmation[keyof typeof AdminTestProjectCleanupInputConfirmation];
+
+
+export const AdminTestProjectCleanupInputConfirmation = {
+  DELETE_CONFIRMED_TEST_PROJECTS: 'DELETE CONFIRMED TEST PROJECTS',
+} as const;
+
+export interface AdminTestProjectCleanupInput {
+  environment: AdminTestProjectCleanupInputEnvironment;
+  dry_run: boolean;
+  cleanup_media?: boolean;
+  confirmation: AdminTestProjectCleanupInputConfirmation;
+}
+
+export type AdminTestProjectCleanupResultEnvironment = typeof AdminTestProjectCleanupResultEnvironment[keyof typeof AdminTestProjectCleanupResultEnvironment];
+
+
+export const AdminTestProjectCleanupResultEnvironment = {
+  preview: 'preview',
+  published: 'published',
+} as const;
+
+export interface AdminTestProjectCleanupResult {
+  environment: AdminTestProjectCleanupResultEnvironment;
+  candidate_count: number;
+  deleted_count: number;
+  deleted_ids: number[];
+  archived_pledges: number;
+  archived_checkouts: number;
+  remaining_projects: number;
+  media_deleted?: number;
+  media_retained_shared?: number;
+  media_pending?: number;
+}
+
 export interface AdminProjectReviewInput {
   approved?: boolean;
   hidden?: boolean;

@@ -31,6 +31,8 @@ import type {
   AdminReviewNotesInput,
   AdminSection,
   AdminTable,
+  AdminTestProjectCleanupInput,
+  AdminTestProjectCleanupResult,
   AgeConfirmation,
   AgeConfirmationInput,
   AuthUserEnvelope,
@@ -6250,6 +6252,88 @@ export function useGetAdminTable<TData = Awaited<ReturnType<typeof getAdminTable
 
 
 
+
+export const getCleanupAdminTestProjectsUrl = () => {
+
+
+
+
+  return `/api/admin/confirmed-test-project-cleanup`
+}
+
+export const cleanupAdminTestProjects = async (adminTestProjectCleanupInput: AdminTestProjectCleanupInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminTestProjectCleanupResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AdminTestProjectCleanupResult>(getCleanupAdminTestProjectsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTestProjectCleanupInput)
+  }
+);}
+
+
+
+
+
+export const getCleanupAdminTestProjectsMutationKey = () => ['cleanupAdminTestProjects'] as const;
+
+export const getCleanupAdminTestProjectsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cleanupAdminTestProjects>>, TError,CleanupAdminTestProjectsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cleanupAdminTestProjects>>, TError,CleanupAdminTestProjectsMutationVariables, TContext> => {
+
+const mutationKey = getCleanupAdminTestProjectsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cleanupAdminTestProjects>>, CleanupAdminTestProjectsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  cleanupAdminTestProjects(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CleanupAdminTestProjectsMutationResult = NonNullable<Awaited<ReturnType<typeof cleanupAdminTestProjects>>>
+    export type CleanupAdminTestProjectsMutationBody = BodyType<AdminTestProjectCleanupInput>
+    export type CleanupAdminTestProjectsMutationError = ErrorType<void>
+    export type CleanupAdminTestProjectsMutationVariables = {data: BodyType<AdminTestProjectCleanupInput>}
+
+    export const useCleanupAdminTestProjects = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cleanupAdminTestProjects>>, TError,CleanupAdminTestProjectsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cleanupAdminTestProjects>>,
+        TError,
+        CleanupAdminTestProjectsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCleanupAdminTestProjectsMutationOptions(options));
+    }
 
 export const getReviewAdminProjectUrl = (projectId: number,) => {
 

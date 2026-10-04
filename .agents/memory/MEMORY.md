@@ -36,3 +36,4 @@
 - [Public project media priority](public-project-media-priority.md) — desktop and mobile show trailer or poster, never both; prominent pledge panel follows the media.
 - [Public filmmaker credit consent](public-filmmaker-credit-consent.md) — private contact names are not public credits; filmmakers explicitly choose their project’s public name.
 - [Pitch editing experience](pitch-editing-experience.md) — owner approved materials inside pitch details, a separate editor, explicit detail saves, and warnings before switching.
+- [Project deletion evidence](project-deletion-evidence.md) — test-project deletion preserves signature/payment history and must not turn old project allocations into general interest.

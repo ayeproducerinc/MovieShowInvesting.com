@@ -2,6 +2,9 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import {
   db,
+  pool,
+  cleanupConfirmedTestProjects,
+  TestProjectCleanupConflict,
   emailLogTable,
   getAdminFilmmakerPitch,
   filmmakersTable,
@@ -27,10 +30,12 @@ import {
   ReviewAdminProjectParams,
   ReviewAdminProjectResponse,
   GetAdminProjectReviewResponse,
+  CleanupAdminTestProjectsBody,
+  CleanupAdminTestProjectsResponse,
 } from "@workspace/api-zod";
 import { authorizeAdminIdentity } from "../lib/admin-auth";
 import { reconcileReviewCheckouts } from "../lib/pitch-review-payments";
-import { checkFilmmakerPitchDeckStatus } from "./filmmaker-draft-materials";
+import { checkFilmmakerPitchDeckStatus, cleanupArchivedTestProjectMedia } from "./filmmaker-draft-materials";
 import { trailerThumbnail } from "./projects";
 
 const router: IRouter = Router();
@@ -376,6 +381,41 @@ router.get("/admin/tables/:section", async (req, res): Promise<void> => {
   }
   const table = await getAdminTable(parsedParams.data.section);
   res.json(GetAdminTableResponse.parse(table));
+});
+
+router.post("/admin/confirmed-test-project-cleanup", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const identity = await authorizeAdminIdentity(req, res);
+  if (!identity) return;
+  const body = CleanupAdminTestProjectsBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "An environment, dry-run choice, and explicit deletion confirmation are required." });
+    return;
+  }
+  const runtimeEnvironment = process.env.NODE_ENV === "production" ? "published"
+    : process.env.NODE_ENV === "development" ? "preview" : null;
+  if (!runtimeEnvironment || body.data.environment !== runtimeEnvironment) {
+    res.status(409).json({ error: "The requested environment does not match this server. Nothing was deleted." });
+    return;
+  }
+  let deletionCommitted = false;
+  try {
+    const result = await cleanupConfirmedTestProjects(pool, runtimeEnvironment, body.data.dry_run);
+    deletionCommitted = !body.data.dry_run;
+    const media = await cleanupArchivedTestProjectMedia(runtimeEnvironment, body.data.dry_run || !body.data.cleanup_media);
+    req.log.info({ environment: runtimeEnvironment, dryRun: body.data.dry_run, deletedCount: result.deleted_count },
+      "Confirmed test project cleanup");
+    res.json(CleanupAdminTestProjectsResponse.parse({ ...result, ...media }));
+  } catch (error) {
+    if (error instanceof TestProjectCleanupConflict) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    req.log.error({ deletionCommitted }, "Confirmed test project cleanup could not finish.");
+    res.status(500).json({ error: deletionCommitted
+      ? "Project deletion committed, but media inspection could not finish. Check the private archive before retrying."
+      : "Project cleanup could not finish. No uncommitted changes were retained." });
+  }
 });
 
 router.patch("/admin/projects/:projectId", async (req, res): Promise<void> => {

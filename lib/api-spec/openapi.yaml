@@ -1983,6 +1983,28 @@ paths:
           description: Sign-in required
         "403":
           description: Not an admin
+  /admin/confirmed-test-project-cleanup:
+    post:
+      operationId: cleanupAdminTestProjects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTestProjectCleanupInput"
+      responses:
+        "200":
+          description: Owner-confirmed test project cleanup result; private history retained
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTestProjectCleanupResult"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Administrator required
+        "409":
+          description: Confirmed inventory changed; nothing deleted
   /admin/projects/{projectId}:
     patch:
       operationId: reviewAdminProject
@@ -3159,6 +3181,28 @@ components:
             type: array
             items: { type: string }
         total: { type: integer, minimum: 0 }
+    AdminTestProjectCleanupInput:
+      type: object
+      required: [environment, dry_run, confirmation]
+      properties:
+        environment: { type: string, enum: [preview, published] }
+        dry_run: { type: boolean }
+        cleanup_media: { type: boolean, default: false }
+        confirmation: { type: string, enum: ["DELETE CONFIRMED TEST PROJECTS"] }
+    AdminTestProjectCleanupResult:
+      type: object
+      required: [environment, candidate_count, deleted_count, deleted_ids, archived_pledges, archived_checkouts, remaining_projects]
+      properties:
+        environment: { type: string, enum: [preview, published] }
+        candidate_count: { type: integer }
+        deleted_count: { type: integer }
+        deleted_ids: { type: array, items: { type: integer } }
+        archived_pledges: { type: integer }
+        archived_checkouts: { type: integer }
+        remaining_projects: { type: integer }
+        media_deleted: { type: integer }
+        media_retained_shared: { type: integer }
+        media_pending: { type: integer }
     AdminProjectReviewInput:
       type: object
       properties:

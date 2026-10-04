@@ -198,6 +198,89 @@ async function deleteCreatedObject(config: BunnyConfig, path: string, owner: Upl
   }
 }
 
+/** Explicit operator-only cleanup of precisely archived, owner-confirmed test assets. */
+export async function cleanupArchivedTestProjectMedia(environment: "preview" | "published", scanOnly = true) {
+  const config = readConfig();
+  const { confirmedTestProjects } = await import("@workspace/db");
+  const confirmed = confirmedTestProjects[environment];
+  const archived = await pool.query(`SELECT project_id, snapshot, media_cleanup FROM test_project_archive
+    WHERE environment=$1 AND project_id=ANY($2::int[]) ORDER BY project_id`, [environment, Object.keys(confirmed).map(Number)]);
+  const result = { media_deleted: 0, media_retained_shared: 0, media_pending: 0 };
+  const videoKeys = new Set(["bunny_video_id", "pending_bunny_video_id", "bunnyVideoId", "pendingBunnyVideoId"]);
+  const storageKeys = new Set(["poster_storage_path", "share_image_storage_path", "pitch_deck_storage_path", "posterStoragePath", "shareImageStoragePath", "pitchDeckStoragePath"]);
+  for (const archivedProject of archived.rows) {
+    if (archivedProject.snapshot?.project?.title !== confirmed[archivedProject.project_id]) {
+      result.media_pending++;
+      continue;
+    }
+    const assets = new Map<string, { video: boolean; value: string }>();
+    function collect(value: unknown): void {
+      if (!value || typeof value !== "object") return;
+      for (const [key, item] of Object.entries(value)) {
+        if (typeof item === "string" && item && (videoKeys.has(key) || storageKeys.has(key))) {
+          assets.set(`${videoKeys.has(key) ? "video" : "storage"}:${item}`, { video: videoKeys.has(key), value: item });
+        } else collect(item);
+      }
+    }
+    collect(archivedProject.snapshot);
+    for (const [key, asset] of assets) {
+      let status: string = archivedProject.media_cleanup[key] ?? "pending";
+      if (!scanOnly && status !== "deleted") {
+        try {
+          // Any surviving submission or draft wins over cleanup, including original
+          // review evidence. Never enumerate the shared provider library/storage.
+          const shared = await pool.query(
+            `SELECT 1 FROM projects p WHERE position($1 IN to_jsonb(p)::text)>0
+             UNION ALL SELECT 1 FROM filmmaker_draft_materials d WHERE position($1 IN to_jsonb(d)::text)>0 LIMIT 1`,
+            [asset.value],
+          );
+          if (shared.rowCount) status = "retained_shared";
+          else if (asset.video ? !UUID.test(asset.value) : !storagePathIsSafe(asset.value)) status = "invalid_reference";
+          else if (asset.video ? !config.stream : !config.storage) status = "pending_config";
+          else {
+            const url = asset.video
+              ? `https://video.bunnycdn.com/library/${encodeURIComponent(config.stream!.libraryId)}/videos/${encodeURIComponent(asset.value)}`
+              : storageUrl(config.storage!, asset.value);
+            const headers = { AccessKey: asset.video ? config.stream!.streamKey : config.storage!.storageKey };
+            let mayDelete = true;
+            if (asset.video) {
+              const found = await providerRequest(url, { headers });
+              if (found.status === 404) {
+                await found.body?.cancel().catch(() => undefined);
+                status = "deleted"; mayDelete = false;
+              } else {
+                if (!found.ok) throw new Error("Provider lookup failed");
+                const info = await found.json() as { collectionId?: string };
+                if (info.collectionId !== config.stream!.collectionId) {
+                  status = "retained_shared"; mayDelete = false;
+                }
+              }
+            }
+            if (mayDelete) {
+              const removed = await providerRequest(url, { method: "DELETE", headers });
+              await removed.body?.cancel().catch(() => undefined);
+              if (!removed.ok && removed.status !== 404) throw new Error("Provider removal failed");
+              const verified = await providerRequest(url, { headers });
+              await verified.body?.cancel().catch(() => undefined);
+              status = verified.status === 404 ? "deleted" : "pending_verification";
+            }
+          }
+        } catch {
+          status = "pending_error";
+        }
+        await pool.query(
+          `UPDATE test_project_archive SET media_cleanup=media_cleanup||jsonb_build_object($2::text,$3::text)
+           WHERE project_id=$1`, [archivedProject.project_id, key, status],
+        );
+      }
+      if (status === "deleted") result.media_deleted++;
+      else if (status === "retained_shared") result.media_retained_shared++;
+      else result.media_pending++;
+    }
+  }
+  return result;
+}
+
 async function deleteCreatedVideo(config: BunnyConfig, videoId: string): Promise<void> {
   if (!UUID.test(videoId)) return;
   const evidence = await pool.query("select 1 from projects where submission_snapshot->'project'->>'bunnyVideoId'=$1 limit 1", [videoId]);
