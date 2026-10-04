@@ -22,6 +22,7 @@ import { FilmmakerInterestAlerts } from '@/components/filmmaker-interest-alerts'
 import { useFilmmakerAuth } from '@/hooks/use-filmmaker-auth';
 import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 import { useAuth } from '@workspace/replit-auth-web';
+import { FilmmakerStartOver } from '@/components/filmmaker-start-over';
 
 function accountError(error: unknown): string {
   if (error && typeof error === 'object' && 'status' in error) {
@@ -184,6 +185,7 @@ export default function FilmmakerProjects() {
   }));
   return <>
     {claimError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{claimError} <Link href="/start/filmmaker">Open this browser’s worksheet</Link> · <button type="button" onClick={() => void linkCurrentVisit()}>Try linking again</button></div>}
+    {(claimError || actionError || projects.data?.has_resumable_draft) && <div className="page-wrap"><FilmmakerStartOver disabled={acting || claiming}/></div>}
     {actionError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{actionError} {actionError.includes('Keep this original browser draft') && <Link href="/start/filmmaker">Open this browser’s worksheet</Link>}</div>}
     <ProjectHubView
       email={ssoUser?.email ?? auth.user?.email ?? ''}

@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import draftResetRouter from "./draft-reset";
 import healthRouter from "./health";
 import ageConfirmationRouter from "./age-confirmation";
 import siteRouter from "./site";
@@ -23,6 +24,7 @@ import replitAuthRouter from "./replit-auth";
 import referralsRouter from "./referrals";
 
 const router: IRouter = Router();
+router.use(draftResetRouter);
 
 router.use(replitAuthRouter);
 router.use(referralsRouter);

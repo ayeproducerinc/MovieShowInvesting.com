@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   pool,
+  FilmmakerAccountError,
   assignVisitorPriceGroup,
   ensureVisitor,
   findVisitorFlowProgress,
@@ -142,6 +143,11 @@ router.get("/progress/:flow", async (req, res): Promise<void> => {
   if (parsedParams.data.flow === "filmmaker") {
     const access = await authorizeFilmmakerVisitor(req, res, visitorId);
     if (!access.allowed) return;
+    const retired = await pool.query("select filmmaker_draft_reset_at from visitors where visitor_id=$1", [visitorId]);
+    if (retired.rows[0]?.filmmaker_draft_reset_at) {
+      res.status(409).json({ code: "draft_cleared", error: "This saved unfinished pitch was cleared. Select Start over to open a fresh worksheet." });
+      return;
+    }
   }
 
   const record = await findVisitorFlowProgress(visitorId, parsedParams.data.flow);
@@ -228,13 +234,24 @@ router.post("/progress", async (req, res): Promise<void> => {
     return;
   }
 
+  const rawDraftId = req.get("X-MSI-Draft-Id");
+  if (parsed.data.flow === "filmmaker" && rawDraftId !== undefined && !/^[1-9]\d*$/.test(rawDraftId)) {
+    res.status(400).json({ error: "Invalid draft identifier." });
+    return;
+  }
   const record = await saveVisitorFlowProgress({
     visitorId,
     flow: parsed.data.flow,
     lastScreen: parsed.data.last_screen,
     answers: parsed.data.answers,
     completed: parsed.data.completed ?? false,
+    ...(parsed.data.flow === "filmmaker" && rawDraftId ? { expectedDraftId: Number(rawDraftId) } : {}),
+  }).catch((error: unknown) => {
+    if (!(error instanceof FilmmakerAccountError)) throw error;
+    res.status(409).json({ error: error.message });
+    return null;
   });
+  if (!record) return;
 
   res.json(SaveFlowProgressResponse.parse({
     flow: record.flow,

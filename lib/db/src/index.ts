@@ -32,6 +32,7 @@ export * from "./filmmaker-materials";
 export * from "./filmmaker-activity";
 export * from "./proposal";
 export * from "./test-project-cleanup";
+export * from "./draft-reset";
 
 export async function ensureVisitor(visitorId: string): Promise<void> {
   await db.insert(visitorsTable).values({ visitorId }).onConflictDoNothing();
@@ -149,18 +150,23 @@ export async function saveVisitorFlowProgress(input: {
   lastScreen: number;
   answers: Record<string, unknown>;
   completed: boolean;
+  expectedDraftId?: number;
 }): Promise<FlowProgressRecord> {
   if (input.flow === "filmmaker") {
     return db.transaction(async (tx) => {
-      await tx.select({ visitorId: visitorsTable.visitorId })
+      const [visitor] = await tx.select({ visitorId: visitorsTable.visitorId, retired: visitorsTable.filmmakerDraftResetAt })
         .from(visitorsTable)
         .where(eq(visitorsTable.visitorId, input.visitorId))
         .for("update");
+      if (visitor?.retired) throw new FilmmakerAccountError("account_draft_conflict", "This draft was cleared. Select Start over to open a fresh worksheet.");
 
       const [existing] = await tx.select().from(flowProgressTable).where(and(
         eq(flowProgressTable.visitorId, input.visitorId),
         eq(flowProgressTable.flow, "filmmaker"),
       ));
+      if ((existing && input.expectedDraftId !== existing.id) || (input.expectedDraftId !== undefined && existing?.id !== input.expectedDraftId)) {
+        throw new FilmmakerAccountError("account_draft_conflict", "This draft changed. Refresh before saving.");
+      }
       if (existing?.completed) {
         return existing;
       }
@@ -304,6 +310,9 @@ export async function createFilmmakerSubmission(input: {
       .for("update");
     if (!visitor) {
       throw new FilmmakerSubmissionError("Visitor must be recorded before submitting.");
+    }
+    if (visitor.filmmakerDraftResetAt) {
+      throw new FilmmakerSubmissionError("This draft was cleared. Start a fresh worksheet before submitting.");
     }
     const [accountLink] = await tx.select().from(filmmakerAccountVisitorsTable)
       .where(eq(filmmakerAccountVisitorsTable.visitorId, input.visitorId))
@@ -791,7 +800,7 @@ export async function startOrResumeFilmmakerAccountDraft(input: {
         throw new FilmmakerAccountError("visitor_not_found", "The current visitor record was not found.");
       }
       currentVisitor = visitor;
-
+      if (!visitor.filmmakerDraftResetAt) {
       const [link] = await tx.select().from(filmmakerAccountVisitorsTable)
         .where(eq(filmmakerAccountVisitorsTable.visitorId, input.currentVisitorId))
         .for("update");
@@ -857,8 +866,8 @@ export async function startOrResumeFilmmakerAccountDraft(input: {
           throw new FilmmakerAccountError("visitor_owned_by_another_account", "This visitor is linked to a different filmmaker account.");
         }
       }
+      }
     }
-
     const [existingDraft] = await tx.select({
       visitorId: filmmakerAccountVisitorsTable.visitorId,
       lastScreen: flowProgressTable.lastScreen,

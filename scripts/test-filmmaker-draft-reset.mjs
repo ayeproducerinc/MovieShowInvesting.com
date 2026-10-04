@@ -1,0 +1,75 @@
+// Development-only integration checks. All mutations target random fixtures;
+// the sitewide cleanup is tested with a fixture-only frozen allowlist.
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import { randomUUID, createHash } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+const dbRequire = createRequire(new URL("../lib/db/package.json", import.meta.url));
+const apiRequire = createRequire(new URL("../artifacts/api-server/package.json", import.meta.url));
+const { Pool } = dbRequire("pg");
+const { build } = apiRequire("esbuild");
+const temp = await mkdtemp(`${tmpdir()}/draft-reset-test-`);
+await build({ entryPoints: ["lib/db/src/draft-reset.ts"], outfile: `${temp}/reset.mjs`, bundle: true, platform: "node", format: "esm", packages: "external" });
+const { inspectDraftReset, resetOwnDrafts, inspectAllDrafts, clearDraftAllowlist } = await import(`${temp}/reset.mjs`);
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const visitors = [];
+const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const owner = { provider: "firebase", uid: `reset-fixture-${randomUUID()}` };
+async function fixture({ linked = false, completed = false, materials = false, progress = true } = {}) {
+  const visitor = randomUUID(); visitors.push(visitor);
+  await pool.query("insert into visitors(visitor_id,price_group) values($1,'A')", [visitor]);
+  if (progress) await pool.query("insert into flow_progress(visitor_id,flow,last_screen,answers,completed) values($1,'filmmaker',2,'{\"title\":\"Reset integration fixture\"}',$2)", [visitor, completed]);
+  if (linked) await pool.query("insert into filmmaker_account_visitors(visitor_id,firebase_uid) values($1,$2)", [visitor, owner.uid]);
+  if (materials) await pool.query("insert into filmmaker_draft_materials(visitor_id,synopsis) values($1,'Fixture synopsis')", [visitor]);
+  return visitor;
+}
+try {
+  const guest = await fixture({ materials: true });
+  const owned = await fixture({ linked: true });
+  const unrelated = await fixture();
+  await pool.query("insert into flow_progress(visitor_id,flow,last_screen,answers,completed) values($1,'investor',2,'{\"kept\":true}',false)", [guest]);
+  let preview = await inspectDraftReset(pool, guest, owner);
+  assert.equal(preview.drafts.length, 2, "Conflict preview must explicitly include guest + account drafts.");
+  await assert.rejects(resetOwnDrafts(pool, { visitor: guest, identity: owner, context: "wrong", drafts: preview.drafts }));
+  await pool.query("update flow_progress set answers=answers||'{\"updated\":true}'::jsonb where visitor_id=$1 and flow='filmmaker'", [guest]);
+  await assert.rejects(resetOwnDrafts(pool, { visitor: guest, identity: owner, ...preview }), /changed/);
+  preview = await inspectDraftReset(pool, guest, owner);
+  const result = await resetOwnDrafts(pool, { visitor: guest, identity: owner, ...preview });
+  visitors.push(result.visitor);
+  assert.equal(result.cleared, 2);
+  assert.equal((await pool.query("select * from flow_progress where visitor_id=$1 and flow='filmmaker'", [guest])).rows.length, 0);
+  assert.equal((await pool.query("select answers from flow_progress where visitor_id=$1 and flow='investor'", [guest])).rows[0].answers.kept, true);
+  assert.equal((await pool.query("select * from filmmaker_draft_materials where visitor_id=$1", [guest])).rows.length, 0);
+  assert.equal((await pool.query("select count(*)::int as n from filmmaker_account_visitors where visitor_id=$1", [owned])).rows[0].n, 1);
+  const fresh = (await pool.query("select * from flow_progress where visitor_id=$1 and flow='filmmaker'", [result.visitor])).rows[0];
+  assert.deepEqual(fresh.answers, {});
+  assert.equal(fresh.last_screen, 1);
+  assert.equal((await pool.query("select price_group from visitors where visitor_id=$1", [result.visitor])).rows[0].price_group, "A");
+  assert.ok((await pool.query("select filmmaker_draft_reset_at from visitors where visitor_id=$1", [guest])).rows[0].filmmaker_draft_reset_at);
+  await assert.rejects(inspectDraftReset(pool, result.visitor, { provider: "firebase", uid: "wrong-owner" }), /another account/);
+  await assert.rejects(inspectDraftReset(pool, result.visitor, owner, fresh.id + 1), /different draft/);
+  const protectedVisitor = await fixture();
+  await pool.query("insert into filmmakers(visitor_id,no_project_yet) values($1,true)", [protectedVisitor]);
+  await assert.rejects(inspectDraftReset(pool, protectedVisitor, null), /submission or checkout/);
+  const completed = await fixture({ completed: true });
+  const orphan = await fixture({ materials: true, progress: false });
+  const changed = await fixture();
+  const inventory = await inspectAllDrafts(pool);
+  const allowlist = inventory.drafts.filter(draft => [completed, orphan, unrelated, protectedVisitor, changed].some(visitor => draft.key === hash(visitor)));
+  assert.equal(allowlist.length, 3, "Completed and dependent drafts must not appear in the eligible inventory.");
+  await pool.query("update flow_progress set answers='{\"changed\":true}' where visitor_id=$1", [changed]);
+  const globalResult = await clearDraftAllowlist(pool, allowlist);
+  assert.deepEqual(globalResult, { cleared: 2, skipped: 1 });
+  assert.equal((await pool.query("select count(*)::int n from flow_progress where visitor_id=$1", [completed])).rows[0].n, 1);
+  assert.equal((await pool.query("select count(*)::int n from flow_progress where visitor_id=$1", [protectedVisitor])).rows[0].n, 1);
+  assert.equal((await pool.query("select count(*)::int n from flow_progress where visitor_id=$1", [changed])).rows[0].n, 1);
+  assert.equal((await pool.query("select count(*)::int n from filmmaker_draft_materials where visitor_id=$1", [orphan])).rows[0].n, 0);
+  console.log("PASS: conflict reset, identity/context checks, stale versions, fresh draft/reload data, investor preservation, retained ownership, dependent/completed protection, material-only cleanup, and frozen global allowlist.");
+} finally {
+  await pool.query("delete from filmmakers where visitor_id=any($1::text[])", [visitors]);
+  await pool.query("delete from filmmaker_account_visitors where visitor_id=any($1::text[])", [visitors]);
+  await pool.query("delete from visitors where visitor_id=any($1::text[])", [visitors]);
+  await pool.end();
+  await rm(temp, { recursive: true, force: true });
+}

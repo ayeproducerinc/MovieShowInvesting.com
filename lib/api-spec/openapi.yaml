@@ -33,6 +33,67 @@ tags:
   - name: auth
     description: Browser sign-in and session status
 paths:
+  /filmmakers/drafts/reset:
+    get:
+      operationId: inspectFilmmakerDraftReset
+      tags: [filmmakers]
+      responses:
+        "200":
+          description: Exact unfinished drafts to confirm before clearing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DraftResetPreview" }
+        "403": { description: Wrong draft owner }
+        "409": { description: Draft has protected dependencies }
+    post:
+      operationId: resetFilmmakerDrafts
+      tags: [filmmakers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DraftResetInput" }
+      responses:
+        "200":
+          description: Drafts cleared and a fresh worksheet selected
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cleared]
+                properties:
+                  cleared: { type: integer }
+        "400": { description: Explicit confirmation required }
+        "403": { description: Wrong draft owner }
+        "409": { description: Draft or browser context changed }
+  /admin/unfinished-draft-cleanup:
+    post:
+      operationId: cleanupUnfinishedDrafts
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DraftCleanupInput" }
+      responses:
+        "200":
+          description: Inventory or result of a confirmed frozen allowlist cleanup
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [drafts, protected_count, cleared, skipped]
+                properties:
+                  drafts:
+                    type: array
+                    items: { $ref: "#/components/schemas/DraftResetSelection" }
+                  protected_count: { type: integer }
+                  cleared: { type: integer }
+                  skipped: { type: integer }
+        "400": { description: Invalid confirmation or allowlist }
+        "401": { description: Sign in required }
+        "403": { description: Administrator required }
+        "409": { description: Wrong server environment }
   /referrals/capture:
     post:
       operationId: captureReferral
@@ -2269,6 +2330,40 @@ components:
       scheme: bearer
       bearerFormat: Firebase ID token
   schemas:
+    DraftResetSelection:
+      type: object
+      required: [key, version, label]
+      properties:
+        key: { type: string, pattern: "^[a-f0-9]{64}$" }
+        version: { type: string, pattern: "^[a-f0-9]{64}$" }
+        label: { type: string, maxLength: 100 }
+    DraftResetPreview:
+      type: object
+      required: [context, drafts]
+      properties:
+        context: { type: string, pattern: "^[a-f0-9]{64}$" }
+        drafts:
+          type: array
+          maxItems: 10000
+          items: { $ref: "#/components/schemas/DraftResetSelection" }
+    DraftResetInput:
+      allOf:
+        - { $ref: "#/components/schemas/DraftResetPreview" }
+        - type: object
+          required: [confirm]
+          properties:
+            confirm: { type: boolean, enum: [true] }
+    DraftCleanupInput:
+      type: object
+      required: [environment, dry_run]
+      properties:
+        environment: { type: string, enum: [preview, published] }
+        dry_run: { type: boolean }
+        confirmation: { type: string, enum: ["CLEAR ALL UNFINISHED FILMMAKER DRAFTS"] }
+        drafts:
+          type: array
+          maxItems: 10000
+          items: { $ref: "#/components/schemas/DraftResetSelection" }
     ReferralCaptureInput:
       type: object
       required: [code]

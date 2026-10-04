@@ -8,6 +8,87 @@
 import * as zod from 'zod';
 
 
+export const inspectFilmmakerDraftResetResponseContextRegExp = new RegExp('^[a-f0-9]{64}$');
+export const inspectFilmmakerDraftResetResponseDraftsItemKeyRegExp = new RegExp('^[a-f0-9]{64}$');
+export const inspectFilmmakerDraftResetResponseDraftsItemVersionRegExp = new RegExp('^[a-f0-9]{64}$');
+export const inspectFilmmakerDraftResetResponseDraftsItemLabelMax = 100;
+
+export const inspectFilmmakerDraftResetResponseDraftsMax = 10000;
+
+
+
+export const InspectFilmmakerDraftResetResponse = zod.object({
+  "context": zod.string().regex(inspectFilmmakerDraftResetResponseContextRegExp),
+  "drafts": zod.array(zod.object({
+  "key": zod.string().regex(inspectFilmmakerDraftResetResponseDraftsItemKeyRegExp),
+  "version": zod.string().regex(inspectFilmmakerDraftResetResponseDraftsItemVersionRegExp),
+  "label": zod.string().max(inspectFilmmakerDraftResetResponseDraftsItemLabelMax)
+})).max(inspectFilmmakerDraftResetResponseDraftsMax)
+})
+
+
+export const resetFilmmakerDraftsBodyOneContextRegExp = new RegExp('^[a-f0-9]{64}$');
+export const resetFilmmakerDraftsBodyOneDraftsItemKeyRegExp = new RegExp('^[a-f0-9]{64}$');
+export const resetFilmmakerDraftsBodyOneDraftsItemVersionRegExp = new RegExp('^[a-f0-9]{64}$');
+export const resetFilmmakerDraftsBodyOneDraftsItemLabelMax = 100;
+
+export const resetFilmmakerDraftsBodyOneDraftsMax = 10000;
+
+
+
+export const ResetFilmmakerDraftsBody = zod.object({
+  "context": zod.string().regex(resetFilmmakerDraftsBodyOneContextRegExp),
+  "drafts": zod.array(zod.object({
+  "key": zod.string().regex(resetFilmmakerDraftsBodyOneDraftsItemKeyRegExp),
+  "version": zod.string().regex(resetFilmmakerDraftsBodyOneDraftsItemVersionRegExp),
+  "label": zod.string().max(resetFilmmakerDraftsBodyOneDraftsItemLabelMax)
+})).max(resetFilmmakerDraftsBodyOneDraftsMax)
+}).and(zod.object({
+  "confirm": zod.literal(true)
+}))
+
+export const ResetFilmmakerDraftsResponse = zod.object({
+  "cleared": zod.number().int()
+})
+
+
+export const cleanupUnfinishedDraftsBodyDraftsItemKeyRegExp = new RegExp('^[a-f0-9]{64}$');
+export const cleanupUnfinishedDraftsBodyDraftsItemVersionRegExp = new RegExp('^[a-f0-9]{64}$');
+export const cleanupUnfinishedDraftsBodyDraftsItemLabelMax = 100;
+
+export const cleanupUnfinishedDraftsBodyDraftsMax = 10000;
+
+
+
+export const CleanupUnfinishedDraftsBody = zod.object({
+  "environment": zod.enum(['preview', 'published']),
+  "dry_run": zod.boolean(),
+  "confirmation": zod.enum(['CLEAR ALL UNFINISHED FILMMAKER DRAFTS']).optional(),
+  "drafts": zod.array(zod.object({
+  "key": zod.string().regex(cleanupUnfinishedDraftsBodyDraftsItemKeyRegExp),
+  "version": zod.string().regex(cleanupUnfinishedDraftsBodyDraftsItemVersionRegExp),
+  "label": zod.string().max(cleanupUnfinishedDraftsBodyDraftsItemLabelMax)
+})).max(cleanupUnfinishedDraftsBodyDraftsMax).optional()
+})
+
+export const cleanupUnfinishedDraftsResponseDraftsItemKeyRegExp = new RegExp('^[a-f0-9]{64}$');
+export const cleanupUnfinishedDraftsResponseDraftsItemVersionRegExp = new RegExp('^[a-f0-9]{64}$');
+export const cleanupUnfinishedDraftsResponseDraftsItemLabelMax = 100;
+
+
+
+export const CleanupUnfinishedDraftsResponse = zod.object({
+  "drafts": zod.array(zod.object({
+  "key": zod.string().regex(cleanupUnfinishedDraftsResponseDraftsItemKeyRegExp),
+  "version": zod.string().regex(cleanupUnfinishedDraftsResponseDraftsItemVersionRegExp),
+  "label": zod.string().max(cleanupUnfinishedDraftsResponseDraftsItemLabelMax)
+})),
+  "protected_count": zod.number().int(),
+  "cleared": zod.number().int(),
+  "skipped": zod.number().int()
+})
+
+
 export const captureReferralBodyCodeMin = 6;
 export const captureReferralBodyCodeMax = 32;
 

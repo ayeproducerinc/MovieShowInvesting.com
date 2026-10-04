@@ -10,6 +10,7 @@ export const visitorsTable = pgTable("visitors", {
   utmCampaign: text("utm_campaign"),
   refCodeUsed: text("ref_code_used"),
   priceGroup: text("price_group"),
+  filmmakerDraftResetAt: timestamp("filmmaker_draft_reset_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 }, (table) => [

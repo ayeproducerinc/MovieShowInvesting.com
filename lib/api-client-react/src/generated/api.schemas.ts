@@ -5,6 +5,49 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface DraftResetSelection {
+  /** @pattern ^[a-f0-9]{64}$ */
+  key: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  version: string;
+  /** @maxLength 100 */
+  label: string;
+}
+
+export interface DraftResetPreview {
+  /** @pattern ^[a-f0-9]{64}$ */
+  context: string;
+  /** @maxItems 10000 */
+  drafts: DraftResetSelection[];
+}
+
+export type DraftResetInput = DraftResetPreview & {
+  confirm: true;
+};
+
+export type DraftCleanupInputEnvironment = typeof DraftCleanupInputEnvironment[keyof typeof DraftCleanupInputEnvironment];
+
+
+export const DraftCleanupInputEnvironment = {
+  preview: 'preview',
+  published: 'published',
+} as const;
+
+export type DraftCleanupInputConfirmation = typeof DraftCleanupInputConfirmation[keyof typeof DraftCleanupInputConfirmation];
+
+
+export const DraftCleanupInputConfirmation = {
+  CLEAR_ALL_UNFINISHED_FILMMAKER_DRAFTS: 'CLEAR ALL UNFINISHED FILMMAKER DRAFTS',
+} as const;
+
+export interface DraftCleanupInput {
+  environment: DraftCleanupInputEnvironment;
+  dry_run: boolean;
+  confirmation?: DraftCleanupInputConfirmation;
+  /** @maxItems 10000 */
+  drafts?: DraftResetSelection[];
+}
+
 export interface ReferralCaptureInput {
   /**
      * @minLength 6
@@ -1618,6 +1661,17 @@ export interface AdminMessageReview {
   id: number;
   hidden: boolean;
 }
+
+export type ResetFilmmakerDrafts200 = {
+  cleared: number;
+};
+
+export type CleanupUnfinishedDrafts200 = {
+  drafts: DraftResetSelection[];
+  protected_count: number;
+  cleared: number;
+  skipped: number;
+};
 
 export type GetAdminReferralsParams = {
 /**
