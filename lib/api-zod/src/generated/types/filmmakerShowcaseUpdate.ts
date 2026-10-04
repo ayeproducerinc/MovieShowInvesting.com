@@ -8,6 +8,12 @@
 
 export interface FilmmakerShowcaseUpdate {
   /**
+     * Name explicitly chosen for public display; null removes the public credit without changing private contact information
+     * @maxLength 120
+     * @nullable
+     */
+  public_filmmaker_name?: string | null;
+  /**
      * @maxLength 3000
      * @nullable
      */

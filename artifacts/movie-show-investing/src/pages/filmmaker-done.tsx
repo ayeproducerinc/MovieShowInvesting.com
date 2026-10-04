@@ -57,6 +57,8 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
   const [cfGoal, setCfGoal] = useState(result.crowdfunding_goal != null ? String(result.crowdfunding_goal) : '');
   const [cfRaised, setCfRaised] = useState(result.crowdfunding_raised != null ? String(result.crowdfunding_raised) : '');
   const [cfObligations, setCfObligations] = useState(result.crowdfunding_obligations || '');
+  const [publicName, setPublicName] = useState(result.public_filmmaker_name || '');
+  useEffect(() => { setPublicName(result.public_filmmaker_name || ''); }, [result.project_id, result.public_filmmaker_name]);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [savedStatus, setSavedStatus] = useState<ShowcaseStatus | null>(null);
@@ -67,7 +69,8 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
     : reviewStatusState === 'checking'
       ? 'Checking this pitch’s payment status before checkout is available…'
       : checkoutUnavailableText;
-  const unsavedDetails = JSON.stringify(validLinks(links)) !== JSON.stringify(result.team_links)
+  const unsavedDetails = (clean(publicName) ?? null) !== (result.public_filmmaker_name?.trim() || null)
+    || JSON.stringify(validLinks(links)) !== JSON.stringify(result.team_links)
     || (clean(teamInfo) ?? '') !== (result.team_info || '')
     || clean(moneyUse) !== (result.money_use || null)
     || clean(distribution) !== (result.distribution_plan || null);
@@ -131,6 +134,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
     const data: FilmmakerShowcaseUpdate = {
       showcase_requested: Boolean(result.showcase_requested),
       team_links: teamLinks,
+      public_filmmaker_name: clean(publicName),
       money_use: clean(moneyUse),
       distribution_plan: clean(distribution),
       // Collapsing preserves values; explicitly clearing this editor removes current team text.
@@ -190,6 +194,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
         ? 'Your showcase review is pending; requesting review is not approval. The page remains accessible to anyone with its link. Share a synopsis, not a full script. You can revise these optional details later.'
          : 'Your project is free and unlisted. Save optional details here, then choose Submit for review when you are ready. Saving details alone does not request review. Share a synopsis, not a full script.'}</p>
     <form onSubmit={event => void submit(event)} style={{ marginTop: 30 }}>
+      <div className="dossier-field"><label htmlFor="showcase-public-name">Public filmmaker name <small>· optional</small></label><input id="showcase-public-name" data-testid="input-showcase-public-name" maxLength={120} value={publicName} onChange={e => setPublicName(e.target.value)} aria-describedby="showcase-public-name-help" autoComplete="off" /><small id="showcase-public-name-help">Appears beside your project title on the public page, visible to anyone with the link. Leave blank to keep your private contact name private. Don’t enter emails or phone numbers.</small></div>
       <div className="dossier-field"><label htmlFor="showcase-team-info">Key team <small>· optional</small></label><textarea id="showcase-team-info" data-testid="input-showcase-team-info" maxLength={3000} value={teamInfo} onChange={e => setTeamInfo(e.target.value)} /></div>
       <div className="dossier-field"><label htmlFor="showcase-links">Team links <small>· optional, one full URL per line, up to 8</small></label><textarea id="showcase-links" data-testid="input-showcase-links" value={links} onChange={e => setLinks(e.target.value)} placeholder={'https://example.com/team'} /></div>
       <div className="dossier-field"><label htmlFor="showcase-money-use">How the money would be used <small>· optional</small></label><textarea id="showcase-money-use" data-testid="input-showcase-money-use" maxLength={3000} value={moneyUse} onChange={e => setMoneyUse(e.target.value)} /></div>

@@ -35,6 +35,7 @@ router.use(cookieParser());
 const VISITOR_COOKIE = "msi_visitor_id";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHOWCASE_FIELDS = new Set([
+  "public_filmmaker_name",
   "team_info", "crowdfunding_ran", "crowdfunding_campaign", "crowdfunding_same_project", "crowdfunding_goal", "crowdfunding_raised", "crowdfunding_obligations",
   "showcase_requested", "synopsis", "team_links", "money_use", "distribution_plan", "trailer_url",
 ]);
@@ -328,6 +329,7 @@ router.get("/filmmakers/result", async (req, res): Promise<void> => {
   const project = result.project;
   const response = {
     team_info: project?.teamInfo ?? null,
+    public_filmmaker_name: project?.publicFilmmakerName ?? null,
     ...(project?.crowdfunding ?? {}),
     completed: true as const,
     no_project_yet: !project,
@@ -432,6 +434,7 @@ router.patch("/filmmakers/showcase", async (req, res): Promise<void> => {
   }
   res.json(UpdateFilmmakerShowcaseResponse.parse({
     project_slug: project.slug,
+    public_filmmaker_name: project.publicFilmmakerName ?? null,
     showcase_requested: Boolean(project.showcaseRequested),
     approved: project.approved,
     hidden: project.hidden,

@@ -152,6 +152,7 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
     proposal: listingEligible || isOwner ? project.proposal : null,
     slug: project.slug,
     title: project.title,
+    public_filmmaker_name: project.publicFilmmakerName?.trim() || null,
     format: project.format,
     genre: project.genre,
     stage: project.stage,

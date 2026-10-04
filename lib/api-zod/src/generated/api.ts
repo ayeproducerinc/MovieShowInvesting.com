@@ -493,6 +493,7 @@ export const getFilmmakerResultResponseProposalOneOneNoteMax = 2000;
 
 
 export const GetFilmmakerResultResponse = zod.object({
+  "public_filmmaker_name": zod.string().nullish().describe('Optional filmmaker credit explicitly chosen for the public project page'),
   "team_info": zod.string().nullish(),
   "crowdfunding_ran": zod.boolean().nullish(),
   "crowdfunding_campaign": zod.string().nullish(),
@@ -730,6 +731,8 @@ export const UpdateFilmmakerShowcaseHeader = zod.object({
   "X-MSI-Project-Id": zod.number().int().min(1).optional().describe('Required for account-linked visitors; must match the completed project resolved from the current visitor cookie.')
 })
 
+export const updateFilmmakerShowcaseBodyPublicFilmmakerNameMax = 120;
+
 export const updateFilmmakerShowcaseBodyTeamInfoMax = 3000;
 
 export const updateFilmmakerShowcaseBodyCrowdfundingCampaignMax = 2000;
@@ -761,6 +764,7 @@ export const updateFilmmakerShowcaseBodyTrailerUrlRegExp = new RegExp('^https?:/
 
 
 export const UpdateFilmmakerShowcaseBody = zod.object({
+  "public_filmmaker_name": zod.string().max(updateFilmmakerShowcaseBodyPublicFilmmakerNameMax).nullish().describe('Name explicitly chosen for public display; null removes the public credit without changing private contact information'),
   "team_info": zod.string().max(updateFilmmakerShowcaseBodyTeamInfoMax).nullish(),
   "crowdfunding_ran": zod.boolean().optional(),
   "crowdfunding_campaign": zod.string().max(updateFilmmakerShowcaseBodyCrowdfundingCampaignMax).optional(),
@@ -777,6 +781,7 @@ export const UpdateFilmmakerShowcaseBody = zod.object({
 })
 
 export const UpdateFilmmakerShowcaseResponse = zod.object({
+  "public_filmmaker_name": zod.string().nullish(),
   "project_slug": zod.string(),
   "showcase_requested": zod.boolean(),
   "approved": zod.boolean(),
@@ -1361,6 +1366,7 @@ export const getPublicProjectResponseConfirmedPledgeTotalMin = 0;
 
 
 export const GetPublicProjectResponse = zod.object({
+  "public_filmmaker_name": zod.string().nullish().describe('Explicit public project credit'),
   "team_info": zod.string().nullish(),
   "budget": zod.number().int().nullish(),
   "proposal": zod.union([zod.object({

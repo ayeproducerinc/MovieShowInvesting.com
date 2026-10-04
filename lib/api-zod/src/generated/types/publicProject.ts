@@ -8,6 +8,11 @@
 import type { FilmmakerProposal } from './filmmakerProposal';
 
 export interface PublicProject {
+  /**
+     * Explicit public project credit
+     * @nullable
+     */
+  public_filmmaker_name?: string | null;
   /** @nullable */
   team_info?: string | null;
   /** @nullable */

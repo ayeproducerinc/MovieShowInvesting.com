@@ -1020,6 +1020,7 @@ export async function updateOwnedFilmmakerShowcase(input: {
   changes: {
     showcase_requested?: boolean;
     synopsis?: string | null;
+    public_filmmaker_name?: string | null;
     team_links?: string[] | null;
     team_info?: string | null;
     crowdfunding_ran?: boolean;
@@ -1044,6 +1045,7 @@ export async function updateOwnedFilmmakerShowcase(input: {
     const changes: Partial<typeof projectsTable.$inferInsert> = {};
     if (input.changes.showcase_requested !== undefined) changes.showcaseRequested = input.changes.showcase_requested;
     if (input.changes.synopsis !== undefined) changes.synopsis = input.changes.synopsis;
+    if (input.changes.public_filmmaker_name !== undefined) changes.publicFilmmakerName = input.changes.public_filmmaker_name?.trim() || null;
     if (input.changes.team_links !== undefined) changes.teamLinks = input.changes.team_links;
     if (input.changes.team_info !== undefined) changes.teamInfo = input.changes.team_info;
     const campaignChanges = Object.fromEntries(Object.entries(input.changes).filter(([key]) => key.startsWith("crowdfunding_")));
@@ -1052,6 +1054,7 @@ export async function updateOwnedFilmmakerShowcase(input: {
     if (input.changes.distribution_plan !== undefined) changes.distributionPlan = input.changes.distribution_plan;
     if (input.changes.trailer_url !== undefined) changes.trailerUrl = input.changes.trailer_url;
     const existingContent = {
+      public_filmmaker_name: project.publicFilmmakerName,
       synopsis: project.synopsis,
       team_links: project.teamLinks ?? [],
       team_info: project.teamInfo,
@@ -1060,12 +1063,12 @@ export async function updateOwnedFilmmakerShowcase(input: {
       trailer_url: project.trailerUrl,
     };
     const hasContentEdit = (changes.crowdfunding !== undefined && JSON.stringify(changes.crowdfunding) !== JSON.stringify(project.crowdfunding))
-      || ["synopsis", "team_links", "team_info", "money_use", "distribution_plan", "trailer_url"].some((key) => {
+      || ["public_filmmaker_name", "synopsis", "team_links", "team_info", "money_use", "distribution_plan", "trailer_url"].some((key) => {
       if (!Object.prototype.hasOwnProperty.call(input.changes, key)) return false;
       const field = key as keyof typeof existingContent;
       const changeValue = input.changes[field];
       const normalizedCurrent = existingContent[field] ?? (key === "team_links" ? [] : null);
-      const normalizedChange = key === "team_links" ? (changeValue ?? []) : (changeValue ?? null);
+      const normalizedChange = key === "public_filmmaker_name" ? (changes.publicFilmmakerName ?? null) : key === "team_links" ? (changeValue ?? []) : (changeValue ?? null);
       return JSON.stringify(normalizedCurrent) !== JSON.stringify(normalizedChange);
     });
     if (project.approved && hasContentEdit) {
@@ -1231,6 +1234,7 @@ export async function getPublicProjectBySlug(slug: string) {
     id: projectsTable.id,
     slug: projectsTable.slug,
     title: projectsTable.title,
+    publicFilmmakerName: projectsTable.publicFilmmakerName,
     format: projectsTable.format,
     genre: projectsTable.genre,
     stage: projectsTable.stage,
@@ -1284,6 +1288,7 @@ export async function getPublicProjectBySlug(slug: string) {
     id: project.id,
     slug: project.slug,
     title: project.title,
+    publicFilmmakerName: project.publicFilmmakerName,
     budget: project.budget,
     proposal: project.proposal,
     format: project.format,

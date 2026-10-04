@@ -10,6 +10,11 @@ import type { FilmmakerResultPriceGroup } from './filmmakerResultPriceGroup';
 import type { FilmmakerResultStage } from './filmmakerResultStage';
 
 export interface FilmmakerResult {
+  /**
+     * Optional filmmaker credit explicitly chosen for the public project page
+     * @nullable
+     */
+  public_filmmaker_name?: string | null;
   /** @nullable */
   team_info?: string | null;
   /** @nullable */

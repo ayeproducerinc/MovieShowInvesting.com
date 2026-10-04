@@ -10,6 +10,7 @@ export const projectsTable = pgTable("projects", {
   filmmakerId: integer("filmmaker_id").references(() => filmmakersTable.id, { onDelete: "set null" }),
   slug: text("slug").unique(),
   title: text("title"),
+  publicFilmmakerName: text("public_filmmaker_name"),
   format: text("format"),
   genre: text("genre"),
   genreOther: text("genre_other"),

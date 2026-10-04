@@ -2485,6 +2485,7 @@ components:
       additionalProperties: false
       required: [completed, no_project_yet, project_id, project_slug, checkout_proof, stage, stage_other, title, format, genre, genre_other, logline, offer_per100, offer_other_text, wants_lower, budget, budget_from_example, price_group, deal_answer, payback_terms, payback_terms_other, showcase_requested, approved, hidden, synopsis, team_links, money_use, distribution_plan, trailer_url, poster_url, share_image_url]
       properties:
+        public_filmmaker_name: { type: ["string", "null"], description: Optional filmmaker credit explicitly chosen for the public project page }
         team_info: { type: ["string", "null"] }
         crowdfunding_ran: { type: ["boolean", "null"] }
         crowdfunding_campaign: { type: ["string", "null"] }
@@ -2613,6 +2614,7 @@ components:
       additionalProperties: false
       minProperties: 1
       properties:
+        public_filmmaker_name: { type: ["string", "null"], maxLength: 120, description: Name explicitly chosen for public display; null removes the public credit without changing private contact information }
         team_info: { type: ["string", "null"], maxLength: 3000 }
         crowdfunding_ran: { type: boolean }
         crowdfunding_campaign: { type: string, maxLength: 2000 }
@@ -2640,6 +2642,7 @@ components:
       additionalProperties: false
       required: [project_slug, showcase_requested, approved, hidden, synopsis, team_links, money_use, distribution_plan, trailer_url]
       properties:
+        public_filmmaker_name: { type: ["string", "null"] }
         project_slug: { type: string }
         showcase_requested: { type: boolean }
         approved: { type: boolean }
@@ -2717,6 +2720,7 @@ components:
       additionalProperties: false
       required: [id, slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, pitch_deck_url, pitch_deck_name, confirmed_pledge_total, approved, showcase_requested, phone_verified, is_owner]
       properties:
+        public_filmmaker_name: { type: ["string", "null"], description: Explicit public project credit, never the filmmaker's private contact name }
         team_info: { type: ["string", "null"] }
         budget: { type: ["integer", "null"] }
         proposal:

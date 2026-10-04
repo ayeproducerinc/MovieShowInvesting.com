@@ -535,6 +535,11 @@ export type FilmmakerProposal = FilmmakerProposalInput & {
 };
 
 export interface FilmmakerResult {
+  /**
+     * Optional filmmaker credit explicitly chosen for the public project page
+     * @nullable
+     */
+  public_filmmaker_name?: string | null;
   /** @nullable */
   team_info?: string | null;
   /** @nullable */
@@ -701,6 +706,12 @@ export interface FilmmakerAccountLeave {
 
 export interface FilmmakerShowcaseUpdate {
   /**
+     * Name explicitly chosen for public display; null removes the public credit without changing private contact information
+     * @maxLength 120
+     * @nullable
+     */
+  public_filmmaker_name?: string | null;
+  /**
      * @maxLength 3000
      * @nullable
      */
@@ -753,6 +764,8 @@ export interface FilmmakerShowcaseUpdate {
 }
 
 export interface FilmmakerShowcase {
+  /** @nullable */
+  public_filmmaker_name?: string | null;
   project_slug: string;
   showcase_requested: boolean;
   approved: boolean;
@@ -860,6 +873,11 @@ export interface FilmmakerImageUpload {
 }
 
 export interface PublicProject {
+  /**
+     * Explicit public project credit
+     * @nullable
+     */
+  public_filmmaker_name?: string | null;
   /** @nullable */
   team_info?: string | null;
   /** @nullable */

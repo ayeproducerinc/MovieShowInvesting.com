@@ -7,6 +7,8 @@
  */
 
 export interface FilmmakerShowcase {
+  /** @nullable */
+  public_filmmaker_name?: string | null;
   project_slug: string;
   showcase_requested: boolean;
   approved: boolean;
