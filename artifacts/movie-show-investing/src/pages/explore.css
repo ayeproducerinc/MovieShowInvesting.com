@@ -1,0 +1,111 @@
+.explore-masthead {
+  display: grid;
+  gap: 24px;
+  padding: 32px 0 24px;
+  border-bottom: 1px solid var(--iv-line);
+}
+
+.explore-masthead h1 {
+  margin: 0;
+  font: 400 clamp(40px, 4.5vw, 64px)/.98 var(--app-font-serif);
+  letter-spacing: -.045em;
+}
+
+.explore-masthead h1 em {
+  display: block;
+  color: var(--iv-wine);
+}
+
+.explore-disclosure {
+  margin: 0;
+  color: #4f595c;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.explore-browse {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  padding: 12px 0 0;
+}
+
+.explore-browse a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  color: var(--iv-wine);
+  font: 700 10px/1.5 var(--app-font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.explore-browse a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.inv-explore .inv-toolbar {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px 0 20px;
+}
+
+.inv-explore .inv-field {
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
+}
+
+.inv-explore .inv-field:first-child,
+.inv-explore .inv-field:last-child {
+  grid-column: 1 / -1;
+}
+
+.inv-explore .inv-input {
+  min-height: 48px;
+  padding: 11px 12px;
+}
+
+.explore-results {
+  scroll-margin-top: 24px;
+}
+
+.explore-results-title {
+  margin: 20px 0 0;
+  color: var(--iv-wine);
+  font: 700 10px/1.5 var(--app-font-mono);
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+
+.inv-explore .inv-projects {
+  padding-top: 16px;
+}
+
+@media (min-width: 850px) {
+  .explore-masthead {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(32px, 5vw, 72px);
+    padding: 40px 0 28px;
+  }
+
+  .explore-disclosure {
+    padding-left: 24px;
+    border-left: 1px solid var(--iv-line);
+  }
+
+  .inv-explore .inv-toolbar {
+    grid-template-columns: 2fr repeat(3, minmax(0, 1fr));
+  }
+
+  .inv-explore .inv-field:first-child,
+  .inv-explore .inv-field:last-child {
+    grid-column: auto;
+  }
+}

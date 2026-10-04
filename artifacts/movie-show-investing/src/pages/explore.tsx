@@ -7,10 +7,11 @@ import { useAuth } from '@workspace/replit-auth-web';
 import { InvestorProjectCard } from '@/components/investor-project-card';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import '../investor.css';
+import './explore.css';
 
 const stages = [['','All stages'],['distribution','Distribution'],['production','Production'],['idea','Idea']] as const;
 const genres = ['','Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Other'];
-const securitiesNotice = "Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.";
+const securitiesNotice = "Project profiles are not investment offers. Expressing interest is non-binding, and no money is collected here. If an investment opportunity opens, full offering documents will be available before you decide. Returns aren’t guaranteed.";
 type ExploreProjectWithPitchDeck = ExploreProject & { pitch_deck_url?: string | null; pitch_deck_name?: string | null };
 
 export default function Explore() {
@@ -30,11 +31,17 @@ export default function Explore() {
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   } });
-  return <section className="inv">
-    <div className="page-wrap"><div className="dossier-notice inv-securities-notice" role="note" data-testid="text-securities-notice">{securitiesNotice}</div><div className="inv-top"><span className="inv-kicker">Movie Show Investing / The collection</span><Link href="/invest" className="inv-kicker" data-testid="link-explore-invest">Express interest <ArrowRight size={13} className="inline"/></Link></div>
-      <div className="inv-hero"><p className="inv-kicker">Independent stories / Open to discovery</p><h1>Find the stories<br/><em>worth following.</em></h1><p className="inv-lead">A collection of approved films and shows, at different points on their way to an audience. Look closer, ask questions, and decide what you believe in.</p></div>
+  return <section className="inv inv-explore">
+    <div className="page-wrap">
+      <header className="explore-masthead">
+        <h1>Find the stories <em>worth investing.</em></h1>
+        <p className="explore-disclosure" role="note" data-testid="text-securities-notice">{securitiesNotice}</p>
+      </header>
+      <div className="explore-browse">
+        <a href="#explore-projects" data-testid="link-browse-projects">↓ Scroll to explore approved projects</a>
+        <Link href="/invest" data-testid="link-explore-invest">Express interest <ArrowRight size={13}/></Link>
+      </div>
     </div>
-    <div className="inv-band"><div className="page-wrap inv-band-inner"><div><p className="inv-kicker" style={{color:'#d9b777'}}>A note before you browse</p><h2>Discovery first.<br/>Decisions later.</h2></div><p>These are project profiles, not investment offers. Expressing interest is non-binding, and no money is collected here. Returns aren’t guaranteed. You may get back less, or nothing.</p></div></div>
     <div className="page-wrap">
       <div className="inv-toolbar" data-clarity-mask="true">
         <div className="inv-field"><label htmlFor="explore-search">Search projects</label><input id="explore-search" className="inv-input" data-testid="input-explore-search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Title or story"/></div>
@@ -42,10 +49,13 @@ export default function Explore() {
         <div className="inv-field"><label htmlFor="explore-genre">Genre</label><select id="explore-genre" className="inv-input" data-testid="select-explore-genre" value={genre} onChange={e=>setGenre(e.target.value)}>{genres.map(v=><option value={v} key={v}>{v || 'All genres'}</option>)}</select></div>
         <div className="inv-field"><label htmlFor="explore-sort">Order</label><select id="explore-sort" className="inv-input" data-testid="select-explore-sort" value={sort} onChange={e=>setSort(e.target.value)}><option value="">Recently added</option><option value="title">Title</option></select></div>
       </div>
+      <div className="explore-results" id="explore-projects">
+      <h2 className="explore-results-title">Approved projects</h2>
       {!authReady || projects.isPending ? <div className="inv-projects" aria-label="Loading projects">{[1,2,3].map(i=><div key={i} className="inv-skeleton" style={{height:185}}/>)}</div> :
       projects.isError ? <div className="inv-state"><p className="inv-kicker">Connection interrupted</p><h1>The collection couldn’t load.</h1><p>Try again to see the latest approved projects.</p><button className="inv-button" data-testid="button-retry-explore" onClick={()=>void projects.refetch()}><RotateCcw size={16}/> Try again</button></div> :
        projects.data?.projects.length ? <div className="inv-projects">{projects.data.projects.map(project=><InvestorProjectCard key={project.id} project={project as ExploreProjectWithPitchDeck} showPitchDeck/>)}</div> :
       <div className="inv-state"><p className="inv-kicker">Nothing in this frame</p><h1>No projects found.</h1><p>{stage || genre || search ? 'Try a different search or clear the filters.' : 'The collection is still taking shape. Check back when approved projects are ready.'}</p>{(stage || genre || search) && <button className="inv-button secondary" data-testid="button-clear-explore" onClick={()=>{setStage('');setGenre('');setSearch('');setSort('');}}>Clear filters</button>}</div>}
+      </div>
     </div>
   </section>;
 }

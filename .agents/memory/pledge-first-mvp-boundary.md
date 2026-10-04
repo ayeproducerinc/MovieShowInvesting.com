@@ -26,3 +26,9 @@ Admin intake review is not legal-identity verification, verified accreditation o
 **Why:** The owner requested basic tracking and manual outreach, not regulated eligibility certification or inferred consent.
 
 **How to apply:** Preserve original pitch and signature evidence separately from current edits, including original media bytes where available. Do not fabricate historical acknowledgments, use shared latest progress as an original pitch, or infer a repayment deadline from backend years.
+
+The Explore disclosure is owner-approved verbatim copy. Keep its sentence order and conditional offering-document availability; do not restore a separate loss-of-investment sentence without approval.
+
+**Why:** The owner explicitly replaced the longer risk wording with their exact four-sentence disclosure, ending with “Returns aren’t guaranteed.”
+
+**How to apply:** Treat Explore disclosure edits as copy changes requiring owner approval, not incidental wording changes during a layout refresh. This constraint applies to Explore, not other legal pages.
