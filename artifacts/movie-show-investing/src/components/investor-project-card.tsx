@@ -12,7 +12,7 @@ function safeDeckUrl(value: string | null | undefined) {
   } catch { return null; }
 }
 
-export function InvestorProjectCard({ project, action, matched = false, showPitchDeck = false }: { project: ExploreProjectWithDeck; action?: { label: string; onClick: () => void; disabled?: boolean }; matched?: boolean; showPitchDeck?: boolean }) {
+export function InvestorProjectCard({ project, action, matched = false, showPitchDeck = false, showStandardTerms = true }: { project: ExploreProjectWithDeck; action?: { label: string; onClick: () => void; disabled?: boolean }; matched?: boolean; showPitchDeck?: boolean; showStandardTerms?: boolean }) {
   const stageLabel = String(project.stage) === 'other' ? 'Other stage (legacy)' : project.stage || 'Stage not listed';
   const deckUrl = showPitchDeck ? safeDeckUrl(project.pitch_deck_url) : null;
   return <article className="inv-project" data-testid={`card-project-${project.id}`}>
@@ -23,7 +23,7 @@ export function InvestorProjectCard({ project, action, matched = false, showPitc
       {matched && <span className="inv-match-badge" data-testid={`badge-match-${project.id}`}>Matches your preferences</span>}
       <h2>{project.title}</h2>
       <p>{project.logline || 'Read the project dossier for more about this story.'}</p>
-      {(project.proposal || project.budget) && <ProposalSummary proposal={project.proposal} budget={project.budget} stage={project.stage} testId={`proposal-${project.id}`} />}
+      {(project.proposal || project.budget) && (showStandardTerms || project.proposal?.decision !== 'standard') && <ProposalSummary proposal={project.proposal} budget={project.budget} stage={project.stage} testId={`proposal-${project.id}`} />}
       <div className="inv-project-links">
         <Link href={`/project/${project.slug}`} data-testid={`link-project-${project.id}`}>View project <ArrowUpRight size={13} className="inline"/></Link>
         {deckUrl && <a href={deckUrl} target="_blank" rel="noopener noreferrer" data-testid={`link-pitch-deck-${project.id}`}>View pitch deck <ArrowUpRight size={13} className="inline"/></a>}
