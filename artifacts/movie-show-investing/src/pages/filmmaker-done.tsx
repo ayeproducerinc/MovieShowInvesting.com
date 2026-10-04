@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, Check, RotateCcw, X } from 'lucide-react';
-import { Link, useLocation } from 'wouter';
+import { Link, useLocation, useSearch } from 'wouter';
 import { getFilmmakerResult, getGetFilmmakerResultQueryKey, useGetFilmmakerResult, useGetPitchReviewCheckoutConfig, useGetPitchReviewCheckoutStatus, useStartPitchReviewCheckout, useUpdateFilmmakerShowcase } from '@workspace/api-client-react';
 import type { FilmmakerResult, FilmmakerShowcaseUpdate } from '@workspace/api-client-react';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
@@ -9,6 +9,8 @@ import { setFilmmakerAction } from '@/lib/filmmaker-intent';
 import { consumePitchReviewChoice, getPitchReviewProof, type PitchReviewChoice } from '@/lib/pitch-review-intent';
 import { ProjectShare, FilmmakerInvite, projectShareUrl } from '@/components/project-share';
 import { ProjectMaterialsEditor } from '@/components/project-materials-editor';
+import { PitchMaterialsEntry } from '@/components/pitch-materials-entry';
+import { pitchDetailsFingerprint } from '@/lib/pitch-details-state';
 import { legacyDeal, money, type Stage } from './filmmaker-calculator';
 import { AgeGateForCurrentUser } from '@/components/age-acknowledgment';
 import { ProposalSummary } from '@/components/proposal-summary';
@@ -58,7 +60,16 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
   const [cfRaised, setCfRaised] = useState(result.crowdfunding_raised != null ? String(result.crowdfunding_raised) : '');
   const [cfObligations, setCfObligations] = useState(result.crowdfunding_obligations || '');
   const [publicName, setPublicName] = useState(result.public_filmmaker_name || '');
-  useEffect(() => { setPublicName(result.public_filmmaker_name || ''); }, [result.project_id, result.public_filmmaker_name]);
+  const [savedDetailsFingerprint, setSavedDetailsFingerprint] = useState(() => pitchDetailsFingerprint({
+    publicName: result.public_filmmaker_name || '', links: result.team_links.join('\n'),
+    teamInfo: result.team_info || '', moneyUse: result.money_use || '', distribution: result.distribution_plan || '',
+    cfRan: result.crowdfunding_ran ?? null, cfCampaign: result.crowdfunding_campaign || '',
+    cfSame: result.crowdfunding_same_project ?? null,
+    cfGoal: result.crowdfunding_goal != null ? String(result.crowdfunding_goal) : '',
+    cfRaised: result.crowdfunding_raised != null ? String(result.crowdfunding_raised) : '',
+    cfObligations: result.crowdfunding_obligations || '',
+  }));
+  const [materialsWarning, setMaterialsWarning] = useState('');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [savedStatus, setSavedStatus] = useState<ShowcaseStatus | null>(null);
@@ -69,11 +80,11 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
     : reviewStatusState === 'checking'
       ? 'Checking this pitch’s payment status before checkout is available…'
       : checkoutUnavailableText;
-  const unsavedDetails = (clean(publicName) ?? null) !== (result.public_filmmaker_name?.trim() || null)
-    || JSON.stringify(validLinks(links)) !== JSON.stringify(result.team_links)
-    || (clean(teamInfo) ?? '') !== (result.team_info || '')
-    || clean(moneyUse) !== (result.money_use || null)
-    || clean(distribution) !== (result.distribution_plan || null);
+  const detailsFingerprint = pitchDetailsFingerprint({
+    publicName, links, teamInfo, moneyUse, distribution,
+    cfRan, cfCampaign, cfSame, cfGoal, cfRaised, cfObligations,
+  });
+  const unsavedDetails = detailsFingerprint !== savedDetailsFingerprint;
   useEffect(() => {
     if (autoOpenReady && result.project_id && !result.showcase_requested
       && !result.hidden && !reviewStatus?.paid && !reviewStatus?.pending) {
@@ -157,6 +168,8 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
         return;
       }
       const updated = await update.mutateAsync({ data });
+      setSavedDetailsFingerprint(detailsFingerprint);
+      setMaterialsWarning('');
       const refreshedStatus = await onSaved({
         project_id: result.project_id,
         project_slug: updated.project_slug,
@@ -186,6 +199,18 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
       {!canCheckout && <p role="status">{paymentNotice}</p>}
     </div>}
     <details className="dossier-fold" data-testid="details-edit-pitch" style={{ marginTop: 8 }}><summary style={{ cursor:'pointer', fontWeight:600 }}>Edit pitch details</summary>
+    <PitchMaterialsEntry disabled={checking || update.isPending || needsReselect} warning={materialsWarning} onOpen={event => {
+      if (checking || update.isPending || needsReselect || unsavedDetails) {
+        event.preventDefault();
+        setMaterialsWarning(needsReselect
+          ? 'Open My projects and select this project again before managing materials. Your unsaved edits are still here.'
+          : checking || update.isPending
+            ? 'Wait for your pitch details to finish saving before opening materials.'
+            : 'You have unsaved pitch details. Click Save pitch details below before opening materials. Your edits are still here.');
+      } else {
+        setMaterialsWarning('');
+      }
+    }}/>
     <span className="dossier-kicker" style={{ marginTop: 16, display:'block' }}>Optional / pitch details</span>
     <h2 style={{ fontSize: 28 }}>{result.showcase_requested ? 'Your showcase details.' : 'Tell more of the story.'}</h2>
     <p>{result.approved && result.showcase_requested && !result.hidden
@@ -194,6 +219,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
         ? 'Your showcase review is pending; requesting review is not approval. The page remains accessible to anyone with its link. Share a synopsis, not a full script. You can revise these optional details later.'
          : 'Your project is free and unlisted. Save optional details here, then choose Submit for review when you are ready. Saving details alone does not request review. Share a synopsis, not a full script.'}</p>
     <form onSubmit={event => void submit(event)} style={{ marginTop: 30 }}>
+      <fieldset disabled={checking || update.isPending || needsReselect} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="dossier-field"><label htmlFor="showcase-public-name">Public filmmaker name <small>· optional</small></label><input id="showcase-public-name" data-testid="input-showcase-public-name" maxLength={120} value={publicName} onChange={e => setPublicName(e.target.value)} aria-describedby="showcase-public-name-help" autoComplete="off" /><small id="showcase-public-name-help">Appears beside your project title on the public page, visible to anyone with the link. Leave blank to keep your private contact name private. Don’t enter emails or phone numbers.</small></div>
       <div className="dossier-field"><label htmlFor="showcase-team-info">Key team <small>· optional</small></label><textarea id="showcase-team-info" data-testid="input-showcase-team-info" maxLength={3000} value={teamInfo} onChange={e => setTeamInfo(e.target.value)} /></div>
       <div className="dossier-field"><label htmlFor="showcase-links">Team links <small>· optional, one full URL per line, up to 8</small></label><textarea id="showcase-links" data-testid="input-showcase-links" value={links} onChange={e => setLinks(e.target.value)} placeholder={'https://example.com/team'} /></div>
@@ -209,6 +235,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
           <textarea aria-label="Campaign type and anything still owed" placeholder="Rewards still to ship, repayment commitments" value={cfObligations} onChange={e => setCfObligations(e.target.value)} />
         </>}
         <small>Unchecking never deletes saved campaign details.</small>
+      </fieldset>
       </fieldset>
       {error && <p className="dossier-error" role="alert" data-testid="error-showcase">{error}</p>}
       {needsReselect && <Link href="/me/projects?action=manage" onClick={() => setFilmmakerAction('manage')} data-testid="link-reselect-showcase-project" className="dossier-button dossier-button-outline">Open My projects <ArrowRight size={17}/></Link>}
@@ -293,6 +320,7 @@ export default function FilmmakerDone() {
 
 function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identityId: string; authLoading: boolean; ssoSignedIn: boolean }) {
   const [, navigate] = useLocation();
+  const search = useSearch();
   const reviewTriggerRef = useRef<HTMLButtonElement>(null);
   const authReady = useFirebaseSessionReady();
   const user = useFirebaseUser();
@@ -306,7 +334,24 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
       ? 'This workspace preview cannot accept real payments. Your free pitch and share link remain saved.'
       : 'Live editorial review checkout is temporarily unavailable. Your free pitch and share link remain saved. Please try again later.';
   const data = result.data;
-  const editMaterials = new URLSearchParams(window.location.search).get('edit') === 'materials';
+  const editMaterials = new URLSearchParams(search).get('edit') === 'materials';
+  const wasEditingMaterials = useRef(editMaterials);
+  useEffect(() => {
+    if (wasEditingMaterials.current && !editMaterials) void result.refetch();
+    wasEditingMaterials.current = editMaterials;
+  }, [editMaterials, result.refetch]);
+  useEffect(() => {
+    if (editMaterials || !data?.completed || !authReady || authLoading
+      || new URLSearchParams(search).get('details') !== 'materials') return;
+    const frame = window.requestAnimationFrame(() => {
+      const details = document.querySelector<HTMLDetailsElement>('[data-testid="details-edit-pitch"]');
+      if (!details) return;
+      details.open = true;
+      details.querySelector('summary')?.focus({ preventScroll: true });
+      details.scrollIntoView({ block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [search, editMaterials, data?.completed, data?.project_id, authReady, authLoading]);
   const checkoutProof = data?.checkout_proof || getPitchReviewProof(data?.project_id ?? null);
   const reviewStatus = useGetPitchReviewCheckoutStatus({
     request: { headers: data?.project_id ? {
@@ -315,7 +360,7 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
     } : {} },
     query: { queryKey: ['/api/filmmakers/review-checkout/status', identityId, data?.project_id], enabled: authReady && !authLoading && !!data?.project_id, refetchOnMount: 'always', refetchInterval: 20_000, retry: false },
   });
-  const checkoutReturn = new URLSearchParams(window.location.search).get('review_checkout');
+  const checkoutReturn = new URLSearchParams(search).get('review_checkout');
   useEffect(() => {
     if (checkoutReturn && data?.project_id) consumePitchReviewChoice(data.project_id);
   }, [checkoutReturn, data?.project_id]);
@@ -423,6 +468,7 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
         <section className="dossier-section" data-testid="section-recap-summary"><span className="dossier-kicker">On file</span><p>{[data.format, data.genre === 'Other' ? data.genre_other || data.genre : data.genre, legacyStage ? `Legacy stage: ${legacyStage}` : stage].filter(Boolean).join(' · ')}</p>
           {(() => { const x = data; const rows: [string, string | null | undefined][] = [['Team', x.team_info || (data.team_links.length ? `${data.team_links.length} link${data.team_links.length === 1 ? '' : 's'}` : null)], ['Distribution plan', data.distribution_plan], ['Planned funding use', data.money_use]]; const shown = rows.filter(([, v]) => v); return shown.length ? <ul className="dossier-links" data-testid="list-recap-specifics">{shown.map(([k, v]) => <li key={k}><strong>{k}:</strong> {v!.length > 120 ? `${v!.slice(0, 117)}...` : v}</li>)}</ul> : null; })()}</section>
           {data.project_slug && !activeShowcaseStatus?.hidden && <ShowcaseForm key={data.project_slug} result={{ ...data, approved: activeShowcaseStatus?.approved ?? data.approved, showcase_requested: activeShowcaseStatus?.showcase_requested ?? data.showcase_requested, hidden: activeShowcaseStatus?.hidden ?? data.hidden }} onSaved={refreshShowcaseStatus} reviewStatus={reviewStatus.data} reviewStatusState={reviewStatus.isSuccess ? 'verified' : reviewStatus.isError ? 'unavailable' : 'checking'} checkoutEnabled={checkoutEnabled} checkoutUnavailableText={checkoutUnavailableText} autoOpenReady={(reviewStatus.isSuccess || reviewStatus.isError) && checkoutReturn === null} reviewTriggerRef={reviewTriggerRef} />}
+          {data.project_slug && activeShowcaseStatus?.hidden && <details className="dossier-fold" data-testid="details-edit-pitch"><summary style={{ cursor: 'pointer', fontWeight: 600 }}>Edit pitch details</summary><PitchMaterialsEntry/></details>}
         {deal && data.budget && repayment && <details className="dossier-section" data-testid="details-proposal"><summary style={{ cursor:'pointer', fontWeight:600 }}>Proposal and illustrative terms</summary><div className="fm-receipt" data-testid="receipt-result-deal"><h3>At a glance</h3><dl>
            <div><dt>{data.budget_from_example ? 'Illustrative example budget' : 'Your estimated project budget'}</dt><dd data-testid="text-result-budget">{money(data.budget)}</dd></div>
           <div><dt>Investor payback target · {money(repayment!)} per $100 of budget</dt><dd data-testid="text-result-investor-target">{money(deal.investorTarget)}</dd></div>
@@ -431,7 +477,6 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
           {!snapshot && <div><dt>After both targets are satisfied</dt><dd>Backend terms unspecified in this earlier submission</dd></div>}
         </dl>{snapshot && <ProposalSummary proposal={snapshot} budget={data.budget} stage={stage} testId="result-proposal" />}<p className="fm-small" style={{ marginTop: 18 }}>Illustrative terms for conversation only. The investor target and platform fee are separate amounts. This is not a return forecast or an offer to invest.</p></div><p className="dossier-notice">After payment processing fees, project income is split proportionally between the investor payback target and the platform's one-time fee, so neither is paid off first. Income may vary, and investors may not reach their full target.</p></details>}
         {data.project_slug && !activeShowcaseStatus?.hidden && <><div id="section-project-share"><ProjectShare slug={data.project_slug} title={data.title || 'Untitled project'} genre={data.genre} logline={data.logline} approved={activeShowcaseStatus?.approved ?? false} showcaseRequested={activeShowcaseStatus?.showcase_requested ?? false} /></div><FilmmakerInvite/></>}
-        {data.project_slug && <div className="dossier-section" data-testid="section-manage-pitch-materials"><details><summary style={{ cursor:'pointer', fontWeight:600 }}>Pitch materials</summary><p>Synopsis, trailer, poster, share image, and pitch deck are managed separately from your project details.</p><Link href="/start/filmmaker/done?edit=materials" className="dossier-button dossier-button-outline" data-testid="link-manage-pitch-materials">Manage pitch materials <ArrowRight size={16}/></Link></details></div>}
       </div>
           <aside className="dossier-side">
             <div className="dossier-sticky">

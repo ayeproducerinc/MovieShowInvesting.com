@@ -35,3 +35,4 @@
 - [Pledge-first MVP boundary](pledge-first-mvp-boundary.md) — compact crowdfunding, preserved pay-later popup, manual review/outreach, and honest original evidence.
 - [Public project media priority](public-project-media-priority.md) — desktop and mobile show trailer or poster, never both; prominent pledge panel follows the media.
 - [Public filmmaker credit consent](public-filmmaker-credit-consent.md) — private contact names are not public credits; filmmakers explicitly choose their project’s public name.
+- [Pitch editing experience](pitch-editing-experience.md) — owner approved materials inside pitch details, a separate editor, explicit detail saves, and warnings before switching.
