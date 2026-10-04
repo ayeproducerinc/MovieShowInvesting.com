@@ -17,6 +17,7 @@ const environment = args.includes("--environment") ? option("--environment") : n
 const base = args.includes("--base") ? option("--base").replace(/\/$/, "") : null;
 const execute = args.includes("--execute");
 const cleanupMedia = args.includes("--cleanup-media");
+const cleanupFollowups = args.includes("--cleanup-followups");
 let app;
 let pool;
 try {
@@ -50,22 +51,25 @@ try {
   const credential = await exchange.json();
   assert(exchange.ok && credential.idToken, "Administrator authentication failed.");
   const token = credential.idToken;
-  const payload = { environment, dry_run: true, confirmation: "DELETE CONFIRMED TEST PROJECTS", cleanup_media: cleanupMedia };
+  const payload = { environment, dry_run: true, confirmation: "DELETE CONFIRMED TEST PROJECTS", cleanup_media: cleanupMedia, cleanup_followups: cleanupFollowups };
   const path = "/admin/confirmed-test-project-cleanup";
   assert.equal((await request(path, null, payload)).response.status, 401, "Anonymous cleanup must be rejected.");
   assert.equal((await request(path, token, { ...payload, confirmation: "wrong" })).response.status, 400, "Missing confirmation must be rejected.");
   assert.equal((await request(path, token, { ...payload, environment: environment === "preview" ? "published" : "preview" })).response.status, 409, "Wrong environment must be rejected.");
   const dry = await request(path, token, payload);
   assert.equal(dry.response.status, 200, "Admin dry run must succeed.");
+  if (cleanupFollowups) {
+    assert.equal(typeof dry.data?.followup_candidate_count, "number", "This server must have the follow-up cleanup update before execution.");
+  }
   console.log("Dry run:", JSON.stringify(dry.data));
 
   // Local development verification: immutable signatures/account rows must remain
   // byte-for-byte unchanged. Never use this connection for published cleanup.
   async function preservedEvidence() {
     const result = await pool.query(`SELECT
-      (SELECT md5(coalesce(jsonb_agg(to_jsonb(x) ORDER BY id)::text,'[]')) FROM investors x) AS investors,
+      (SELECT md5(coalesce(jsonb_agg(to_jsonb(x)-'call_opt_in' ORDER BY id)::text,'[]')) FROM investors x) AS investors,
       (SELECT md5(coalesce(jsonb_agg(to_jsonb(x) ORDER BY id)::text,'[]')) FROM interest_entries x) AS signatures,
-      (SELECT count(*)::int FROM filmmakers) AS filmmakers,
+      (SELECT md5(coalesce(jsonb_agg(to_jsonb(x)-'chat_opt_in' ORDER BY id)::text,'[]')) FROM filmmakers x) AS filmmakers,
       (SELECT count(*)::int FROM filmmaker_account_visitors) AS account_links,
       (SELECT count(*)::int FROM visitors) AS visitors`);
     return result.rows[0];
@@ -81,6 +85,7 @@ try {
     const deleted = await request(path, token, { ...payload, dry_run: false });
     assert.equal(deleted.response.status, 200, "Deletion must succeed; inspect archive before retrying if a request failed.");
     assert.equal(deleted.data.deleted_count, dry.data.candidate_count, "Deleted count must match the confirmed dry run.");
+    assert.equal(deleted.data.cleared_followups, dry.data.followup_candidate_count, "Cleared follow-ups must match the dry run.");
     console.log("Deletion result:", JSON.stringify(deleted.data));
     if (pool) {
       assert.deepEqual(await preservedEvidence(), before, "Accounts and signed evidence must remain unchanged.");
@@ -91,6 +96,16 @@ try {
     const allowed = new Set(environment === "preview" ? [2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,27,28,30,34,35] : [2,4,5,6,7,8,9,10,11,12,13]);
     assert(!explore.data.projects.some(project => allowed.has(project.id)), "Confirmed test projects must not remain in Explore.");
     console.log("PASS confirmed test projects absent from Explore");
+    const queues = await request("/admin/tables/queues", token);
+    assert(queues.response.ok && Array.isArray(queues.data?.rows), "Admin queue must return actual results.");
+    const queueColumn = queues.data.columns.findIndex(label => /^queue$/i.test(label));
+    const projectColumn = queues.data.columns.findIndex(label => /^project id$/i.test(label));
+    assert(queueColumn >= 0 && projectColumn >= 0);
+    assert(!queues.data.rows.some(row => allowed.has(Number(row[projectColumn]))), "Confirmed projects must not remain in the admin queue.");
+    if (cleanupFollowups && deleted.data.remaining_followups === 0 && deleted.data.remaining_projects === 0) {
+      assert.equal(queues.data.rows.length, 0, "The cleared admin queue must be empty.");
+    }
+    console.log("PASS admin queue verified:", queues.data.rows.length, "remaining entries");
   }
 } catch {
   // SDK errors can contain personal information. Do not print raw error objects.

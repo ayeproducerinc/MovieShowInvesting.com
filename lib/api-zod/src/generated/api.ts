@@ -2042,11 +2042,13 @@ export const GetAdminTableResponse = zod.object({
 
 
 export const cleanupAdminTestProjectsBodyCleanupMediaDefault = false;
+export const cleanupAdminTestProjectsBodyCleanupFollowupsDefault = false;
 
 export const CleanupAdminTestProjectsBody = zod.object({
   "environment": zod.enum(['preview', 'published']),
   "dry_run": zod.boolean(),
   "cleanup_media": zod.boolean().default(cleanupAdminTestProjectsBodyCleanupMediaDefault),
+  "cleanup_followups": zod.boolean().default(cleanupAdminTestProjectsBodyCleanupFollowupsDefault),
   "confirmation": zod.enum(['DELETE CONFIRMED TEST PROJECTS'])
 })
 
@@ -2058,6 +2060,9 @@ export const CleanupAdminTestProjectsResponse = zod.object({
   "archived_pledges": zod.number().int(),
   "archived_checkouts": zod.number().int(),
   "remaining_projects": zod.number().int(),
+  "followup_candidate_count": zod.number().int().optional(),
+  "cleared_followups": zod.number().int().optional(),
+  "remaining_followups": zod.number().int().optional(),
   "media_deleted": zod.number().int().optional(),
   "media_retained_shared": zod.number().int().optional(),
   "media_pending": zod.number().int().optional()

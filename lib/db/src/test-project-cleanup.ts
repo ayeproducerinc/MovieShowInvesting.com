@@ -23,8 +23,15 @@ export const confirmedTestProjects: Record<CleanupEnvironment, Record<number, st
 
 export class TestProjectCleanupConflict extends Error {}
 
+// Separately confirmed test follow-ups. Do not include later requests or accounts.
+const confirmedTestFollowups: Record<CleanupEnvironment, { calls: number[]; chats: number[] }> = {
+  preview: { calls: [1, 2], chats: [4, 6, 7, 8, 9, 11, 12, 14, 29, 38, 39] },
+  published: { calls: [1, 2], chats: [4, 6, 7, 8, 9, 11, 12] },
+};
+
 export async function cleanupConfirmedTestProjects(
   pool: Pool, environment: CleanupEnvironment, dryRun: boolean,
+  cleanupFollowups = false,
 ) {
   const confirmed = confirmedTestProjects[environment];
   const ids = Object.keys(confirmed).map(Number);
@@ -36,7 +43,7 @@ export async function cleanupConfirmedTestProjects(
     // Prevent concurrent writes from creating dependencies between archive and delete.
     await client.query(`LOCK TABLE projects, pledges, pitch_review_checkouts, messages,
       conversations, conversation_messages, conversation_moderation_audit,
-      interest_alerts, flow_progress IN SHARE ROW EXCLUSIVE MODE`);
+      interest_alerts, flow_progress, investors, filmmakers IN SHARE ROW EXCLUSIVE MODE`);
     const projects = await client.query(
       `SELECT p.*, f.visitor_id AS cleanup_visitor_id
        FROM projects p LEFT JOIN filmmakers f ON f.id=p.filmmaker_id
@@ -54,6 +61,16 @@ export async function cleanupConfirmedTestProjects(
         (SELECT count(*)::int FROM pitch_review_checkouts WHERE project_id=ANY($1::int[])) AS checkouts`,
       [activeIds],
     );
+    const followups = confirmedTestFollowups[environment];
+    const followupCandidates = cleanupFollowups ? await client.query(
+      `SELECT
+        (SELECT count(*)::int FROM investors i WHERE i.call_opt_in=true AND i.id=ANY($1::int[])
+          AND NOT EXISTS (SELECT 1 FROM test_followup_archive a WHERE a.kind='investor_call' AND a.record_id=i.id))
+        + (SELECT count(*)::int FROM filmmakers f WHERE f.chat_opt_in=true AND f.id=ANY($2::int[])
+          AND NOT EXISTS (SELECT 1 FROM test_followup_archive a WHERE a.kind='filmmaker_chat' AND a.record_id=f.id)) AS count`,
+      [followups.calls, followups.chats],
+    ) : null;
+    let clearedFollowups = 0;
     if (!dryRun) {
       for (const project of projects.rows) {
         const existingArchive = await client.query("SELECT 1 FROM test_project_archive WHERE project_id=$1", [project.id]);
@@ -77,7 +94,7 @@ export async function cleanupConfirmedTestProjects(
           [project.id, environment, JSON.stringify({ project, ...evidence.rows[0] })],
         );
       }
-      // Signed interest_entries and investor/account rows are deliberately unchanged.
+      // Signed interest_entries and financial/account identities are unchanged.
       // Archive then remove allocations, rather than letting SET NULL turn them into
       // unallocated interest. Archive retains the original project/entry linkage.
       await client.query("DELETE FROM pledges WHERE project_id=ANY($1::int[])", [activeIds]);
@@ -89,8 +106,32 @@ export async function cleanupConfirmedTestProjects(
         WHERE flow='filmmaker' AND completed=false
         AND answers#>>'{_submission,project_id}'=ANY($1::text[])`, [activeIds.map(String)]);
       await client.query("DELETE FROM projects WHERE id=ANY($1::int[])", [activeIds]);
+      if (cleanupFollowups) {
+        // Preserve the original test request. Only IDs newly archived in THIS
+        // transaction can be cleared, making repeat execution safe for new requests.
+        const calls = await client.query(
+          `INSERT INTO test_followup_archive(kind, record_id, environment, snapshot)
+           SELECT 'investor_call', i.id, $2, to_jsonb(i) FROM investors i
+           WHERE i.call_opt_in=true AND i.id=ANY($1::int[])
+           ON CONFLICT DO NOTHING RETURNING record_id`, [followups.calls, environment],
+        );
+        const chats = await client.query(
+          `INSERT INTO test_followup_archive(kind, record_id, environment, snapshot)
+           SELECT 'filmmaker_chat', f.id, $2, to_jsonb(f) FROM filmmakers f
+           WHERE f.chat_opt_in=true AND f.id=ANY($1::int[])
+           ON CONFLICT DO NOTHING RETURNING record_id`, [followups.chats, environment],
+        );
+        await client.query("UPDATE investors SET call_opt_in=false WHERE id=ANY($1::int[])",
+          [calls.rows.map(row => Number(row.record_id))]);
+        await client.query("UPDATE filmmakers SET chat_opt_in=false WHERE id=ANY($1::int[])",
+          [chats.rows.map(row => Number(row.record_id))]);
+        clearedFollowups = calls.rows.length + chats.rows.length;
+      }
     }
     const remaining = await client.query("SELECT count(*)::int AS count FROM projects");
+    const remainingFollowups = await client.query(`SELECT
+      (SELECT count(*)::int FROM investors WHERE call_opt_in=true)
+      + (SELECT count(*)::int FROM filmmakers WHERE chat_opt_in=true) AS count`);
     await client.query("COMMIT");
     return {
       environment, candidate_count: activeIds.length, deleted_count: dryRun ? 0 : activeIds.length,
@@ -98,6 +139,9 @@ export async function cleanupConfirmedTestProjects(
       archived_pledges: dryRun ? 0 : Number(dependencies.rows[0].pledges),
       archived_checkouts: dryRun ? 0 : Number(dependencies.rows[0].checkouts),
       remaining_projects: Number(remaining.rows[0].count),
+      followup_candidate_count: Number(followupCandidates?.rows[0].count ?? 0),
+      cleared_followups: clearedFollowups,
+      remaining_followups: Number(remainingFollowups.rows[0].count),
     };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);

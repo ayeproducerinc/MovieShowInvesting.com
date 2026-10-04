@@ -400,7 +400,7 @@ router.post("/admin/confirmed-test-project-cleanup", async (req, res): Promise<v
   }
   let deletionCommitted = false;
   try {
-    const result = await cleanupConfirmedTestProjects(pool, runtimeEnvironment, body.data.dry_run);
+    const result = await cleanupConfirmedTestProjects(pool, runtimeEnvironment, body.data.dry_run, body.data.cleanup_followups);
     deletionCommitted = !body.data.dry_run;
     const media = await cleanupArchivedTestProjectMedia(runtimeEnvironment, body.data.dry_run || !body.data.cleanup_media);
     req.log.info({ environment: runtimeEnvironment, dryRun: body.data.dry_run, deletedCount: result.deleted_count },

@@ -3188,6 +3188,7 @@ components:
         environment: { type: string, enum: [preview, published] }
         dry_run: { type: boolean }
         cleanup_media: { type: boolean, default: false }
+        cleanup_followups: { type: boolean, default: false }
         confirmation: { type: string, enum: ["DELETE CONFIRMED TEST PROJECTS"] }
     AdminTestProjectCleanupResult:
       type: object
@@ -3200,6 +3201,9 @@ components:
         archived_pledges: { type: integer }
         archived_checkouts: { type: integer }
         remaining_projects: { type: integer }
+        followup_candidate_count: { type: integer }
+        cleared_followups: { type: integer }
+        remaining_followups: { type: integer }
         media_deleted: { type: integer }
         media_retained_shared: { type: integer }
         media_pending: { type: integer }

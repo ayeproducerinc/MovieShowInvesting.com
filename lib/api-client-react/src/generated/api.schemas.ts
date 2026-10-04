@@ -1376,6 +1376,7 @@ export interface AdminTestProjectCleanupInput {
   environment: AdminTestProjectCleanupInputEnvironment;
   dry_run: boolean;
   cleanup_media?: boolean;
+  cleanup_followups?: boolean;
   confirmation: AdminTestProjectCleanupInputConfirmation;
 }
 
@@ -1395,6 +1396,9 @@ export interface AdminTestProjectCleanupResult {
   archived_pledges: number;
   archived_checkouts: number;
   remaining_projects: number;
+  followup_candidate_count?: number;
+  cleared_followups?: number;
+  remaining_followups?: number;
   media_deleted?: number;
   media_retained_shared?: number;
   media_pending?: number;
