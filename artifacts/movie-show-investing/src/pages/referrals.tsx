@@ -12,7 +12,13 @@ const date = (v: string | null) => v ? new Date(v).toLocaleDateString('en-US', {
 const LABEL: Record<string, string> = { pending: 'Pending', eligible: 'Eligible', paid: 'Paid', cancelled: 'Cancelled', review_required: 'Under review' };
 
 function Rules() {
-  return <p className="ref-note" data-testid="text-referral-rules">You earn $10, one time, for each new person who signs up through your link, but only after their first paid project is approved and publicly listed. Payment alone earns nothing, and declined or repeat projects do not count. People who already have an account, and your own signup, do not qualify. Rewards are paid manually by our team; nothing is sent automatically. Your link is remembered for 30 days from the first valid visit.</p>;
+  return <div className="ref-note" data-testid="text-referral-rules">
+    <p>Earn $10 for each new person who signs up through your link and gets their first paid project approved and listed.</p>
+    <p><strong className="font-bold">New accounts only</strong>. Existing members and your own signup don't count.</p>
+    <p><strong className="font-bold">One reward per person</strong>. Declined and repeat projects don't count.</p>
+    <p><strong className="font-bold">30-day window</strong>. Your link is remembered for 30 days from their first visit.</p>
+    <p><strong className="font-bold">Paid by our team</strong>. Rewards are sent manually, not automatically.</p>
+  </div>;
 }
 
 function SignedOut() {
