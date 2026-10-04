@@ -8,6 +8,145 @@
 import * as zod from 'zod';
 
 
+export const captureReferralBodyCodeMin = 6;
+export const captureReferralBodyCodeMax = 32;
+
+export const captureReferralBodyManualDefault = false;
+
+export const CaptureReferralBody = zod.object({
+  "code": zod.string().min(captureReferralBodyCodeMin).max(captureReferralBodyCodeMax),
+  "manual": zod.boolean().default(captureReferralBodyManualDefault)
+})
+
+export const CaptureReferralResponse = zod.object({
+  "saved": zod.boolean(),
+  "expires_at": zod.string()
+})
+
+
+export const ClaimReferralResponse = zod.object({
+  "code": zod.string(),
+  "referred_by": zod.boolean(),
+  "signup_count": zod.number().int(),
+  "pending_count": zod.number().int(),
+  "eligible_cents": zod.number().int(),
+  "paid_cents": zod.number().int(),
+  "rewards": zod.array(zod.object({
+  "id": zod.number().int(),
+  "amount_cents": zod.number().int(),
+  "status": zod.enum(['pending', 'eligible', 'paid', 'cancelled', 'review_required']),
+  "project_title": zod.string().nullable(),
+  "payment_checked_at": zod.string().nullable(),
+  "paid_at": zod.string().nullable(),
+  "payout_reference": zod.string().nullable(),
+  "review_flag": zod.boolean()
+}))
+})
+
+
+export const GetMyReferralsResponse = zod.object({
+  "code": zod.string(),
+  "referred_by": zod.boolean(),
+  "signup_count": zod.number().int(),
+  "pending_count": zod.number().int(),
+  "eligible_cents": zod.number().int(),
+  "paid_cents": zod.number().int(),
+  "rewards": zod.array(zod.object({
+  "id": zod.number().int(),
+  "amount_cents": zod.number().int(),
+  "status": zod.enum(['pending', 'eligible', 'paid', 'cancelled', 'review_required']),
+  "project_title": zod.string().nullable(),
+  "payment_checked_at": zod.string().nullable(),
+  "paid_at": zod.string().nullable(),
+  "payout_reference": zod.string().nullable(),
+  "review_flag": zod.boolean()
+}))
+})
+
+
+export const getAdminReferralsQueryPageDefault = 1;
+
+
+
+export const GetAdminReferralsQueryParams = zod.object({
+  "page": zod.coerce.number().int().min(1).default(getAdminReferralsQueryPageDefault)
+})
+
+export const GetAdminReferralsResponse = zod.object({
+  "page": zod.number().int(),
+  "total": zod.number().int(),
+  "page_size": zod.number().int(),
+  "rows": zod.array(zod.object({
+  "referral_id": zod.string(),
+  "referrer_email": zod.string(),
+  "referred_email": zod.string(),
+  "signed_up_at": zod.string(),
+  "project_id": zod.number().int().nullable(),
+  "milestone": zod.enum(['signed_up', 'paid_pending_review', 'declined', 'not_public', 'listed']),
+  "reward": zod.union([zod.object({
+  "id": zod.number().int(),
+  "amount_cents": zod.number().int(),
+  "status": zod.enum(['pending', 'eligible', 'paid', 'cancelled', 'review_required']),
+  "project_title": zod.string().nullable(),
+  "payment_checked_at": zod.string().nullable(),
+  "paid_at": zod.string().nullable(),
+  "payout_reference": zod.string().nullable(),
+  "review_flag": zod.boolean()
+}),zod.null()])
+}))
+})
+
+
+
+
+
+export const VerifyReferralRewardParams = zod.object({
+  "rewardId": zod.coerce.number().int().min(1)
+})
+
+export const VerifyReferralRewardResponse = zod.object({
+  "id": zod.number().int(),
+  "amount_cents": zod.number().int(),
+  "status": zod.enum(['pending', 'eligible', 'paid', 'cancelled', 'review_required']),
+  "project_title": zod.string().nullable(),
+  "payment_checked_at": zod.string().nullable(),
+  "paid_at": zod.string().nullable(),
+  "payout_reference": zod.string().nullable(),
+  "review_flag": zod.boolean()
+})
+
+
+
+
+
+export const RecordReferralPayoutParams = zod.object({
+  "rewardId": zod.coerce.number().int().min(1)
+})
+
+export const recordReferralPayoutBodyReferenceMin = 3;
+export const recordReferralPayoutBodyReferenceMax = 120;
+
+export const recordReferralPayoutBodyPaidOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const RecordReferralPayoutBody = zod.object({
+  "reference": zod.string().min(recordReferralPayoutBodyReferenceMin).max(recordReferralPayoutBodyReferenceMax),
+  "paid_on": zod.string().regex(recordReferralPayoutBodyPaidOnRegExp),
+  "confirmed_sent": zod.boolean()
+})
+
+export const RecordReferralPayoutResponse = zod.object({
+  "id": zod.number().int(),
+  "amount_cents": zod.number().int(),
+  "status": zod.enum(['pending', 'eligible', 'paid', 'cancelled', 'review_required']),
+  "project_title": zod.string().nullable(),
+  "payment_checked_at": zod.string().nullable(),
+  "paid_at": zod.string().nullable(),
+  "payout_reference": zod.string().nullable(),
+  "review_flag": zod.boolean()
+})
+
+
 export const GetAgeConfirmationResponse = zod.object({
   "age_confirmed": zod.boolean(),
   "confirmed_at": zod.coerce.date().nullable()

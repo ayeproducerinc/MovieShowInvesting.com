@@ -28,6 +28,7 @@ import {
   JoinFilmmakerCommunityResponse,
 } from "@workspace/api-zod";
 import { authenticateFilmmaker } from "../lib/filmmaker-auth";
+import { syncReferralRewards } from "../lib/referral-reward-sync";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -119,6 +120,7 @@ router.post("/filmmakers/community/join", async (req, res): Promise<void> => {
           verifiedEmail: identity.email,
           expectedDraftId: parsed.data.draft_id,
         });
+        await syncReferralRewards();
       }
     }
     await recordFilmmakerAccountActivity(identity.uid, identity.provider);
@@ -173,6 +175,7 @@ router.post("/filmmakers/projects/claim", async (req, res): Promise<void> => {
       verifiedEmail: identity.email,
       ...(expectedDraftId !== undefined ? { expectedDraftId } : {}),
     });
+    await syncReferralRewards();
     res.json(ClaimFilmmakerProjectResponse.parse({
       claimed: true,
       submission_claimed: result.submissionClaimed,

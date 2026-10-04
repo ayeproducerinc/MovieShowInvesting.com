@@ -3,6 +3,8 @@ import { ReplitConnectors } from "@replit/connectors-sdk";
 import { db, pitchReviewCheckoutsTable, projectsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { logger } from "./logger";
+import { classifyReferralPayment, type ReferralPaymentStatus } from "./referral-policy";
+import { referralRewardSyncSql } from "./referral-reward-sync";
 
 const SANDBOX_ACCOUNT = "acct_1UKlvzI6ABsowmLh";
 const SANDBOX_PRICE = "price_1UKmPMI6ABsowmLhzyjaBfRh";
@@ -50,6 +52,21 @@ async function assertAccount(): Promise<void> {
     || (live() && price.product !== LIVE_PRODUCT)) {
     throw new Error("Review price does not match the approved one-time $49 offer");
   }
+}
+
+/** Read-only current provider evidence. No charges, refunds or payouts are made. */
+export async function verifyReferralReviewPayment(sessionId: string, projectId: number): Promise<ReferralPaymentStatus> {
+  if (!sessionId.startsWith(live() ? "cs_live_" : "cs_test_")) return "unverified";
+  await assertAccount();
+  const session = await stripe(`/v1/checkout/sessions/${encodeURIComponent(sessionId)}`);
+  if (typeof session.payment_intent !== "string") return "unverified";
+  const [intent, items] = await Promise.all([
+    stripe(`/v1/payment_intents/${encodeURIComponent(session.payment_intent)}?expand[]=latest_charge`),
+    stripe(`/v1/checkout/sessions/${encodeURIComponent(sessionId)}/line_items?limit=2`),
+  ]);
+  return classifyReferralPayment(session, intent, items, {
+    sessionId, projectId, live: live(), priceId: priceId(),
+  });
 }
 
 function validSession(session: any, projectId: number, sessionId?: string): boolean {
@@ -164,6 +181,7 @@ async function reconcileOne(row: typeof pitchReviewCheckoutsTable.$inferSelect):
     await tx.update(projectsTable)
       .set({ reviewPaidAt: new Date(), showcaseRequested: true, reviewDecision: null })
       .where(eq(projectsTable.id, row.projectId));
+    await tx.execute(referralRewardSyncSql());
   });
 }
 

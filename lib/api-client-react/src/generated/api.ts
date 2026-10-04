@@ -76,6 +76,7 @@ import type {
   Flow,
   FlowProgress,
   GetAdminInvestorsParams,
+  GetAdminReferralsParams,
   GetExploreParams,
   GetFilmmakerProjectPitchDeckParams,
   GetPitchReviewCheckoutConfig200,
@@ -105,6 +106,12 @@ import type {
   QuestionReportResult,
   QuestionSubmission,
   QuestionTokenAnswerInput,
+  ReferralCaptureInput,
+  ReferralCaptureResult,
+  ReferralLedger,
+  ReferralMember,
+  ReferralPayoutInput,
+  ReferralReward,
   SaveInvestorIntent409,
   SaveProgressInput,
   SearchLocationsParams,
@@ -143,6 +150,456 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getCaptureReferralUrl = () => {
+
+
+
+
+  return `/api/referrals/capture`
+}
+
+export const captureReferral = async (referralCaptureInput: ReferralCaptureInput, options?: Parameters<typeof customFetch>[1]): Promise<ReferralCaptureResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ReferralCaptureResult>(getCaptureReferralUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(referralCaptureInput)
+  }
+);}
+
+
+
+
+
+export const getCaptureReferralMutationKey = () => ['captureReferral'] as const;
+
+export const getCaptureReferralMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof captureReferral>>, TError,CaptureReferralMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof captureReferral>>, TError,CaptureReferralMutationVariables, TContext> => {
+
+const mutationKey = getCaptureReferralMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof captureReferral>>, CaptureReferralMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  captureReferral(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CaptureReferralMutationResult = NonNullable<Awaited<ReturnType<typeof captureReferral>>>
+    export type CaptureReferralMutationBody = BodyType<ReferralCaptureInput>
+    export type CaptureReferralMutationError = ErrorType<void>
+    export type CaptureReferralMutationVariables = {data: BodyType<ReferralCaptureInput>}
+
+    export const useCaptureReferral = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof captureReferral>>, TError,CaptureReferralMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof captureReferral>>,
+        TError,
+        CaptureReferralMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCaptureReferralMutationOptions(options));
+    }
+
+export const getClaimReferralUrl = () => {
+
+
+
+
+  return `/api/referrals/claim`
+}
+
+export const claimReferral = async ( options?: Parameters<typeof customFetch>[1]): Promise<ReferralMember> => {
+
+  return customFetch<ReferralMember>(getClaimReferralUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getClaimReferralMutationKey = () => ['claimReferral'] as const;
+
+export const getClaimReferralMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimReferral>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimReferral>>, TError,void, TContext> => {
+
+const mutationKey = getClaimReferralMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimReferral>>, void> = () => {
+
+
+          return  claimReferral(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimReferralMutationResult = NonNullable<Awaited<ReturnType<typeof claimReferral>>>
+
+    export type ClaimReferralMutationError = ErrorType<void>
+
+
+    export const useClaimReferral = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimReferral>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimReferral>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClaimReferralMutationOptions(options));
+    }
+
+export const getGetMyReferralsUrl = () => {
+
+
+
+
+  return `/api/referrals/me`
+}
+
+export const getMyReferrals = async ( options?: Parameters<typeof customFetch>[1]): Promise<ReferralMember> => {
+
+  return customFetch<ReferralMember>(getGetMyReferralsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyReferralsQueryKey = () => {
+    return [
+    `/api/referrals/me`
+    ] as const;
+    }
+
+
+export const getGetMyReferralsQueryOptions = <TData = Awaited<ReturnType<typeof getMyReferrals>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyReferrals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyReferralsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyReferrals>>> = ({ signal }) => getMyReferrals({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyReferrals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyReferralsQueryResult = NonNullable<Awaited<ReturnType<typeof getMyReferrals>>>
+export type GetMyReferralsQueryError = ErrorType<void>
+
+
+
+export function useGetMyReferrals<TData = Awaited<ReturnType<typeof getMyReferrals>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyReferrals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyReferralsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminReferralsUrl = (params?: GetAdminReferralsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/referrals?${stringifiedParams}` : `/api/admin/referrals`
+}
+
+export const getAdminReferrals = async (params?: GetAdminReferralsParams, options?: Parameters<typeof customFetch>[1]): Promise<ReferralLedger> => {
+
+  return customFetch<ReferralLedger>(getGetAdminReferralsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminReferralsQueryKey = (params?: GetAdminReferralsParams,) => {
+    return [
+    `/api/admin/referrals`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminReferralsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminReferrals>>, TError = ErrorType<void>>(params?: GetAdminReferralsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminReferrals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminReferralsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminReferrals>>> = ({ signal }) => getAdminReferrals(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminReferrals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminReferralsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminReferrals>>>
+export type GetAdminReferralsQueryError = ErrorType<void>
+
+
+
+export function useGetAdminReferrals<TData = Awaited<ReturnType<typeof getAdminReferrals>>, TError = ErrorType<void>>(
+ params?: GetAdminReferralsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminReferrals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminReferralsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getVerifyReferralRewardUrl = (rewardId: number,) => {
+
+
+
+
+  return `/api/admin/referrals/${rewardId}/verify`
+}
+
+export const verifyReferralReward = async (rewardId: number, options?: Parameters<typeof customFetch>[1]): Promise<ReferralReward> => {
+
+  return customFetch<ReferralReward>(getVerifyReferralRewardUrl(rewardId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getVerifyReferralRewardMutationKey = () => ['verifyReferralReward'] as const;
+
+export const getVerifyReferralRewardMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyReferralReward>>, TError,VerifyReferralRewardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyReferralReward>>, TError,VerifyReferralRewardMutationVariables, TContext> => {
+
+const mutationKey = getVerifyReferralRewardMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyReferralReward>>, VerifyReferralRewardMutationVariables> = (props) => {
+          const {rewardId} = props ?? {};
+
+          return  verifyReferralReward(rewardId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyReferralRewardMutationResult = NonNullable<Awaited<ReturnType<typeof verifyReferralReward>>>
+
+    export type VerifyReferralRewardMutationError = ErrorType<void>
+    export type VerifyReferralRewardMutationVariables = {rewardId: number}
+
+    export const useVerifyReferralReward = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyReferralReward>>, TError,VerifyReferralRewardMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyReferralReward>>,
+        TError,
+        VerifyReferralRewardMutationVariables,
+        TContext
+      > => {
+      return useMutation(getVerifyReferralRewardMutationOptions(options));
+    }
+
+export const getRecordReferralPayoutUrl = (rewardId: number,) => {
+
+
+
+
+  return `/api/admin/referrals/${rewardId}/payout`
+}
+
+export const recordReferralPayout = async (rewardId: number,
+    referralPayoutInput: ReferralPayoutInput, options?: Parameters<typeof customFetch>[1]): Promise<ReferralReward> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ReferralReward>(getRecordReferralPayoutUrl(rewardId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(referralPayoutInput)
+  }
+);}
+
+
+
+
+
+export const getRecordReferralPayoutMutationKey = () => ['recordReferralPayout'] as const;
+
+export const getRecordReferralPayoutMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordReferralPayout>>, TError,RecordReferralPayoutMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordReferralPayout>>, TError,RecordReferralPayoutMutationVariables, TContext> => {
+
+const mutationKey = getRecordReferralPayoutMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordReferralPayout>>, RecordReferralPayoutMutationVariables> = (props) => {
+          const {rewardId,data} = props ?? {};
+
+          return  recordReferralPayout(rewardId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordReferralPayoutMutationResult = NonNullable<Awaited<ReturnType<typeof recordReferralPayout>>>
+    export type RecordReferralPayoutMutationBody = BodyType<ReferralPayoutInput>
+    export type RecordReferralPayoutMutationError = ErrorType<void>
+    export type RecordReferralPayoutMutationVariables = {rewardId: number;data: BodyType<ReferralPayoutInput>}
+
+    export const useRecordReferralPayout = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordReferralPayout>>, TError,RecordReferralPayoutMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordReferralPayout>>,
+        TError,
+        RecordReferralPayoutMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRecordReferralPayoutMutationOptions(options));
+    }
 
 export const getGetAgeConfirmationUrl = () => {
 

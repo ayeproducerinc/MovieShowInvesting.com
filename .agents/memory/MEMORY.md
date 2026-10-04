@@ -1,4 +1,5 @@
 - [Firebase Auth config semantics](firebase-auth-config-semantics.md) — a missing passwordRequired field in the Admin API can mean false, not a failed passwordless update.
+- [Firebase signup time precision](firebase-signup-time-precision.md) — Admin creation-time strings lose milliseconds; honor that precision when proving a new signup.
 - [Firebase runtime web config](firebase-runtime-web-config.md) — auth tests must use the app's effective browser configuration; an existing environment key may differ.
 - [Firebase email-link quota](firebase-email-link-quota.md) — auth/quota-exceeded can block sign-in even with valid provider and domains; don't bypass email ownership.
 - [Firebase email-link handoff](firebase-email-link-handoff.md) — keep admin sign-in in the existing tab; embedded previews may partition storage, so retain the secure fallback.

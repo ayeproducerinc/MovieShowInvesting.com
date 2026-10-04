@@ -33,6 +33,98 @@ tags:
   - name: auth
     description: Browser sign-in and session status
 paths:
+  /referrals/capture:
+    post:
+      operationId: captureReferral
+      tags: [referrals]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReferralCaptureInput" }
+      responses:
+        "200":
+          description: Referral remembered before signup
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferralCaptureResult" }
+        "400": { description: Invalid referral code }
+        "409": { description: Attribution already finalized }
+        "429": { description: Too many attempts }
+  /referrals/claim:
+    post:
+      operationId: claimReferral
+      tags: [referrals]
+      responses:
+        "200":
+          description: Register member and finalize attribution
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferralMember" }
+        "401": { description: Sign in required }
+  /referrals/me:
+    get:
+      operationId: getMyReferrals
+      tags: [referrals]
+      responses:
+        "200":
+          description: Private referral summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferralMember" }
+        "401": { description: Sign in required }
+  /admin/referrals:
+    get:
+      operationId: getAdminReferrals
+      tags: [referrals]
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+      responses:
+        "200":
+          description: Private paginated referral ledger
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferralLedger" }
+        "403": { description: Administrator required }
+  /admin/referrals/{rewardId}/verify:
+    post:
+      operationId: verifyReferralReward
+      tags: [referrals]
+      parameters:
+        - in: path
+          name: rewardId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Current payment and listing eligibility
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferralReward" }
+        "409": { description: Verification unavailable }
+  /admin/referrals/{rewardId}/payout:
+    post:
+      operationId: recordReferralPayout
+      tags: [referrals]
+      parameters:
+        - in: path
+          name: rewardId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReferralPayoutInput" }
+      responses:
+        "200":
+          description: External manual payout recorded; no funds moved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferralReward" }
+        "409": { description: Already paid or no longer eligible }
   /participation/age-confirmation:
     get:
       operationId: getAgeConfirmation
@@ -2177,6 +2269,74 @@ components:
       scheme: bearer
       bearerFormat: Firebase ID token
   schemas:
+    ReferralCaptureInput:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string, minLength: 6, maxLength: 32 }
+        manual: { type: boolean, default: false }
+    ReferralCaptureResult:
+      type: object
+      required: [saved, expires_at]
+      properties:
+        saved: { type: boolean }
+        expires_at: { type: string }
+    ReferralMember:
+      type: object
+      required: [code, referred_by, signup_count, pending_count, eligible_cents, paid_cents, rewards]
+      properties:
+        code: { type: string }
+        referred_by: { type: boolean }
+        signup_count: { type: integer }
+        pending_count: { type: integer }
+        eligible_cents: { type: integer }
+        paid_cents: { type: integer }
+        rewards:
+          type: array
+          items: { $ref: "#/components/schemas/ReferralReward" }
+    ReferralReward:
+      type: object
+      required: [id, amount_cents, status, project_title, payment_checked_at, paid_at, payout_reference, review_flag]
+      properties:
+        id: { type: integer }
+        amount_cents: { type: integer }
+        status: { type: string, enum: [pending, eligible, paid, cancelled, review_required] }
+        project_title: { type: ["string", "null"] }
+        payment_checked_at: { type: ["string", "null"] }
+        paid_at: { type: ["string", "null"] }
+        payout_reference: { type: ["string", "null"] }
+        review_flag: { type: boolean }
+    ReferralLedgerRow:
+      type: object
+      required: [referral_id, referrer_email, referred_email, signed_up_at, project_id, milestone, reward]
+      properties:
+        referral_id: { type: string }
+        referrer_email: { type: string }
+        referred_email: { type: string }
+        signed_up_at: { type: string }
+        project_id: { type: ["integer", "null"] }
+        milestone: { type: string, enum: [signed_up, paid_pending_review, declined, not_public, listed] }
+        reward:
+          oneOf:
+            - $ref: "#/components/schemas/ReferralReward"
+            - { type: "null" }
+    ReferralLedger:
+      type: object
+      required: [rows, page, total, page_size]
+      properties:
+        page: { type: integer }
+        total: { type: integer }
+        page_size: { type: integer }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/ReferralLedgerRow" }
+    ReferralPayoutInput:
+      type: object
+      required: [reference, paid_on, confirmed_sent]
+      properties:
+        reference: { type: string, minLength: 3, maxLength: 120 }
+        paid_on: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        confirmed_sent: { type: boolean }
     InvestorNotificationInput:
       type: object
       additionalProperties: false

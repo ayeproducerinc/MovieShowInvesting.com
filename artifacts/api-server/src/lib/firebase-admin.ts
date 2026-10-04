@@ -29,3 +29,8 @@ export async function getFirebaseUidForEmail(email: string): Promise<string> {
   const user = await getFirebaseAdminAuth().getUserByEmail(email);
   return user.uid;
 }
+
+export async function getFirebaseAccountCreatedAt(uid: string): Promise<Date> {
+  const user = await getFirebaseAdminAuth().getUser(uid);
+  return new Date(user.metadata.creationTime);
+}

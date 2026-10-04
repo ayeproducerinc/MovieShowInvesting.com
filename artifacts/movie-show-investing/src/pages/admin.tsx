@@ -12,6 +12,7 @@ import {
 } from '@workspace/api-client-react';
 import { ArrowDownToLine, ArrowRight, ArrowUpRight, Clapperboard, Eye, FileText, LockKeyhole, LogOut, ShieldAlert, X } from 'lucide-react';
 import { ProposalSummary } from '@/components/proposal-summary';
+import { AdminReferrals } from '@/components/admin-referrals';
 import { AdminInvestors } from '@/components/admin-investors';
 import { PitchProvenance, ReviewNotesForm } from '@/components/admin-pitch-extras';
 import { ReadableValue } from '@/components/admin-readable';
@@ -42,6 +43,7 @@ function clearPrivateData(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.removeQueries({ predicate: query => typeof query.queryKey[0] === 'string' && /^\/api\/admin\/conversations\/\d+$/.test(query.queryKey[0]) });
   queryClient.removeQueries({ predicate: query => typeof query.queryKey[0] === 'string' && query.queryKey[0].startsWith('/api/admin/investors') });
   queryClient.removeQueries({ queryKey: ['admin-project-pitch-details'] });
+  queryClient.removeQueries({ predicate: query => typeof query.queryKey[0] === 'string' && (query.queryKey[0].startsWith('/api/admin/referrals') || query.queryKey[0] === '/api/referrals/me') });
   for (const section of SECTIONS) {
     void queryClient.cancelQueries({ queryKey: getGetAdminTableQueryKey(section.id) });
     queryClient.removeQueries({ queryKey: getGetAdminTableQueryKey(section.id) });
@@ -449,6 +451,7 @@ function Dashboard({ userId, email, onSignOut }: { userId: string; email: string
   const [active, setActive] = useState<AdminSection>('summary');
   const [conversationMode, setConversationMode] = useState(false);
   const [investorMode, setInvestorMode] = useState(false);
+  const [referralMode, setReferralMode] = useState(false);
   const section = SECTIONS.find(item => item.id === active)!;
   // The active table is read here for the export control; SectionData shares its query cache.
   const { data, isFetching } = useGetAdminTable(active, {
@@ -457,13 +460,14 @@ function Dashboard({ userId, email, onSignOut }: { userId: string; email: string
   return <Frame email={email} onSignOut={onSignOut}>
     <div className="admin-stage">
       <aside className="admin-sidebar" aria-label="Administration sections">
-        <div className="admin-sidebar-label admin-mono">Index / 12 views</div>
+        <div className="admin-sidebar-label admin-mono">Index / 13 views</div>
         <nav className="admin-nav" aria-label="Data sections">
-          {SECTIONS.map((item, i) => <button key={item.id} type="button" aria-current={!conversationMode && active === item.id ? 'page' : undefined} onClick={() => { setActive(item.id); setConversationMode(false); setInvestorMode(false); }} data-testid={`button-section-${item.id}`}>
+          {SECTIONS.map((item, i) => <button key={item.id} type="button" aria-current={!conversationMode && !investorMode && !referralMode && active === item.id ? 'page' : undefined} onClick={() => { setActive(item.id); setConversationMode(false); setInvestorMode(false); setReferralMode(false); }} data-testid={`button-section-${item.id}`}>
             <span className="admin-nav-number">{String(i + 1).padStart(2, '0')}</span>{item.label}
           </button>)}
-          <button type="button" aria-current={conversationMode ? 'page' : undefined} onClick={() => { setConversationMode(true); setInvestorMode(false); }} data-testid="button-section-conversations"><span className="admin-nav-number">11</span>Conversations</button>
-          <button type="button" aria-current={investorMode ? 'page' : undefined} onClick={() => { setInvestorMode(true); setConversationMode(false); }} data-testid="button-section-investors"><span className="admin-nav-number">12</span>Investors</button>
+          <button type="button" aria-current={conversationMode ? 'page' : undefined} onClick={() => { setConversationMode(true); setInvestorMode(false); setReferralMode(false); }} data-testid="button-section-conversations"><span className="admin-nav-number">11</span>Conversations</button>
+          <button type="button" aria-current={investorMode ? 'page' : undefined} onClick={() => { setInvestorMode(true); setConversationMode(false); setReferralMode(false); }} data-testid="button-section-investors"><span className="admin-nav-number">12</span>Investors</button>
+          <button type="button" aria-current={referralMode ? 'page' : undefined} onClick={() => { setReferralMode(true); setConversationMode(false); setInvestorMode(false); }} data-testid="button-section-referrals"><span className="admin-nav-number">13</span>Referrals</button>
         </nav>
           <div className="admin-sidebar-foot">Private administration<br />{email}<br /><br />No payments are collected here.</div>
       </aside>
@@ -471,15 +475,15 @@ function Dashboard({ userId, email, onSignOut }: { userId: string; email: string
         <div className="admin-main-inner">
           <div className="admin-title-row">
             <div>
-               <div className="admin-overline admin-mono">Administration / {investorMode ? '12' : conversationMode ? '11' : String(SECTIONS.indexOf(section) + 1).padStart(2, '0')}</div>
-               <h1 className="admin-page-title" data-testid="text-section-heading">{investorMode ? 'Investors' : conversationMode ? 'Conversations' : section.label}</h1>
-               <p className="admin-lede">{investorMode ? 'Private self-reported intake and non-binding interest. Not KYC, accreditation verification or approval to invest.' : conversationMode ? 'Project threads, reports, and auditable moderation actions.' : section.description}</p>
+               <div className="admin-overline admin-mono">Administration / {referralMode ? '13' : investorMode ? '12' : conversationMode ? '11' : String(SECTIONS.indexOf(section) + 1).padStart(2, '0')}</div>
+               <h1 className="admin-page-title" data-testid="text-section-heading">{referralMode ? 'Referrals' : investorMode ? 'Investors' : conversationMode ? 'Conversations' : section.label}</h1>
+               <p className="admin-lede">{referralMode ? 'Referrer and referred signups, with payment and listing milestones. Manual payouts only.' : investorMode ? 'Private self-reported intake and non-binding interest. Not KYC, accreditation verification or approval to invest.' : conversationMode ? 'Project threads, reports, and auditable moderation actions.' : section.description}</p>
             </div>
-             {!conversationMode && !investorMode && <button type="button" className="admin-button" disabled={!data || isFetching} onClick={() => data && downloadCsv(data, active)} data-testid={`button-download-${active}`} title={!data ? 'Available when this section loads' : `Download ${section.label} as CSV`}>
+             {!conversationMode && !investorMode && !referralMode && <button type="button" className="admin-button" disabled={!data || isFetching} onClick={() => data && downloadCsv(data, active)} data-testid={`button-download-${active}`} title={!data ? 'Available when this section loads' : `Download ${section.label} as CSV`}>
               <ArrowDownToLine size={16} /> Download CSV
              </button>}
           </div>
-            {investorMode ? <AdminInvestors key={userId} userId={userId}/> : conversationMode ? <AdminConversations uid={userId}/> : <SectionData key={`${active}-${userId}`} section={section} userId={userId} />}
+            {referralMode ? <AdminReferrals key={userId} userId={userId}/> : investorMode ? <AdminInvestors key={userId} userId={userId}/> : conversationMode ? <AdminConversations uid={userId}/> : <SectionData key={`${active}-${userId}`} section={section} userId={userId} />}
         </div>
       </main>
     </div>

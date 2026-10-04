@@ -5,6 +5,96 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface ReferralCaptureInput {
+  /**
+     * @minLength 6
+     * @maxLength 32
+     */
+  code: string;
+  manual?: boolean;
+}
+
+export interface ReferralCaptureResult {
+  saved: boolean;
+  expires_at: string;
+}
+
+export type ReferralRewardStatus = typeof ReferralRewardStatus[keyof typeof ReferralRewardStatus];
+
+
+export const ReferralRewardStatus = {
+  pending: 'pending',
+  eligible: 'eligible',
+  paid: 'paid',
+  cancelled: 'cancelled',
+  review_required: 'review_required',
+} as const;
+
+export interface ReferralReward {
+  id: number;
+  amount_cents: number;
+  status: ReferralRewardStatus;
+  /** @nullable */
+  project_title: string | null;
+  /** @nullable */
+  payment_checked_at: string | null;
+  /** @nullable */
+  paid_at: string | null;
+  /** @nullable */
+  payout_reference: string | null;
+  review_flag: boolean;
+}
+
+export interface ReferralMember {
+  code: string;
+  referred_by: boolean;
+  signup_count: number;
+  pending_count: number;
+  eligible_cents: number;
+  paid_cents: number;
+  rewards: ReferralReward[];
+}
+
+export type ReferralLedgerRowMilestone = typeof ReferralLedgerRowMilestone[keyof typeof ReferralLedgerRowMilestone];
+
+
+export const ReferralLedgerRowMilestone = {
+  signed_up: 'signed_up',
+  paid_pending_review: 'paid_pending_review',
+  declined: 'declined',
+  not_public: 'not_public',
+  listed: 'listed',
+} as const;
+
+export interface ReferralLedgerRow {
+  referral_id: string;
+  referrer_email: string;
+  referred_email: string;
+  signed_up_at: string;
+  /** @nullable */
+  project_id: number | null;
+  milestone: ReferralLedgerRowMilestone;
+  reward: ReferralReward | null;
+}
+
+export interface ReferralLedger {
+  page: number;
+  total: number;
+  page_size: number;
+  rows: ReferralLedgerRow[];
+}
+
+export interface ReferralPayoutInput {
+  /**
+     * @minLength 3
+     * @maxLength 120
+     */
+  reference: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  paid_on: string;
+  confirmed_sent: boolean;
+}
+
 export interface InvestorNotificationInput {
   allowed: boolean;
   expected_owner: string;
@@ -1528,6 +1618,13 @@ export interface AdminMessageReview {
   id: number;
   hidden: boolean;
 }
+
+export type GetAdminReferralsParams = {
+/**
+ * @minimum 1
+ */
+page?: number;
+};
 
 export type BeginBrowserLoginParams = {
 returnTo?: string;

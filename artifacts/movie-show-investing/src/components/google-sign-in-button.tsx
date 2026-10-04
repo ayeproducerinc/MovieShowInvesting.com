@@ -7,6 +7,7 @@ import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-
 import { signInWithGoogle } from '@/lib/google-sign-in';
 import { clearPrivateAuthQueries } from '@/lib/homepage-community';
 import { canPrepareRegisteredFilmmakerHandoff, clearFilmmakerAuthHandoff, prepareRegisteredFilmmakerHandoff, subscribeFilmmakerAuthPreparation } from '@/lib/filmmaker-auth-handoff';
+import { useReferralCaptureStatus } from '@/lib/referral-attribution';
 
 type Props = {
   auth: Auth | null;
@@ -24,6 +25,7 @@ export function GoogleSignInButton({
   auth, queryClient, className, disabled = false,
   testId = 'button-continue-google', label, onBeforeSignIn, onSignInError, onSignedIn,
 }: Props) {
+  const referralCapture = useReferralCaptureStatus();
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [firebaseSignedIn, setFirebaseSignedIn] = useState(() => Boolean(auth?.currentUser));
@@ -44,7 +46,7 @@ export function GoogleSignInButton({
   }, [auth]);
 
   async function begin() {
-    if (busy || disabled) return;
+    if (busy || disabled || referralCapture === 'pending' || referralCapture === 'error') return;
     setFeedback('');
     if (!auth) {
       const message = 'Google sign-in is not ready yet. Check the connection and try again.';
@@ -106,7 +108,7 @@ export function GoogleSignInButton({
     <button
       type="button"
       className={className}
-      disabled={disabled || busy || !onBeforeSignIn && !filmmakerHandoffReady}
+      disabled={disabled || busy || referralCapture === 'pending' || referralCapture === 'error' || !onBeforeSignIn && !filmmakerHandoffReady}
       onClick={() => void begin()}
       data-testid={testId}
     >

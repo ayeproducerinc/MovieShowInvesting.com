@@ -29,6 +29,8 @@ import Pricing from '@/pages/pricing';
 import Investor, { InvestorDone } from '@/pages/investor';
 import Lineup from '@/pages/lineup';
 import LineupConfirm from '@/pages/lineup-confirm';
+import Referrals from '@/pages/referrals';
+import { ReferralClaim } from '@/components/referral-claim';
 import Conversation from '@/pages/conversation';
 
 const queryClient = new QueryClient();
@@ -44,6 +46,7 @@ const metadata: Record<string, [string, string]> = {
   '/invest/done': ['Interest saved | Movie Show Investing', 'Your non-binding interest has been saved. No money has been collected.'],
   '/lineup': ['My saved lineup | Movie Show Investing', 'A private view of your saved, non-binding project interest. No money has been collected.'],
   '/lineup/confirm': ['Review & confirm interest | Movie Show Investing', 'Review your saved amount and allocations and sign to confirm non-binding interest. No money is collected.'],
+  '/referrals': ['My referrals | Movie Show Investing', 'Your private referral link and reward history.'],
   '/messages': ['Messages | Movie Show Investing', 'Your private project conversations.'],
    '/start/filmmaker': ['Filmmaker worksheet | Movie Show Investing', 'Share your project and explore illustrative terms in a guided worksheet.'],
    '/start/filmmaker/done': ['Thank you | Movie Show Investing', 'Your filmmaker answers have been received.'],
@@ -101,6 +104,7 @@ function PublicPages() {
   const visit = useVisitAttribution();
   return <>
     <FirebaseBootstrap />
+    <ReferralClaim />
     <SiteShell>
     <PageMetadata />
     <RoutedErrorBoundary>
@@ -116,6 +120,7 @@ function PublicPages() {
         <Route path="/invest" component={Investor} />
         <Route path="/lineup" component={Lineup} />
         <Route path="/lineup/confirm" component={LineupConfirm} />
+        <Route path="/referrals" component={Referrals} />
         <Route path="/messages/:id" component={Conversation} />
         <Route path="/messages" component={Conversation} />
           <Route path="/start/filmmaker/done" component={FilmmakerDone} />

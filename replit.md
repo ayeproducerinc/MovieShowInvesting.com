@@ -47,5 +47,14 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Pointers
 
+### Referral operations
+
+- Members use `/referrals`; administrators use the existing dashboard's **Referrals** view.
+- A $10 reward is per new person, not per pitch: signup, verified first paid pitch, editorial approval, and public listing are all required. Existing accounts and repeat projects are not retroactively credited.
+- Before sending a manual payout, use **Verify**. **Record payout** verifies again when opening its form and before saving. Send money externally first, then record the actual date and unique reference and confirm it was sent. This application does not transfer referral funds.
+- Periodically verify pending and paid rewards for refunds/disputes. Unpaid rewards are cancelled; recorded payments remain in history and are flagged for review. No automatic recovery or payout is implemented.
+- Referral schema changes are managed by the existing publishing schema flow, not new startup DDL. Publish is an owner action; no production schema or payment data was modified while building this feature.
+- Targeted development regressions: `NODE_ENV=development pnpm --filter @workspace/scripts exec tsx --test ../artifacts/api-server/src/lib/referral-policy.test.ts ../artifacts/api-server/src/lib/referrals.integration.test.ts`. Integration fixtures are explicitly removed in `finally`.
+
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
 - Product source of truth: `DECISIONS.md` and `PLAN.md`. Reference material: the three uploaded Movie Show Investing PDFs in `.conversation/attached_assets/`.

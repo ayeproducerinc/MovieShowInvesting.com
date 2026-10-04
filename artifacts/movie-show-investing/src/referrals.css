@@ -1,0 +1,27 @@
+.ref-page{padding:clamp(48px,7vw,110px) 0 120px;color:#26303d}
+.ref-kicker{color:#902f4d;font:700 10px/1.5 var(--app-font-mono);letter-spacing:.15em;text-transform:uppercase}
+.ref-title{font-size:clamp(44px,6vw,84px);line-height:.98;margin:18px 0 22px;max-width:900px}
+.ref-lede{max-width:640px;font-size:15px;line-height:1.7;color:#4d555c}
+.ref-grid{display:grid;gap:0;grid-template-columns:repeat(2,1fr);border:1px solid #bcb4a7;margin:36px 0}
+.ref-stat{padding:20px;border-right:1px solid #cec7bb;border-bottom:1px solid #cec7bb}
+.ref-stat b{display:block;font-size:30px;font-weight:600;margin-top:6px}
+@media(min-width:768px){.ref-grid{grid-template-columns:repeat(4,1fr)}.ref-stat{border-bottom:0}.ref-stat:last-child{border-right:0}}
+.ref-box{border:1px solid #26303d;padding:20px;margin:28px 0;background:#f9f6ee}
+.ref-code{font:700 22px/1.3 var(--app-font-mono);letter-spacing:.12em;word-break:break-all}
+.ref-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.ref-input{min-height:48px;border:1px solid #26303d;background:#fffdf8;padding:0 14px;font:600 14px var(--app-font-mono);flex:1 1 220px;min-width:0}
+.ref-btn{min-height:48px;padding:0 20px;border:1px solid #943c55;background:#943c55;color:#fff8ed;font-size:13px;font-weight:700}
+.ref-btn.alt{background:transparent;color:#26303d;border-color:#26303d}
+.ref-btn:disabled{opacity:.5}
+.ref-note{font-size:12px;line-height:1.65;color:#5d6468;margin-top:10px}
+.ref-err{color:#902f4d;font-size:13px;margin-top:10px}
+.ref-hist{border-top:1px solid #26303d;margin-top:14px}
+.ref-hist li{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:14px 0;border-bottom:1px solid #cec7bb;font-size:14px}
+.ref-pill{font:700 10px var(--app-font-mono);letter-spacing:.1em;text-transform:uppercase;border:1px solid #26303d;padding:3px 8px}
+.ref-skel{height:46px;background:#e2dacf;margin:14px 0;animation:admin-breathe 1.4s ease-in-out infinite alternate}
+.ref-admin-bar{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
+.ref-admin-bar input,.ref-admin-bar select,.ref-payout input[type=text],.ref-payout input[type=date]{min-height:40px;border:1px solid #8d887f;background:#fffdf8;padding:0 10px;font:inherit;min-width:0}
+.ref-payout{border:1px solid #26303d;padding:18px;margin:20px 0;display:grid;gap:12px;max-width:560px}
+.ref-payout label{display:grid;gap:4px;font-size:13px}
+.ref-payout label.chk{display:flex;gap:10px;align-items:flex-start}
+.ref-cell-actions{display:flex;gap:8px;flex-wrap:wrap}
