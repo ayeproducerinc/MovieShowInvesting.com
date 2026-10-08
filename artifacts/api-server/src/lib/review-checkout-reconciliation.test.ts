@@ -78,9 +78,101 @@ test("new checkout permits customer codes but never pre-applies FREE99", async (
   assert.equal(await startReviewCheckout(99, "fixture"), r["/v1/checkout/sessions"].url);
   const form = new URLSearchParams(s.requests.find(r => r.path === "/v1/checkout/sessions")?.body);
   assert.equal(form.get("allow_promotion_codes"), "true");
-  assert.equal(form.get("payment_method_collection"), "if_required");
+  assert.equal(form.has("payment_method_collection"), false);
   assert.equal([...form.keys()].some(k => k.startsWith("discounts")), false);
   assert.equal(s.rows[0].sessionId, sid);
+});
+
+const pending = (version = "v2:", age = 60_000) => [{
+  sessionId: `pending:${version}00000000-0000-4000-8000-000000000099`,
+  projectId: 99, visitorId: "fixture", state: "open", paidAt: null, createdAt: new Date(Date.now() - age),
+}];
+const providerError = (status: number, type: string) => ({
+  __status: status, __body: { error: { type, param: "payment_method_collection" } },
+});
+function openCreated(r: Record<string, any>) {
+  return { ...r[`/v1/checkout/sessions/${sid}`], status: "open", payment_status: "unpaid",
+    payment_intent: null, allow_promotion_codes: true, url: "https://checkout.stripe.com/c/pay/fixture" };
+}
+test("definitive Stripe creation failure releases only its reservation and permits retry", async () => {
+  const r = responses("paid"); r["/v1/checkout/sessions"] = providerError(400, "invalid_request_error");
+  const s = resetFixture(r);
+  await assert.rejects(startReviewCheckout(99, "fixture"), /Stripe request failed/);
+  assert.equal(s.rows[0].state, "creation_failed"); assert.equal(s.projects[0].showcaseRequested, false);
+  r["/v1/checkout/sessions"] = openCreated(r);
+  await startReviewCheckout(99, "fixture");
+  assert.equal(s.rows.length, 2); assert.equal(s.rows[1].sessionId, sid);
+});
+test("legacy failed request is replayed with its original key and released after definitive rejection", async () => {
+  const r = responses("paid"); r["/v1/checkout/sessions"] = providerError(400, "invalid_request_error");
+  const row = pending("")[0], s = resetFixture(r, [row]);
+  await reconcileReviewCheckouts(99);
+  assert.equal(row.state, "creation_failed"); assert.equal(s.projects[0].showcaseRequested, false);
+  const request = s.requests.find(x => x.path === "/v1/checkout/sessions")!;
+  assert.equal(request.headers?.["Idempotency-Key"], row.sessionId);
+  assert.equal(new URLSearchParams(request.body).get("payment_method_collection"), "if_required");
+});
+test("uncertain timeout is retained and recovered with the same idempotency key", async () => {
+  const r = responses("paid"); r["/v1/checkout/sessions"] = new Error("fixture timeout");
+  const s = resetFixture(r);
+  await assert.rejects(startReviewCheckout(99, "fixture"), /timeout/);
+  assert.equal(s.rows[0].state, "open");
+  const reservation = s.rows[0].sessionId;
+  s.rows[0].createdAt = new Date(Date.now() - 60_000);
+  r["/v1/checkout/sessions"] = { ...openCreated(r), metadata: { project_id: "99", checkout_reservation: reservation } };
+  await reconcileReviewCheckouts(99);
+  assert.equal(s.rows.length, 1); assert.equal(s.rows[0].sessionId, sid);
+  const requests = s.requests.filter(x => x.path === "/v1/checkout/sessions");
+  assert.equal(requests[0].headers?.["Idempotency-Key"], requests[1].headers?.["Idempotency-Key"]);
+  assert.equal(requests[0].body, requests[1].body);
+});
+test("provider success followed by local persistence failure recovers the original Checkout", async () => {
+  const r = responses("paid");
+  r["/v1/checkout/sessions"] = (options: any) => ({
+    ...openCreated(r), metadata: { project_id: "99", checkout_reservation: options.headers["Idempotency-Key"] },
+  });
+  const s = resetFixture(r); s.failSessionPersistence = 1;
+  await assert.rejects(startReviewCheckout(99, "fixture"), /persistence/);
+  assert.ok(s.rows[0].sessionId.startsWith("pending:v2:"));
+  s.rows[0].createdAt = new Date(Date.now() - 60_000);
+  await reconcileReviewCheckouts(99);
+  assert.equal(s.rows[0].sessionId, sid); assert.equal(s.rows.length, 1);
+  const requests = s.requests.filter(x => x.path === "/v1/checkout/sessions");
+  assert.equal(requests[0].body, requests[1].body);
+  assert.equal(requests[0].headers?.["Idempotency-Key"], requests[1].headers?.["Idempotency-Key"]);
+});
+test("a recovered completed waived session is fulfilled once rather than creating a second review", async () => {
+  const r = responses(), row = pending()[0];
+  r["/v1/checkout/sessions"] = { ...r[`/v1/checkout/sessions/${sid}`], metadata: { project_id: "99", checkout_reservation: row.sessionId } };
+  const s = resetFixture(r, [row]);
+  await reconcileReviewCheckouts(99); await reconcileReviewCheckouts(99);
+  assert.equal(s.rows[0].state, "waived"); assert.equal(s.rewards, 0);
+  assert.equal(s.projects[0].showcaseRequested, true);
+  assert.equal(s.requests.filter(x => x.path === "/v1/checkout/sessions").length, 1);
+});
+test("idempotency conflict, provider failure and timeout never release uncertain pending rows", async () => {
+  for (const error of [providerError(400, "idempotency_error"), providerError(500, "api_error"), new Error("timeout")]) {
+    const r = responses("paid"); r["/v1/checkout/sessions"] = error;
+    const s = resetFixture(r, pending());
+    await assert.rejects(reconcileReviewCheckouts(99));
+    assert.equal(s.rows[0].state, "open"); assert.equal(s.projects[0].showcaseRequested, false);
+  }
+});
+test("old or just-started reservations cannot be replayed or silently cleared", async () => {
+  for (const age of [0, 20 * 60 * 60 * 1000, 25 * 60 * 60 * 1000]) {
+    const s = resetFixture(responses("paid"), pending("v2:", age));
+    await assert.rejects(reconcileReviewCheckouts(99), /manual reconciliation/);
+    assert.equal(s.rows[0].state, "open");
+    assert.equal(s.requests.some(x => x.path === "/v1/checkout/sessions"), false);
+  }
+});
+test("concurrent creation attempts can reserve only one open Checkout", async () => {
+  const r = responses("paid"); r["/v1/checkout/sessions"] = openCreated(r);
+  const s = resetFixture(r);
+  const results = await Promise.allSettled([startReviewCheckout(99, "fixture"), startReviewCheckout(99, "fixture")]);
+  assert.equal(results.filter(x => x.status === "fulfilled").length, 1);
+  assert.equal(s.rows.length, 1);
+  assert.equal(s.requests.filter(x => x.path === "/v1/checkout/sessions").length, 1);
 });
 test("a legacy unpaid checkout is expired before a code-enabled replacement is created", async () => {
   const r = responses("paid");

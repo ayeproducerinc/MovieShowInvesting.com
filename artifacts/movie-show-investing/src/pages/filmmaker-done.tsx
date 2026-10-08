@@ -35,7 +35,7 @@ type ShowcaseStatus = {
   refreshFailed?: boolean;
 };
 
-function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checkoutEnabled, checkoutUnavailableText, autoOpenReady, reviewTriggerRef }: { result: FilmmakerResult; onSaved: (updated: ShowcaseStatus) => Promise<ShowcaseStatus>; reviewStatus?: GetPitchReviewCheckoutStatus200; reviewStatusState: 'checking' | 'verified' | 'unavailable'; checkoutEnabled: boolean; checkoutUnavailableText: string; autoOpenReady: boolean; reviewTriggerRef: React.RefObject<HTMLButtonElement | null> }) {
+function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checkoutEnabled, checkoutUnavailableText, autoOpenReady, reviewTriggerRef, onRetryStatus, statusFetching }: { result: FilmmakerResult; onSaved: (updated: ShowcaseStatus) => Promise<ShowcaseStatus>; reviewStatus?: GetPitchReviewCheckoutStatus200; reviewStatusState: 'checking' | 'verified' | 'unavailable'; checkoutEnabled: boolean; checkoutUnavailableText: string; autoOpenReady: boolean; reviewTriggerRef: React.RefObject<HTMLButtonElement | null>; onRetryStatus: () => void; statusFetching: boolean }) {
   const update = useUpdateFilmmakerShowcase({ request: { headers: result.project_id ? { 'X-MSI-Project-Id': String(result.project_id) } : {} } });
   const checkoutProof = result.checkout_proof || getPitchReviewProof(result.project_id);
   const checkout = useStartPitchReviewCheckout({ request: { headers: result.project_id ? {
@@ -76,7 +76,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
   const [approvalMayHavePaused, setApprovalMayHavePaused] = useState(false);
   const canCheckout = checkoutEnabled && reviewStatusState === 'verified';
   const paymentNotice = reviewStatusState === 'unavailable'
-    ? 'We could not verify whether this pitch has already been paid. Please try again later; do not pay again until its status can be checked.'
+    ? 'Checkout status is temporarily unavailable. This does not mean you paid. Your pitch is saved. Retry status before starting another checkout.'
     : reviewStatusState === 'checking'
       ? 'Checking this pitch’s payment status before checkout is available…'
       : checkoutUnavailableText;
@@ -197,6 +197,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
       <p>The free unlisted page and share link remain yours. If approved, your pitch will join Explore’s public Pitch Collection with no preset expiration date. Investors will be able to browse when they join.</p>
       <button ref={reviewTriggerRef} type="button" className="dossier-button" data-testid="button-open-review-paywall" onClick={() => { returnFocusRef.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : reviewTriggerRef.current; if (result.project_id) consumePitchReviewChoice(result.project_id); setOfferSource('manual'); setCheckoutError(''); setShowPaywall(true); }}>Submit for editorial review · $49 <ArrowRight size={17}/></button>
       {!canCheckout && <p role="status">{paymentNotice}</p>}
+      {reviewStatusState === 'unavailable' && <button type="button" className="dossier-button dossier-button-outline" data-testid="button-retry-review-status" disabled={statusFetching} onClick={onRetryStatus}>{statusFetching ? 'Checking status…' : 'Retry checkout status'}</button>}
     </div>}
     <details className="dossier-fold" data-testid="details-edit-pitch" style={{ marginTop: 8 }}><summary style={{ cursor:'pointer', fontWeight:600 }}>Edit pitch details</summary>
     <PitchMaterialsEntry disabled={checking || update.isPending || needsReselect} warning={materialsWarning} onOpen={event => {
@@ -266,6 +267,7 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
            <p className="mt-3 text-sm">After we complete your review, a declined pitch is not automatically refunded. If we cannot deliver the review, we’ll refund the payment, subject to applicable law. You can leave checkout before paying; cancelling checkout does not submit the pitch for review.</p>
           <p className="mt-3 text-sm">We’re building the Pitch Collection that investors will be able to browse when they join.</p>
             {!canCheckout && <p role="status" className="dossier-notice mt-4">{paymentNotice}</p>}
+            {reviewStatusState === 'unavailable' && <button type="button" className="dossier-button dossier-button-outline mt-3" data-testid="button-retry-review-status-modal" disabled={statusFetching} onClick={onRetryStatus}>{statusFetching ? 'Checking status…' : 'Retry checkout status'}</button>}
           </div>
            <div className="shrink-0 border-t border-[#c8c0b5] px-7 py-4 md:px-10">
              {!canCheckout && <p role="status" className="mb-3 text-xs text-[#4d5557]">{paymentNotice}</p>}
@@ -469,7 +471,7 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
          {checkoutReturn !== 'return' && reviewStatus.data?.fee_waived && <p className="dossier-notice" data-testid="status-review-fee-waived">Your editorial review fee was waived with FREE99. No payment was required.</p>}
         <section className="dossier-section" data-testid="section-recap-summary"><span className="dossier-kicker">On file</span><p>{[data.format, data.genre === 'Other' ? data.genre_other || data.genre : data.genre, legacyStage ? `Legacy stage: ${legacyStage}` : stage].filter(Boolean).join(' · ')}</p>
           {(() => { const x = data; const rows: [string, string | null | undefined][] = [['Team', x.team_info || (data.team_links.length ? `${data.team_links.length} link${data.team_links.length === 1 ? '' : 's'}` : null)], ['Distribution plan', data.distribution_plan], ['Planned funding use', data.money_use]]; const shown = rows.filter(([, v]) => v); return shown.length ? <ul className="dossier-links" data-testid="list-recap-specifics">{shown.map(([k, v]) => <li key={k}><strong>{k}:</strong> {v!.length > 120 ? `${v!.slice(0, 117)}...` : v}</li>)}</ul> : null; })()}</section>
-          {data.project_slug && !activeShowcaseStatus?.hidden && <ShowcaseForm key={data.project_slug} result={{ ...data, approved: activeShowcaseStatus?.approved ?? data.approved, showcase_requested: activeShowcaseStatus?.showcase_requested ?? data.showcase_requested, hidden: activeShowcaseStatus?.hidden ?? data.hidden }} onSaved={refreshShowcaseStatus} reviewStatus={reviewStatus.data} reviewStatusState={reviewStatus.isSuccess ? 'verified' : reviewStatus.isError ? 'unavailable' : 'checking'} checkoutEnabled={checkoutEnabled} checkoutUnavailableText={checkoutUnavailableText} autoOpenReady={(reviewStatus.isSuccess || reviewStatus.isError) && checkoutReturn === null} reviewTriggerRef={reviewTriggerRef} />}
+           {data.project_slug && !activeShowcaseStatus?.hidden && <ShowcaseForm key={data.project_slug} result={{ ...data, approved: activeShowcaseStatus?.approved ?? data.approved, showcase_requested: activeShowcaseStatus?.showcase_requested ?? data.showcase_requested, hidden: activeShowcaseStatus?.hidden ?? data.hidden }} onSaved={refreshShowcaseStatus} reviewStatus={reviewStatus.data} reviewStatusState={reviewStatus.isSuccess ? 'verified' : reviewStatus.isError ? 'unavailable' : 'checking'} checkoutEnabled={checkoutEnabled} checkoutUnavailableText={checkoutUnavailableText} autoOpenReady={(reviewStatus.isSuccess || reviewStatus.isError) && checkoutReturn === null} reviewTriggerRef={reviewTriggerRef} onRetryStatus={() => { void reviewStatus.refetch(); void checkoutConfig.refetch(); }} statusFetching={reviewStatus.isFetching} />}
           {data.project_slug && activeShowcaseStatus?.hidden && <details className="dossier-fold" data-testid="details-edit-pitch"><summary style={{ cursor: 'pointer', fontWeight: 600 }}>Edit pitch details</summary><PitchMaterialsEntry/></details>}
         {deal && data.budget && repayment && <details className="dossier-section" data-testid="details-proposal"><summary style={{ cursor:'pointer', fontWeight:600 }}>Proposal and illustrative terms</summary><div className="fm-receipt" data-testid="receipt-result-deal"><h3>At a glance</h3><dl>
            <div><dt>{data.budget_from_example ? 'Illustrative example budget' : 'Your estimated project budget'}</dt><dd data-testid="text-result-budget">{money(data.budget)}</dd></div>

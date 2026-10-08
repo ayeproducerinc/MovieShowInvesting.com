@@ -7,7 +7,7 @@ import {
   requireMatchingFilmmakerContext,
   type FilmmakerIdentity,
 } from "../lib/filmmaker-auth";
-import { reconcileReviewCheckouts, reviewCheckoutConfig, startReviewCheckout, reviewFeeWaived } from "../lib/pitch-review-payments";
+import { reconcileReviewCheckouts, reviewCheckoutConfig, startReviewCheckout, reviewFeeWaived, reviewCheckoutFailureDetails } from "../lib/pitch-review-payments";
 import { verifyPitchReviewProof } from "../lib/pitch-review-proof";
 import { requireAccountAgeConfirmation } from "../lib/age-confirmation";
 
@@ -114,8 +114,8 @@ router.post("/filmmakers/review-checkout", async (req, res): Promise<void> => {
   try {
     await reconcileReviewCheckouts(project.id);
   } catch (error) {
-    req.log.error({ error }, "Could not verify previous checkout");
-    res.status(503).json({ error: "Payment verification is unavailable. Please retry later; do not pay twice." });
+    req.log.error(reviewCheckoutFailureDetails(error), "Could not verify previous checkout");
+    res.status(503).json({ error: "Checkout status is temporarily unavailable. This does not mean you paid. Please retry status before starting another checkout." });
     return;
   }
   const latest = await getCompletedFilmmakerResult(visitorId);
@@ -131,7 +131,7 @@ router.post("/filmmakers/review-checkout", async (req, res): Promise<void> => {
     const url = await startReviewCheckout(project.id, visitorId);
     res.json({ url, already_submitted: false });
   } catch (error) {
-    req.log.error({ error }, "Could not create review checkout");
+    req.log.error(reviewCheckoutFailureDetails(error), "Could not create review checkout");
     res.status(503).json({ error: "Review checkout is unavailable. Your free pitch remains saved; do not pay again if you already completed checkout." });
   }
 });
@@ -143,8 +143,8 @@ router.get("/filmmakers/review-checkout/status", async (req, res): Promise<void>
   try {
     await reconcileReviewCheckouts(context.project.id);
   } catch (error) {
-    req.log.error({ error }, "Could not verify review payment");
-    res.status(503).json({ error: "We could not verify your checkout yet. Please try again; do not complete another checkout." });
+    req.log.error(reviewCheckoutFailureDetails(error), "Could not verify review payment");
+    res.status(503).json({ error: "Checkout status is temporarily unavailable. This does not mean you paid. Please retry status before starting another checkout." });
     return;
   }
   const refreshed = await getCompletedFilmmakerResult(context.visitorId);

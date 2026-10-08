@@ -6,6 +6,7 @@ import { logger } from "./logger";
 import { classifyReferralPayment, type ReferralPaymentStatus } from "./referral-policy";
 import { referralRewardSyncSql } from "./referral-reward-sync";
 import { FREE99_PROMOTION_ID, FREE99_COUPON_ID, reviewSessionKind, reviewLineItemsMatch, free99EvidenceMatches, completedFreeReview } from "./review-checkout-policy";
+import { CHECKOUT_REPLAY_WINDOW_MS, CHECKOUT_SETTLE_MS, reviewCheckoutForm, providerFailure, ReviewStripeError, isDefinitiveCreationFailure } from "./review-checkout-request";
 
 const SANDBOX_ACCOUNT = "acct_1UKlvzI6ABsowmLh";
 const SANDBOX_PRICE = "price_1UKmPMI6ABsowmLhzyjaBfRh";
@@ -26,6 +27,16 @@ function safeCheckoutFailure(error: unknown): string {
   return "Stripe connection or checkout could not be verified";
 }
 
+export function reviewCheckoutFailureDetails(error: unknown) {
+  return {
+    reason: safeCheckoutFailure(error),
+    ...(error instanceof ReviewStripeError ? {
+      providerStatus: error.status, providerType: error.stripeType,
+      providerCode: error.stripeCode, parameter: error.parameter, providerRequestId: error.requestId,
+    } : {}),
+  };
+}
+
 export async function reviewCheckoutConfig() {
   let enabled = false;
   try {
@@ -40,7 +51,10 @@ export async function reviewCheckoutConfig() {
 
 async function stripe(path: string, options?: { method: string; body: string; headers: Record<string, string> }): Promise<any> {
   const response = await connectors.proxy("stripe", path, options);
-  if (!response.ok) throw new Error(`Stripe request failed (${response.status})`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw providerFailure(response.status, body, response.headers.get("request-id"));
+  }
   return response.json();
 }
 
@@ -80,13 +94,70 @@ export async function reviewFeeWaived(projectId: number): Promise<boolean> {
   return Boolean(row);
 }
 
+function checkoutDomain() {
+  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
+  if (!domain || !/^[a-z0-9.-]+$/i.test(domain)) throw new Error("A valid checkout return domain is required");
+  return domain;
+}
+
+async function closeFailedCreation(reservation: string) {
+  await db.update(pitchReviewCheckoutsTable).set({ state: "creation_failed" })
+    .where(and(eq(pitchReviewCheckoutsTable.sessionId, reservation), eq(pitchReviewCheckoutsTable.state, "open")));
+}
+
+async function createReservedCheckout(projectId: number, reservation: string) {
+  try {
+    return await stripe("/v1/checkout/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Idempotency-Key": reservation },
+      body: reviewCheckoutForm(projectId, reservation, priceId(), checkoutDomain(), live()).toString(),
+    });
+  } catch (error) {
+    if (isDefinitiveCreationFailure(error)) await closeFailedCreation(reservation);
+    throw error;
+  }
+}
+
+async function recoverPendingCheckout(row: typeof pitchReviewCheckoutsTable.$inferSelect) {
+  const age = Date.now() - new Date(row.createdAt).getTime();
+  // Stripe may discard keys after 24 hours. Never replay an old reservation
+  // after retention, nor race a just-started request. Domain/parameter changes
+  // produce an idempotency conflict and remain blocked, not a new Checkout.
+  if (!/^pending:(?:v2:)?[0-9a-f-]{36}$/i.test(row.sessionId)
+    || !Number.isFinite(age) || age < CHECKOUT_SETTLE_MS || age >= CHECKOUT_REPLAY_WINDOW_MS) {
+    throw new Error("Checkout environment or reservation requires manual reconciliation");
+  }
+  await assertAccount();
+  let session;
+  try {
+    session = await createReservedCheckout(row.projectId, row.sessionId);
+  } catch (error) {
+    if (!isDefinitiveCreationFailure(error)) throw error;
+    logger.info({ projectId: row.projectId, ...reviewCheckoutFailureDetails(error) }, "Failed checkout reservation safely released");
+    return null;
+  }
+  if (!validSession(session, row.projectId)
+    || (row.sessionId.startsWith("pending:v2:") && session.metadata?.checkout_reservation !== row.sessionId)
+    || !["open", "complete", "expired"].includes(session.status)) {
+    throw new Error("Recovered checkout identity does not match the stored pitch");
+  }
+  await db.update(pitchReviewCheckoutsTable).set({ sessionId: session.id })
+    .where(and(eq(pitchReviewCheckoutsTable.sessionId, row.sessionId), eq(pitchReviewCheckoutsTable.state, "open")));
+  return { ...row, sessionId: session.id };
+}
+
 export async function startReviewCheckout(projectId: number, visitorId: string): Promise<string> {
   await assertAccount();
   if (await reviewFeeWaived(projectId)) throw new Error("This pitch has already received a fee-waived review");
-  const [existing] = await db.select().from(pitchReviewCheckoutsTable)
+  let [existing] = await db.select().from(pitchReviewCheckoutsTable)
     .where(and(eq(pitchReviewCheckoutsTable.projectId, projectId), eq(pitchReviewCheckoutsTable.state, "open")))
     .limit(1);
   if (existing) {
+    if (existing.sessionId.startsWith("pending:")) {
+      const recovered = await recoverPendingCheckout(existing);
+      if (!recovered) return startReviewCheckout(projectId, visitorId);
+      existing = recovered;
+    }
     if (!existing.sessionId.startsWith(live() ? "cs_live_" : "cs_test_")) {
       throw new Error("An earlier or uncertain checkout requires manual reconciliation");
     }
@@ -97,7 +168,7 @@ export async function startReviewCheckout(projectId: number, visitorId: string):
       throw new Error("This review checkout has already been completed");
     }
     if (previous.status === "open" && previous.url) {
-      if (previous.allow_promotion_codes === true && previous.payment_method_collection === "if_required") return previous.url;
+      if (previous.allow_promotion_codes === true) return previous.url;
       // A legacy unpaid Checkout cannot have these options changed in place.
       // Expire it before reserving a replacement; if a payment wins the race,
       // Stripe refuses expiration and we must not create another checkout.
@@ -113,33 +184,12 @@ export async function startReviewCheckout(projectId: number, visitorId: string):
     await db.update(pitchReviewCheckoutsTable).set({ state: "closed" })
       .where(eq(pitchReviewCheckoutsTable.sessionId, existing.sessionId));
   }
-  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-  if (!domain || !/^[a-z0-9.-]+$/i.test(domain)) throw new Error("A valid checkout return domain is required");
+  checkoutDomain();
   // Reserve the pitch before calling Stripe. If Stripe succeeds but persistence fails,
   // the reservation blocks a second charge until an operator reconciles it.
-  const reservation = `pending:${randomUUID()}`;
+  const reservation = `pending:v2:${randomUUID()}`;
   await db.insert(pitchReviewCheckoutsTable).values({ sessionId: reservation, projectId, visitorId });
-  const form = new URLSearchParams({
-    mode: "payment",
-    "payment_method_types[0]": "card",
-    "line_items[0][price]": priceId()!,
-    "line_items[0][quantity]": "1",
-    allow_promotion_codes: "true",
-    payment_method_collection: "if_required",
-    client_reference_id: String(projectId),
-    "metadata[project_id]": String(projectId),
-    "payment_intent_data[metadata][project_id]": String(projectId),
-    "custom_text[submit][message]": live()
-      ? "Editorial review of one completed pitch costs $49 before any eligible promotion. Your final total is shown above. Approval or public listing is not guaranteed. A declined pitch is not automatically refunded. If we cannot deliver the review, we will refund any fee paid, subject to applicable law."
-      : "TEST CHECKOUT ONLY. No charge. Editorial review does not guarantee approval.",
-    success_url: `https://${domain}/start/filmmaker/done?review_checkout=return&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `https://${domain}/start/filmmaker/done?review_checkout=cancelled`,
-  });
-  const session = await stripe("/v1/checkout/sessions", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", "Idempotency-Key": reservation },
-    body: form.toString(),
-  });
+  const session = await createReservedCheckout(projectId, reservation);
   if (!session.id?.startsWith(live() ? "cs_live_" : "cs_test_")
     || !session.url?.startsWith("https://checkout.stripe.com/")
     || !validSession(session, projectId) || session.status !== "open") {
@@ -151,6 +201,11 @@ export async function startReviewCheckout(projectId: number, visitorId: string):
 }
 
 async function reconcileOne(row: typeof pitchReviewCheckoutsTable.$inferSelect): Promise<void> {
+  if (row.sessionId.startsWith("pending:")) {
+    const recovered = await recoverPendingCheckout(row);
+    if (recovered) await reconcileOne(recovered);
+    return;
+  }
   if (!row.sessionId.startsWith(live() ? "cs_live_" : "cs_test_")) {
     throw new Error("Checkout environment or reservation requires manual reconciliation");
   }
@@ -226,7 +281,7 @@ export async function reconcileReviewCheckouts(projectId?: number): Promise<void
       // Background reconciliation must not let one unresolved reservation
       // prevent an unrelated completed payment from reaching review.
       if (projectId != null) throw error;
-      logger.warn({ reason: safeCheckoutFailure(error), projectId: row.projectId }, "Review checkout needs individual reconciliation");
+      logger.warn({ ...reviewCheckoutFailureDetails(error), projectId: row.projectId }, "Review checkout needs individual reconciliation");
     }
   }
 }
@@ -235,7 +290,7 @@ export function startReviewCheckoutReconciliation(): void {
   const timer = setInterval(() => {
     if (live() && !priceId()) return;
     void reconcileReviewCheckouts().catch((error: unknown) => {
-      logger.warn({ error }, "Review checkout reconciliation failed");
+      logger.warn(reviewCheckoutFailureDetails(error), "Review checkout reconciliation failed");
     });
   }, 60_000);
   timer.unref();
