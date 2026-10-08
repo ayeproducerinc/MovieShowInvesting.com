@@ -23,6 +23,24 @@
   line-height: 1.6;
 }
 
+.inv-explore .inv-project-body {
+  overflow-wrap: anywhere;
+}
+
+.inv-explore .inv-project-links .explore-view-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--iv-wine);
+  text-decoration: none;
+}
+
+.inv-explore .explore-view-project:hover {
+  background: #eee6da;
+}
+
 .explore-browse {
   display: flex;
   flex-wrap: wrap;
