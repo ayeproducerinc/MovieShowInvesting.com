@@ -1,7 +1,5 @@
-import { randomBytes } from "node:crypto";
 import { pool, type AuthSessionUser } from "@workspace/db";
 import type { Request, Response } from "express";
-import * as oidc from "openid-client";
 
 export const ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
 export const SESSION_COOKIE = "__Host-msi.sid";
@@ -11,15 +9,6 @@ export const OIDC_TTL = 10 * 60 * 1000;
 
 export interface ReplitSessionData {
   user: AuthSessionUser;
-}
-
-let oidcConfig: oidc.Configuration | null = null;
-
-function getClientId(): string {
-  if (!process.env.REPL_ID) {
-    throw new Error("REPL_ID is required to configure OIDC.");
-  }
-  return process.env.REPL_ID;
 }
 
 function trustedHosts(): Set<string> {
@@ -108,19 +97,6 @@ export function getSafeReturnTo(value: unknown, origin: string): string {
   }
 }
 
-export async function getOidcConfig(): Promise<oidc.Configuration> {
-  if (!oidcConfig) {
-    const issuer = new URL(ISSUER_URL);
-    if (issuer.protocol !== "https:") {
-      throw new Error("OIDC issuer must use HTTPS.");
-    }
-    oidcConfig = await oidc.discovery(issuer, getClientId());
-  }
-  return oidcConfig;
-}
-
-export { getClientId };
-
 export function setSecureCookie(res: Response, name: string, value: string, maxAge: number): void {
   res.cookie(name, value, {
     httpOnly: true,
@@ -138,15 +114,6 @@ export function clearSecureCookie(res: Response, name: string): void {
     sameSite: "none",
     path: "/",
   });
-}
-
-export async function createSession(user: AuthSessionUser): Promise<string> {
-  const sid = randomBytes(32).toString("hex");
-  await pool.query(
-    "insert into sessions (sid, sess, expire) values ($1, $2::jsonb, $3)",
-    [sid, JSON.stringify({ user }), new Date(Date.now() + SESSION_TTL)],
-  );
-  return sid;
 }
 
 export async function getSession(sid: string): Promise<ReplitSessionData | null> {
@@ -174,72 +141,4 @@ export async function getSession(sid: string): Promise<ReplitSessionData | null>
 
 export async function deleteSession(sid: string): Promise<void> {
   await pool.query("delete from sessions where sid = $1", [sid]);
-}
-
-export async function upsertVerifiedOidcUser(claims: oidc.IDToken): Promise<AuthSessionUser> {
-  const claimValues = claims as oidc.IDToken & Record<string, unknown>;
-  if (
-    typeof claimValues.iss !== "string" ||
-    claimValues.iss !== ISSUER_URL ||
-    typeof claimValues.sub !== "string" ||
-    !claimValues.sub ||
-    claimValues.email_verified !== true ||
-    typeof claimValues.email !== "string"
-  ) {
-    throw new Error("OIDC identity requires a verified email address.");
-  }
-
-  const email = claimValues.email.trim().toLowerCase();
-  if (
-    email.length > 254 ||
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-  ) {
-    throw new Error("OIDC identity contains an invalid email address.");
-  }
-  const optionalString = (value: unknown): string | null =>
-    typeof value === "string" && value.trim() ? value.trim() : null;
-  const rawImage = optionalString(claimValues.profile_image_url ?? claimValues.picture);
-  let profileImageUrl: string | null = null;
-  if (rawImage) {
-    try {
-      const parsedImage = new URL(rawImage);
-      if (parsedImage.protocol === "https:") profileImageUrl = parsedImage.href;
-    } catch {
-      profileImageUrl = null;
-    }
-  }
-
-  const firstName = optionalString(claimValues.first_name ?? claimValues.given_name);
-  const lastName = optionalString(claimValues.last_name ?? claimValues.family_name);
-  const result = await pool.query<{
-    id: string;
-    email: string;
-    first_name: string | null;
-    last_name: string | null;
-    profile_image_url: string | null;
-  }>(
-    `insert into replit_auth_users
-      (issuer, subject, email, first_name, last_name, profile_image_url)
-     values ($1, $2, $3, $4, $5, $6)
-     on conflict (issuer, subject) do update set
-       email = excluded.email,
-       first_name = excluded.first_name,
-       last_name = excluded.last_name,
-       profile_image_url = excluded.profile_image_url,
-       updated_at = now()
-     returning id, email, first_name, last_name, profile_image_url`,
-    [claimValues.iss, claimValues.sub, email, firstName, lastName, profileImageUrl],
-  );
-  const user = result.rows[0];
-  if (!user) {
-    throw new Error("OIDC account could not be persisted.");
-  }
-
-  return {
-    id: user.id,
-    email: user.email,
-    firstName: user.first_name,
-    lastName: user.last_name,
-    profileImageUrl: user.profile_image_url,
-  };
 }

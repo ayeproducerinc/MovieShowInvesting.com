@@ -32,7 +32,6 @@ minimumReleaseAgeExclude:
   # These are published by Replit and trusted — the supply-chain attack vector
   # this setting guards against does not apply to our own packages.
   - '@replit/*'
-  - stripe-replit-sync
 
 packages:
   - artifacts/*
@@ -42,7 +41,6 @@ packages:
 
 catalog:
   '@replit/vite-plugin-cartographer': ^0.5.21
-  '@replit/vite-plugin-dev-banner': ^0.1.1
   '@replit/vite-plugin-runtime-error-modal': ^0.0.6
   '@tailwindcss/vite': ^4.1.14
   '@tanstack/react-query': ^5.90.21
