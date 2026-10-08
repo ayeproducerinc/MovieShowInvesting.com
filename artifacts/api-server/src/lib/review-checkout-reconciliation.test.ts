@@ -1,7 +1,10 @@
-import { test } from "node:test";
+import { beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { resetFixture } from "./review-checkout.test-fixture";
-import { startReviewCheckout, reconcileReviewCheckouts, reviewFeeWaived } from "./pitch-review-payments";
+import {
+  startReviewCheckout, reconcileReviewCheckouts, reviewFeeWaived, reviewCheckoutConfig,
+  reviewCheckoutNeedsAttention, resetReviewAccountCacheForTests,
+} from "./pitch-review-payments";
 import { FREE99_PROMOTION_ID, FREE99_COUPON_ID } from "./review-checkout-policy";
 import "./review-checkout-policy.test";
 import "./referral-policy.test";
@@ -32,6 +35,7 @@ function responses(kind: "paid" | "waived" = "waived") {
   } as Record<string, any>;
 }
 const open = () => [{ sessionId: sid, projectId: 99, visitorId: "fixture", state: "open", paidAt: null }];
+beforeEach(() => resetReviewAccountCacheForTests());
 
 test("free completion submits once without marking paid or creating referral rewards", async () => {
   const s = resetFixture(responses(), open());
@@ -53,12 +57,36 @@ test("ordinary $49 completion remains paid and synchronizes referral eligibility
   assert.equal(s.rewards, 1); assert.equal(await reviewFeeWaived(99), false);
   await reconcileReviewCheckouts(99); assert.equal(s.rewards, 1);
 });
-test("unsupported promotion fails closed and leaves pitch unsubmitted", async () => {
+test("unsupported promotion is flagged for an operator, leaves pitch unsubmitted, and blocks another checkout", async () => {
   const r = responses(); r[`/v1/checkout/sessions/${sid}`].discounts[0].promotion_code = "promo_other";
   const s = resetFixture(r, open());
-  await assert.rejects(reconcileReviewCheckouts(99), /approved FREE99/);
-  assert.equal(s.rows[0].state, "open"); assert.equal(s.projects[0].showcaseRequested, false);
+  await reconcileReviewCheckouts(99);
+  assert.equal(s.rows[0].state, "needs_attention"); assert.equal(s.projects[0].showcaseRequested, false);
+  assert.equal(s.rewards, 0); assert.equal(await reviewCheckoutNeedsAttention(99), true);
+  const n = s.requests.length;
+  await reconcileReviewCheckouts(99);
+  assert.equal(s.requests.length, n);
+  await assert.rejects(startReviewCheckout(99, "fixture"), /awaiting manual review/);
+  assert.equal(s.requests.some(x => x.path === "/v1/checkout/sessions"), false);
+});
+test("partially discounted paid completion is flagged rather than retried forever", async () => {
+  const r = responses("paid");
+  Object.assign(r[`/v1/checkout/sessions/${sid}`], { amount_total: 2450, total_details: { amount_discount: 2450, amount_tax: 0 } });
+  const s = resetFixture(r, open());
+  process.env.ADMIN_EMAIL = "admin@checkout-fixture.example";
+  try { await reconcileReviewCheckouts(99); } finally { delete process.env.ADMIN_EMAIL; }
+  assert.equal(s.rows[0].state, "needs_attention"); assert.equal(s.projects[0].reviewPaidAt, null);
   assert.equal(s.rewards, 0);
+  // Mail is unconfigured in tests; the alert is still attempted and logged once.
+  assert.deepEqual(s.emails.map(e => e.type), ["review_checkout_attention"]);
+});
+test("an incomplete session with an unexpected amount still waits instead of being flagged", async () => {
+  const r = responses("paid");
+  Object.assign(r[`/v1/checkout/sessions/${sid}`], { status: "open", payment_status: "unpaid", amount_total: 2450,
+    total_details: { amount_discount: 2450, amount_tax: 0 } });
+  const s = resetFixture(r, open());
+  await assert.rejects(reconcileReviewCheckouts(99), /does not match the stored pitch/);
+  assert.equal(s.rows[0].state, "open");
 });
 test("cancelled checkout closes the reservation without submitting the pitch", async () => {
   const r = responses("paid"); Object.assign(r[`/v1/checkout/sessions/${sid}`], { status: "expired", payment_status: "unpaid", payment_intent: null });
@@ -158,12 +186,40 @@ test("idempotency conflict, provider failure and timeout never release uncertain
     assert.equal(s.rows[0].state, "open"); assert.equal(s.projects[0].showcaseRequested, false);
   }
 });
-test("old or just-started reservations cannot be replayed or silently cleared", async () => {
-  for (const age of [0, 20 * 60 * 60 * 1000, 25 * 60 * 60 * 1000]) {
-    const s = resetFixture(responses("paid"), pending("v2:", age));
-    await assert.rejects(reconcileReviewCheckouts(99), /manual reconciliation/);
+test("just-started reservations cannot be replayed or silently cleared", async () => {
+  const s = resetFixture(responses("paid"), pending("v2:", 0));
+  await assert.rejects(reconcileReviewCheckouts(99), /manual reconciliation/);
+  assert.equal(s.rows[0].state, "open");
+  assert.equal(s.requests.some(x => x.path.startsWith("/v1/checkout/sessions")), false);
+});
+const listOnly = (list: any) => (options?: { body?: string }) => options?.body !== undefined
+  ? new Error("expired reservations must never be replayed") : list;
+test("expired reservations are released only after Stripe lists no Checkout for the pitch", async () => {
+  for (const [version, age] of [["v2:", 20 * 60 * 60 * 1000], ["v2:", 25 * 60 * 60 * 1000], ["", 72 * 60 * 60 * 1000]] as const) {
+    const r = responses("paid");
+    r["/v1/checkout/sessions"] = listOnly({ has_more: false, data: [{ id: "cs_live_unrelated", client_reference_id: "12" }] });
+    const s = resetFixture(r, pending(version, age));
+    await reconcileReviewCheckouts(99);
+    assert.equal(s.rows[0].state, "creation_failed"); assert.equal(s.projects[0].showcaseRequested, false);
+    assert.ok(s.requests.some(x => x.path.startsWith("/v1/checkout/sessions?created")));
+    assert.equal(s.requests.some(x => x.path === "/v1/checkout/sessions" && x.body !== undefined), false);
+  }
+});
+test("an expired reservation with a matching Stripe Checkout is flagged and blocks another charge", async () => {
+  const r = responses("paid");
+  r["/v1/checkout/sessions"] = listOnly({ has_more: false, data: [{ id: sid, client_reference_id: "99" }] });
+  const s = resetFixture(r, pending("v2:", 25 * 60 * 60 * 1000));
+  await reconcileReviewCheckouts(99);
+  assert.equal(s.rows[0].state, "needs_attention");
+  await assert.rejects(startReviewCheckout(99, "fixture"), /awaiting manual review/);
+});
+test("a failed, malformed or capped Stripe listing keeps the expired reservation blocked", async () => {
+  for (const list of [providerError(400, "invalid_request_error"), { data: "malformed" },
+    { has_more: true, data: [{ id: "cs_live_page", client_reference_id: "12" }] }]) {
+    const r = responses("paid"); r["/v1/checkout/sessions"] = listOnly(list);
+    const s = resetFixture(r, pending("v2:", 25 * 60 * 60 * 1000));
+    await assert.rejects(reconcileReviewCheckouts(99));
     assert.equal(s.rows[0].state, "open");
-    assert.equal(s.requests.some(x => x.path === "/v1/checkout/sessions"), false);
   }
 });
 test("concurrent creation attempts can reserve only one open Checkout", async () => {
@@ -202,15 +258,42 @@ test("failed legacy expiration never opens another checkout or closes the reserv
   assert.equal(s.rows.length, 1); assert.equal(s.rows[0].state, "open");
   assert.equal(s.requests.some(x => x.path === "/v1/checkout/sessions"), false);
 });
-test("account, refunded paid charge and ineligible pitch fail without fulfillment", async () => {
-  for (const variant of ["account", "refund", "hidden"]) {
+test("an unverified account fails closed and leaves the checkout open for retry", async () => {
+  const r = responses("paid"); r["/v1/account"].id = "acct_other";
+  const s = resetFixture(r, open());
+  await assert.rejects(reconcileReviewCheckouts(99));
+  assert.equal(s.rows[0].state, "open"); assert.equal(s.projects[0].showcaseRequested, false);
+  assert.equal(s.rewards, 0);
+});
+test("refunded paid charge and ineligible pitch are flagged without fulfillment", async () => {
+  for (const variant of ["refund", "hidden"]) {
     const r = responses("paid");
-    if (variant === "account") r["/v1/account"].id = "acct_other";
     if (variant === "refund") r["/v1/payment_intents/pi_fixture"].latest_charge.refunded = true;
     const s = resetFixture(r, open());
     if (variant === "hidden") s.projects[0].hidden = true;
-    await assert.rejects(reconcileReviewCheckouts(99));
-    assert.equal(s.rows[0].state, "open"); assert.equal(s.projects[0].showcaseRequested, false);
-    assert.equal(s.rewards, 0);
+    await reconcileReviewCheckouts(99);
+    assert.equal(s.rows[0].state, "needs_attention"); assert.equal(s.projects[0].showcaseRequested, false);
+    assert.equal(s.projects[0].reviewPaidAt, null); assert.equal(s.rewards, 0);
   }
+});
+test("account and price verification is shared across requests", async () => {
+  const s = resetFixture(responses("paid"));
+  assert.equal((await reviewCheckoutConfig()).enabled, true);
+  assert.equal((await reviewCheckoutConfig()).enabled, true);
+  assert.equal(s.requests.filter(x => x.path === "/v1/account").length, 1);
+  assert.equal(s.requests.filter(x => x.path.startsWith("/v1/prices/")).length, 1);
+});
+test("a failed account check is cached briefly and then retried", async () => {
+  mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  try {
+    const r = responses("paid"); r["/v1/account"].id = "acct_other";
+    const s = resetFixture(r);
+    assert.equal((await reviewCheckoutConfig()).enabled, false);
+    r["/v1/account"].id = "acct_1PLbbtKMfAphuict";
+    assert.equal((await reviewCheckoutConfig()).enabled, false);
+    assert.equal(s.requests.filter(x => x.path === "/v1/account").length, 1);
+    mock.timers.tick(31_000);
+    assert.equal((await reviewCheckoutConfig()).enabled, true);
+    assert.equal(s.requests.filter(x => x.path === "/v1/account").length, 2);
+  } finally { mock.timers.reset(); }
 });

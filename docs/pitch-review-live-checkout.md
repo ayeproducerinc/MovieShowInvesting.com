@@ -38,7 +38,10 @@ The filmmaker-facing review action is displayed only when the API verifies the l
 
 ## Operational controls
 
-- On uncertain Stripe results or an orphaned `pending:` checkout reservation, **do not** delete the reservation or ask the filmmaker to pay again. Reconcile the Stripe session and payment with the pitch before releasing the reservation. Expired sessions are automatically closed only after verification.
+- On uncertain Stripe results or an orphaned `pending:` checkout reservation, **do not** delete the reservation or ask the filmmaker to pay again. Reconcile the Stripe session and payment with the pitch before releasing the reservation. Expired sessions are automatically closed only after verification. A reservation older than 20 hours is released automatically only when Stripe's session list shows no Checkout for that pitch; if one exists, it is flagged instead.
+- **Needs attention.** A completed Checkout the app cannot fulfil automatically is marked `needs_attention`. Causes: a non-FREE99 or partial discount, a mismatch, a refund or dispute, or a pitch hidden or approved mid-checkout. When that happens, `ADMIN_EMAIL` gets an alert, the item appears as "Payment issue" in the admin Queues, and new checkouts for that pitch are blocked. To resolve it, open the session in the Stripe dashboard, then either:
+  - **Refund it**, and set the row's `state` to `closed`.
+  - **Fulfil it**: set `projects.showcase_requested=true` (plus `review_paid_at` for a paid review), and the row's `state` to `paid` or `waived` (and `paid_at` for paid).
 - The review queue is populated only after server-side verification of session, single $49 price line item, live account, payment intent, and unrefunded charge. A return URL alone is never proof of payment. Review payment does not approve Explore listing.
 - A later refund or dispute requires an operator to review the pitch and unapprove/unlist it as appropriate; the current automatic reconciliation checks charge refund/dispute **at fulfillment time**, not continuously after a pitch enters review. Establish the operator procedure before declaring checkout operational.
 - If the live connection cannot be verified, do not substitute another Stripe account, a test link, or a manual payment. The free unlisted pitch remains saved.

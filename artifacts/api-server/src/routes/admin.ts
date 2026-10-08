@@ -12,6 +12,7 @@ import {
   investorMinimumsTable,
   investorsTable,
   messagesTable,
+  pitchReviewCheckoutsTable,
   pledgesTable,
   projectsTable,
   updateMessageVisibility,
@@ -253,6 +254,12 @@ async function getAdminTable(section: Section): Promise<AdminTable> {
 
   if (section === "queues") {
     const rows: unknown[][] = [];
+    const flaggedCheckouts = await db.select().from(pitchReviewCheckoutsTable)
+      .where(eq(pitchReviewCheckoutsTable.state, "needs_attention"));
+    for (const checkout of flaggedCheckouts) {
+      const project = projectById.get(checkout.projectId);
+      rows.push(["Payment issue", "Urgent", project?.title ?? "", checkout.sessionId, checkout.createdAt, "Needs attention", checkout.projectId]);
+    }
     for (const project of projects.filter((item) => item.showcaseRequested)) {
       const status = project.hidden ? "Hidden" : project.approved ? "Approved" : project.reviewDecision === "declined" ? "Declined" : "Pending";
       rows.push(["Approval", "", project.title ?? "", project.slug ?? "", project.createdAt, status, project.id]);

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FREE99_PROMOTION_ID, FREE99_COUPON_ID, reviewSessionKind, reviewLineItemsMatch, free99EvidenceMatches, completedFreeReview } from "./review-checkout-policy";
+import { FREE99_PROMOTION_ID, FREE99_COUPON_ID, reviewSessionKind, reviewLineItemsMatch, free99EvidenceMatches, completedFreeReview, showcaseNeedsReviewFee } from "./review-checkout-policy";
 import { classifyReferralPayment } from "./referral-policy";
 
 const expected = { projectId: 99, sessionId: "cs_live_fixture", live: true, priceId: "price_fixture" };
@@ -60,6 +60,14 @@ test("cancelled, open, fake paid and intent-bearing free sessions cannot complet
   for (const change of [{ status: "expired" }, { status: "open" }, { payment_status: "unpaid" }, { payment_status: "paid" }, { payment_intent: "pi_other" }]) {
     assert.equal(completedFreeReview({ ...session(), ...change }), false);
   }
+});
+test("re-requesting review needs a fee only when the pitch was never paid, waived, requested or approved", () => {
+  const unpaid = { reviewPaidAt: null, showcaseRequested: false, approved: false };
+  assert.equal(showcaseNeedsReviewFee(unpaid, false), true);
+  assert.equal(showcaseNeedsReviewFee(unpaid, true), false);
+  assert.equal(showcaseNeedsReviewFee({ ...unpaid, reviewPaidAt: new Date() }, false), false);
+  assert.equal(showcaseNeedsReviewFee({ ...unpaid, showcaseRequested: true }, false), false);
+  assert.equal(showcaseNeedsReviewFee({ ...unpaid, approved: true }, false), false);
 });
 test("wrong price, quantity, currency, amount or extra line items are rejected", () => {
   for (const change of [{ price: { id: "price_other" } }, { quantity: 2 }, { currency: "eur" }, { amount_subtotal: 0 }, { amount_total: 4900 }]) {

@@ -1,6 +1,19 @@
 /** Persisted reservation prefixes version the exact Stripe request for safe replay. */
 export const CHECKOUT_REPLAY_WINDOW_MS = 20 * 60 * 60 * 1000;
 export const CHECKOUT_SETTLE_MS = 30_000;
+/** Bounded scan for a Checkout created by an expired reservation; a capped scan stays uncertain. */
+export const RESERVATION_SCAN_PAGES = 10;
+
+export function reservationSessionListPath(reservedAt: Date, startingAfter?: string) {
+  const created = Math.floor(reservedAt.getTime() / 1000);
+  const params = new URLSearchParams({
+    "created[gte]": String(created - 60),
+    "created[lte]": String(created + 24 * 60 * 60),
+    limit: "100",
+  });
+  if (startingAfter) params.set("starting_after", startingAfter);
+  return `/v1/checkout/sessions?${params}`;
+}
 
 export function reviewCheckoutForm(projectId: number, reservation: string, price: string, domain: string, live: boolean) {
   const current = reservation.startsWith("pending:v2:");

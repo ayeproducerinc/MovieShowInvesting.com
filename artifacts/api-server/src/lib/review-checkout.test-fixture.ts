@@ -6,9 +6,11 @@ const table = (name: string, columns: string[]) => Object.fromEntries([
 ]);
 export const pitchReviewCheckoutsTable = table("checkouts", ["sessionId", "projectId", "visitorId", "state", "paidAt", "createdAt"]);
 export const projectsTable = table("projects", ["id", "reviewPaidAt", "showcaseRequested"]);
-let state: { rows: Row[]; projects: Row[]; responses: Record<string, any>; requests: { path: string; body?: string; headers?: Record<string, string> }[]; rewards: number; failSessionPersistence: number };
+// Mailjet's body-free status log; kept apart so alerts never touch checkout rows.
+export const emailLogTable = table("email_log", ["to", "type", "status"]);
+let state: { rows: Row[]; projects: Row[]; emails: Row[]; responses: Record<string, any>; requests: { path: string; body?: string; headers?: Record<string, string> }[]; rewards: number; failSessionPersistence: number };
 export function resetFixture(responses: Record<string, any>, rows: Row[] = []) {
-  state = { rows, projects: [{ id: 99, slug: "fixture", hidden: false, approved: false, showcaseRequested: false, reviewPaidAt: null }], responses, requests: [], rewards: 0, failSessionPersistence: 0 };
+  state = { rows, projects: [{ id: 99, slug: "fixture", hidden: false, approved: false, showcaseRequested: false, reviewPaidAt: null }], emails: [], responses, requests: [], rewards: 0, failSessionPersistence: 0 };
   return state;
 }
 export function fixtureState() { return state; }
@@ -16,7 +18,7 @@ export const eq = (column: string, value: unknown) => (row: Row) => row[column] 
 export const and = (...predicates: ((row: Row) => boolean)[]) => (row: Row) => predicates.every(p => p(row));
 export const sql = (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values });
 export const logger = { warn() {}, info() {}, error() {} };
-const rowsFor = (t: any) => t === projectsTable ? state.projects : state.rows;
+const rowsFor = (t: any) => t === projectsTable ? state.projects : t === emailLogTable ? state.emails : state.rows;
 export const db = {
   select(selection?: Row) {
     let rows: Row[] = [], predicate = (_row: Row) => true, limit = Infinity;

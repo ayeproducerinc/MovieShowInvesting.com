@@ -28,6 +28,8 @@ import { reserveFilmmakerSubmissionAttempt } from "../lib/filmmaker-submission-l
 import { cleanupDiscardedDraftMaterials } from "./filmmaker-draft-materials";
 import { issuePitchReviewProof } from "../lib/pitch-review-proof";
 import { requireAccountAgeConfirmation } from "../lib/age-confirmation";
+import { reviewFeeWaived } from "../lib/pitch-review-payments";
+import { showcaseNeedsReviewFee } from "../lib/review-checkout-policy";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -420,7 +422,7 @@ router.patch("/filmmakers/showcase", async (req, res): Promise<void> => {
   if (access.identity
     && !requireMatchingFilmmakerContext(req, res, "X-MSI-Project-Id", current.project.id, "project")) return;
   if (parsed.data.showcase_requested === true
-    && !current.project.reviewPaidAt && !current.project.showcaseRequested && !current.project.approved) {
+    && showcaseNeedsReviewFee(current.project, await reviewFeeWaived(current.project.id))) {
     res.status(402).json({ error: "Pay the $49 review fee before submitting this pitch for review." });
     return;
   }

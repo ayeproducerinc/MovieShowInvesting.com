@@ -3,10 +3,11 @@ import { ReplitConnectors } from "@replit/connectors-sdk";
 import { db, pitchReviewCheckoutsTable, projectsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { logger } from "./logger";
+import { sendTransactionalEmail } from "./mailjet";
 import { classifyReferralPayment, type ReferralPaymentStatus } from "./referral-policy";
 import { referralRewardSyncSql } from "./referral-reward-sync";
 import { FREE99_PROMOTION_ID, FREE99_COUPON_ID, reviewSessionKind, reviewLineItemsMatch, free99EvidenceMatches, completedFreeReview } from "./review-checkout-policy";
-import { CHECKOUT_REPLAY_WINDOW_MS, CHECKOUT_SETTLE_MS, reviewCheckoutForm, providerFailure, ReviewStripeError, isDefinitiveCreationFailure } from "./review-checkout-request";
+import { CHECKOUT_REPLAY_WINDOW_MS, CHECKOUT_SETTLE_MS, RESERVATION_SCAN_PAGES, reservationSessionListPath, reviewCheckoutForm, providerFailure, ReviewStripeError, isDefinitiveCreationFailure } from "./review-checkout-request";
 
 const SANDBOX_ACCOUNT = "acct_1UKlvzI6ABsowmLh";
 const SANDBOX_PRICE = "price_1UKmPMI6ABsowmLhzyjaBfRh";
@@ -23,6 +24,7 @@ function safeCheckoutFailure(error: unknown): string {
     || error.message === "Review price does not match the approved one-time $49 offer"
     || /^Stripe request failed \(\d{3}\)$/.test(error.message)
     || error.message === "Checkout environment or reservation requires manual reconciliation"
+    || error.message === "A previous checkout for this pitch is awaiting manual review"
   )) return error.message;
   return "Stripe connection or checkout could not be verified";
 }
@@ -58,7 +60,26 @@ async function stripe(path: string, options?: { method: string; body: string; he
   return response.json();
 }
 
-async function assertAccount(): Promise<void> {
+const ACCOUNT_VERIFIED_MS = 5 * 60_000;
+const ACCOUNT_FAILED_MS = 30_000;
+let accountCheck: { until: number; result: Promise<void> } | null = null;
+
+export function resetReviewAccountCacheForTests(): void {
+  accountCheck = null;
+}
+
+// Share one account/price verification across requests and reconcile rows so
+// public status and config polling cannot multiply provider calls.
+function assertAccount(): Promise<void> {
+  const now = Date.now();
+  if (accountCheck && accountCheck.until > now) return accountCheck.result;
+  const entry = { until: now + ACCOUNT_VERIFIED_MS, result: verifyAccount() };
+  accountCheck = entry;
+  entry.result.catch(() => { entry.until = Math.min(entry.until, Date.now() + ACCOUNT_FAILED_MS); });
+  return entry.result;
+}
+
+async function verifyAccount(): Promise<void> {
   const account = await stripe("/v1/account");
   if (account.id !== (live() ? LIVE_ACCOUNT : SANDBOX_ACCOUNT)) throw new Error("Connected Stripe account does not match the approved payment environment");
   const price = await stripe(`/v1/prices/${encodeURIComponent(priceId()!)}`);
@@ -88,10 +109,51 @@ function validSession(session: any, projectId: number, sessionId?: string): bool
   return reviewSessionKind(session, { projectId, sessionId, live: live(), priceId: priceId() }) !== null;
 }
 
-export async function reviewFeeWaived(projectId: number): Promise<boolean> {
+async function checkoutInState(projectId: number, state: string): Promise<boolean> {
   const [row] = await db.select({ sessionId: pitchReviewCheckoutsTable.sessionId }).from(pitchReviewCheckoutsTable)
-    .where(and(eq(pitchReviewCheckoutsTable.projectId, projectId), eq(pitchReviewCheckoutsTable.state, "waived"))).limit(1);
+    .where(and(eq(pitchReviewCheckoutsTable.projectId, projectId), eq(pitchReviewCheckoutsTable.state, state))).limit(1);
   return Boolean(row);
+}
+
+export function reviewFeeWaived(projectId: number): Promise<boolean> {
+  return checkoutInState(projectId, "waived");
+}
+
+/** A completed or uncertain Checkout an operator must resolve before any new charge. */
+export function reviewCheckoutNeedsAttention(projectId: number): Promise<boolean> {
+  return checkoutInState(projectId, "needs_attention");
+}
+
+/** Thrown only after Stripe reports a completed Checkout that cannot be fulfilled automatically. */
+class CompletedCheckoutMismatch extends Error {}
+
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+})[character]!);
+
+async function flagCheckout(row: typeof pitchReviewCheckoutsTable.$inferSelect, reason: string): Promise<void> {
+  let flagged = false;
+  await db.transaction(async (tx) => {
+    const [stored] = await tx.select().from(pitchReviewCheckoutsTable)
+      .where(eq(pitchReviewCheckoutsTable.sessionId, row.sessionId)).for("update");
+    if (!stored || stored.state !== "open") return;
+    await tx.update(pitchReviewCheckoutsTable).set({ state: "needs_attention" })
+      .where(eq(pitchReviewCheckoutsTable.sessionId, row.sessionId));
+    flagged = true;
+  });
+  if (!flagged) return;
+  logger.error({ projectId: row.projectId, sessionId: row.sessionId, reason }, "Review checkout needs attention");
+  const to = process.env.ADMIN_EMAIL?.trim();
+  if (!to) return;
+  const text = `A pitch review checkout needs manual attention.\nProject ID: ${row.projectId}\nCheckout: ${row.sessionId}\nReason: ${reason}\nCheck it in the Stripe dashboard, then refund or fulfill it. See docs/pitch-review-live-checkout.md.`;
+  try {
+    await sendTransactionalEmail({
+      to, type: "review_checkout_attention", subject: "Pitch review checkout needs attention", text,
+      html: text.split("\n").map((line) => `<p>${escapeHtml(line)}</p>`).join(""),
+    });
+  } catch {
+    logger.warn({ projectId: row.projectId }, "Review checkout attention alert could not be sent");
+  }
 }
 
 function checkoutDomain() {
@@ -124,8 +186,12 @@ async function recoverPendingCheckout(row: typeof pitchReviewCheckoutsTable.$inf
   // after retention, nor race a just-started request. Domain/parameter changes
   // produce an idempotency conflict and remain blocked, not a new Checkout.
   if (!/^pending:(?:v2:)?[0-9a-f-]{36}$/i.test(row.sessionId)
-    || !Number.isFinite(age) || age < CHECKOUT_SETTLE_MS || age >= CHECKOUT_REPLAY_WINDOW_MS) {
+    || !Number.isFinite(age) || age < CHECKOUT_SETTLE_MS) {
     throw new Error("Checkout environment or reservation requires manual reconciliation");
+  }
+  if (age >= CHECKOUT_REPLAY_WINDOW_MS) {
+    await settleExpiredReservation(row);
+    return null;
   }
   await assertAccount();
   let session;
@@ -146,9 +212,35 @@ async function recoverPendingCheckout(row: typeof pitchReviewCheckoutsTable.$inf
   return { ...row, sessionId: session.id };
 }
 
+// Past the replay window the original request cannot be safely replayed. Release
+// the reservation only when a complete, bounded listing proves Stripe never
+// created a Checkout for this pitch around that time; any match goes to an operator.
+async function settleExpiredReservation(row: typeof pitchReviewCheckoutsTable.$inferSelect): Promise<void> {
+  await assertAccount();
+  const reservedAt = new Date(row.createdAt);
+  let startingAfter: string | undefined;
+  for (let page = 0; page < RESERVATION_SCAN_PAGES; page++) {
+    const list = await stripe(reservationSessionListPath(reservedAt, startingAfter));
+    if (!Array.isArray(list?.data)) throw new Error("Checkout environment or reservation requires manual reconciliation");
+    if (list.data.some((session: any) => session?.client_reference_id === String(row.projectId))) {
+      await flagCheckout(row, "An expired checkout reservation has a matching Stripe Checkout");
+      return;
+    }
+    if (list.has_more !== true) {
+      await closeFailedCreation(row.sessionId);
+      logger.info({ projectId: row.projectId }, "Expired checkout reservation released after Stripe showed no Checkout");
+      return;
+    }
+    startingAfter = list.data.at(-1)?.id;
+    if (typeof startingAfter !== "string") break;
+  }
+  throw new Error("Checkout environment or reservation requires manual reconciliation");
+}
+
 export async function startReviewCheckout(projectId: number, visitorId: string): Promise<string> {
   await assertAccount();
   if (await reviewFeeWaived(projectId)) throw new Error("This pitch has already received a fee-waived review");
+  if (await reviewCheckoutNeedsAttention(projectId)) throw new Error("A previous checkout for this pitch is awaiting manual review");
   let [existing] = await db.select().from(pitchReviewCheckoutsTable)
     .where(and(eq(pitchReviewCheckoutsTable.projectId, projectId), eq(pitchReviewCheckoutsTable.state, "open")))
     .limit(1);
@@ -201,6 +293,17 @@ export async function startReviewCheckout(projectId: number, visitorId: string):
 }
 
 async function reconcileOne(row: typeof pitchReviewCheckoutsTable.$inferSelect): Promise<void> {
+  try {
+    await fulfillCheckout(row);
+  } catch (error) {
+    // A completed Checkout that fails verification may have taken money; stop
+    // retrying it, block another charge, and alert an operator instead.
+    if (!(error instanceof CompletedCheckoutMismatch)) throw error;
+    await flagCheckout(row, error.message);
+  }
+}
+
+async function fulfillCheckout(row: typeof pitchReviewCheckoutsTable.$inferSelect): Promise<void> {
   if (row.sessionId.startsWith("pending:")) {
     const recovered = await recoverPendingCheckout(row);
     if (recovered) await reconcileOne(recovered);
@@ -211,12 +314,13 @@ async function reconcileOne(row: typeof pitchReviewCheckoutsTable.$inferSelect):
   }
   await assertAccount();
   const session = await stripe(`/v1/checkout/sessions/${encodeURIComponent(row.sessionId)}?expand[]=total_details.breakdown`);
+  const Mismatch = session?.status === "complete" ? CompletedCheckoutMismatch : Error;
   const expected = { projectId: row.projectId, sessionId: row.sessionId, live: live(), priceId: priceId() };
   const kind = reviewSessionKind(session, expected);
-  if (!kind) throw new Error("Checkout identity or amount does not match the stored pitch");
+  if (!kind) throw new Mismatch("Checkout identity or amount does not match the stored pitch");
   const items = await stripe(`/v1/checkout/sessions/${encodeURIComponent(row.sessionId)}/line_items?limit=2`);
   if (!reviewLineItemsMatch(items, expected, kind)) {
-    throw new Error("Checkout line item does not match the review price");
+    throw new Mismatch("Checkout line item does not match the review price");
   }
   if (session.status !== "complete") {
     if (session.status === "expired" && session.payment_status !== "paid") {
@@ -231,11 +335,11 @@ async function reconcileOne(row: typeof pitchReviewCheckoutsTable.$inferSelect):
       stripe(`/v1/coupons/${FREE99_COUPON_ID}`),
     ]);
     if (!completedFreeReview(session) || !free99EvidenceMatches(session, promotion, coupon, LIVE_PRODUCT)) {
-      throw new Error("Free review does not match the approved FREE99 promotion");
+      throw new CompletedCheckoutMismatch("Free review does not match the approved FREE99 promotion");
     }
   } else {
     if (session.payment_status !== "paid") return;
-    if (typeof session.payment_intent !== "string") throw new Error("Paid checkout has no verifiable payment intent");
+    if (typeof session.payment_intent !== "string") throw new CompletedCheckoutMismatch("Paid checkout has no verifiable payment intent");
     const intent = await stripe(`/v1/payment_intents/${encodeURIComponent(session.payment_intent)}?expand[]=latest_charge`);
     if (intent.id !== session.payment_intent || intent.livemode !== live() || intent.status !== "succeeded" || intent.currency !== "usd"
       || intent.amount_received !== 4900 || intent.amount !== 4900
@@ -246,7 +350,7 @@ async function reconcileOne(row: typeof pitchReviewCheckoutsTable.$inferSelect):
       || intent.latest_charge.amount !== 4900 || intent.latest_charge.currency !== "usd"
       || intent.latest_charge.paid !== true || intent.latest_charge.refunded
       || intent.latest_charge.amount_refunded !== 0 || intent.latest_charge.disputed) {
-      throw new Error("Payment intent is not a settled, unrefunded review payment");
+      throw new CompletedCheckoutMismatch("Payment intent is not a settled, unrefunded review payment");
     }
   }
   await db.transaction(async (tx) => {
@@ -256,7 +360,7 @@ async function reconcileOne(row: typeof pitchReviewCheckoutsTable.$inferSelect):
     const [project] = await tx.select().from(projectsTable)
       .where(eq(projectsTable.id, row.projectId)).for("update");
     if (!project || !project.slug || project.hidden || project.approved || project.showcaseRequested || project.reviewPaidAt) {
-      throw new Error("Completed review pitch is missing or no longer eligible; manual fulfillment required");
+      throw new CompletedCheckoutMismatch("Completed review pitch is missing or no longer eligible; manual fulfillment required");
     }
     await tx.update(pitchReviewCheckoutsTable)
       .set({ state: kind, paidAt: kind === "paid" ? new Date() : null })

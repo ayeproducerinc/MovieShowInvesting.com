@@ -52,6 +52,13 @@ export function free99EvidenceMatches(session: any, promotion: any, coupon: any,
   // expired or exhausted its limits. Stripe enforces those limits at redemption.
 }
 
+/** A verified FREE99 waiver counts like a paid fee when the owner re-requests review. */
+export function showcaseNeedsReviewFee(project: {
+  reviewPaidAt?: Date | string | null; showcaseRequested?: boolean | null; approved?: boolean | null;
+}, feeWaived: boolean): boolean {
+  return !project.reviewPaidAt && !project.showcaseRequested && !project.approved && !feeWaived;
+}
+
 export function completedFreeReview(session: any): boolean {
   return session?.status === "complete" && session.payment_status === "no_payment_required"
     && session.payment_intent == null;
