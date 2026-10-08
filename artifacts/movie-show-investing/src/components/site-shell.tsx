@@ -16,6 +16,7 @@ const navigation = [
   { href: '/explore', label: 'Explore projects' },
   { href: '/start/filmmaker', label: 'Pitch' },
   { href: '/invest', label: 'Pledge' },
+  { href: '/pricing', label: 'Pricing' },
   { href: '/faq', label: 'FAQs' },
   { href: '/messages', label: 'Messages' },
 ];
