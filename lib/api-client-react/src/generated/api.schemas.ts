@@ -1752,6 +1752,7 @@ export type StartPitchReviewCheckout200 = {
 
 export type GetPitchReviewCheckoutStatus200 = {
   paid: boolean;
+  fee_waived: boolean;
   pending: boolean;
   approved: boolean;
   declined: boolean;

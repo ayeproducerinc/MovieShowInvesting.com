@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { logger } from "./logger";
 import { classifyReferralPayment, type ReferralPaymentStatus } from "./referral-policy";
 import { referralRewardSyncSql } from "./referral-reward-sync";
+import { FREE99_PROMOTION_ID, FREE99_COUPON_ID, reviewSessionKind, reviewLineItemsMatch, free99EvidenceMatches, completedFreeReview } from "./review-checkout-policy";
 
 const SANDBOX_ACCOUNT = "acct_1UKlvzI6ABsowmLh";
 const SANDBOX_PRICE = "price_1UKmPMI6ABsowmLhzyjaBfRh";
@@ -70,17 +71,18 @@ export async function verifyReferralReviewPayment(sessionId: string, projectId: 
 }
 
 function validSession(session: any, projectId: number, sessionId?: string): boolean {
-  return (!sessionId || session.id === sessionId)
-    && session.livemode === live() && session.client_reference_id === String(projectId)
-    && session.metadata?.project_id === String(projectId)
-    && session.mode === "payment" && session.currency === "usd"
-    && session.amount_total === 4900 && session.amount_subtotal === 4900
-    && session.total_details?.amount_discount === 0
-    && session.total_details?.amount_tax === 0;
+  return reviewSessionKind(session, { projectId, sessionId, live: live(), priceId: priceId() }) !== null;
+}
+
+export async function reviewFeeWaived(projectId: number): Promise<boolean> {
+  const [row] = await db.select({ sessionId: pitchReviewCheckoutsTable.sessionId }).from(pitchReviewCheckoutsTable)
+    .where(and(eq(pitchReviewCheckoutsTable.projectId, projectId), eq(pitchReviewCheckoutsTable.state, "waived"))).limit(1);
+  return Boolean(row);
 }
 
 export async function startReviewCheckout(projectId: number, visitorId: string): Promise<string> {
   await assertAccount();
+  if (await reviewFeeWaived(projectId)) throw new Error("This pitch has already received a fee-waived review");
   const [existing] = await db.select().from(pitchReviewCheckoutsTable)
     .where(and(eq(pitchReviewCheckoutsTable.projectId, projectId), eq(pitchReviewCheckoutsTable.state, "open")))
     .limit(1);
@@ -90,12 +92,24 @@ export async function startReviewCheckout(projectId: number, visitorId: string):
     }
     const previous = await stripe(`/v1/checkout/sessions/${encodeURIComponent(existing.sessionId)}`);
     if (!validSession(previous, projectId, existing.sessionId)) throw new Error("Existing checkout identity mismatch");
-    if (previous.payment_status === "paid") {
+    if (previous.status === "complete" || previous.payment_status === "paid") {
       await reconcileOne(existing);
-      throw new Error("A review payment has already been received");
+      throw new Error("This review checkout has already been completed");
     }
-    if (previous.status === "open" && previous.url) return previous.url;
-    if (previous.status !== "expired") throw new Error("An earlier checkout is still being verified");
+    if (previous.status === "open" && previous.url) {
+      if (previous.allow_promotion_codes === true && previous.payment_method_collection === "if_required") return previous.url;
+      // A legacy unpaid Checkout cannot have these options changed in place.
+      // Expire it before reserving a replacement; if a payment wins the race,
+      // Stripe refuses expiration and we must not create another checkout.
+      const expired = await stripe(`/v1/checkout/sessions/${encodeURIComponent(existing.sessionId)}/expire`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "Idempotency-Key": `promo-upgrade:${existing.sessionId}` },
+        body: "",
+      });
+      if (!validSession(expired, projectId, existing.sessionId) || expired.status !== "expired" || expired.payment_status === "paid") {
+        throw new Error("An earlier checkout is still being verified");
+      }
+    } else if (previous.status !== "expired") throw new Error("An earlier checkout is still being verified");
     await db.update(pitchReviewCheckoutsTable).set({ state: "closed" })
       .where(eq(pitchReviewCheckoutsTable.sessionId, existing.sessionId));
   }
@@ -110,11 +124,13 @@ export async function startReviewCheckout(projectId: number, visitorId: string):
     "payment_method_types[0]": "card",
     "line_items[0][price]": priceId()!,
     "line_items[0][quantity]": "1",
+    allow_promotion_codes: "true",
+    payment_method_collection: "if_required",
     client_reference_id: String(projectId),
     "metadata[project_id]": String(projectId),
     "payment_intent_data[metadata][project_id]": String(projectId),
     "custom_text[submit][message]": live()
-      ? "This $49 fee covers editorial review of one completed pitch. Approval or public listing is not guaranteed. A completed review that declines a pitch is not automatically refunded. If we cannot deliver the review, we will refund the fee, subject to applicable law."
+      ? "Editorial review of one completed pitch costs $49 before any eligible promotion. Your final total is shown above. Approval or public listing is not guaranteed. A declined pitch is not automatically refunded. If we cannot deliver the review, we will refund any fee paid, subject to applicable law."
       : "TEST CHECKOUT ONLY. No charge. Editorial review does not guarantee approval.",
     success_url: `https://${domain}/start/filmmaker/done?review_checkout=return&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `https://${domain}/start/filmmaker/done?review_checkout=cancelled`,
@@ -139,32 +155,44 @@ async function reconcileOne(row: typeof pitchReviewCheckoutsTable.$inferSelect):
     throw new Error("Checkout environment or reservation requires manual reconciliation");
   }
   await assertAccount();
-  const session = await stripe(`/v1/checkout/sessions/${encodeURIComponent(row.sessionId)}`);
-  if (!validSession(session, row.projectId, row.sessionId)) throw new Error("Checkout identity or amount does not match the stored pitch");
+  const session = await stripe(`/v1/checkout/sessions/${encodeURIComponent(row.sessionId)}?expand[]=total_details.breakdown`);
+  const expected = { projectId: row.projectId, sessionId: row.sessionId, live: live(), priceId: priceId() };
+  const kind = reviewSessionKind(session, expected);
+  if (!kind) throw new Error("Checkout identity or amount does not match the stored pitch");
   const items = await stripe(`/v1/checkout/sessions/${encodeURIComponent(row.sessionId)}/line_items?limit=2`);
-  if (items.has_more || items.data?.length !== 1 || items.data[0].price?.id !== priceId()
-    || items.data[0].quantity !== 1 || items.data[0].amount_total !== 4900) {
+  if (!reviewLineItemsMatch(items, expected, kind)) {
     throw new Error("Checkout line item does not match the review price");
   }
-  if (session.payment_status !== "paid" || session.status !== "complete") {
+  if (session.status !== "complete") {
     if (session.status === "expired" && session.payment_status !== "paid") {
       await db.update(pitchReviewCheckoutsTable).set({ state: "closed" })
         .where(and(eq(pitchReviewCheckoutsTable.sessionId, row.sessionId), eq(pitchReviewCheckoutsTable.state, "open")));
     }
     return;
   }
-  if (typeof session.payment_intent !== "string") throw new Error("Paid checkout has no verifiable payment intent");
-  const intent = await stripe(`/v1/payment_intents/${encodeURIComponent(session.payment_intent)}?expand[]=latest_charge`);
-  if (intent.livemode !== live() || intent.status !== "succeeded" || intent.currency !== "usd"
-    || intent.amount_received !== 4900 || intent.amount !== 4900
-    || intent.metadata?.project_id !== String(row.projectId)
-    || !intent.latest_charge || typeof intent.latest_charge !== "object"
-    || intent.latest_charge.livemode !== live()
-    || intent.latest_charge.payment_intent !== intent.id
-    || intent.latest_charge.amount !== 4900 || intent.latest_charge.currency !== "usd"
-    || intent.latest_charge.paid !== true || intent.latest_charge.refunded
-    || intent.latest_charge.amount_refunded !== 0 || intent.latest_charge.disputed) {
-    throw new Error("Payment intent is not a settled, unrefunded review payment");
+  if (kind === "waived") {
+    const [promotion, coupon] = await Promise.all([
+      stripe(`/v1/promotion_codes/${FREE99_PROMOTION_ID}`),
+      stripe(`/v1/coupons/${FREE99_COUPON_ID}`),
+    ]);
+    if (!completedFreeReview(session) || !free99EvidenceMatches(session, promotion, coupon, LIVE_PRODUCT)) {
+      throw new Error("Free review does not match the approved FREE99 promotion");
+    }
+  } else {
+    if (session.payment_status !== "paid") return;
+    if (typeof session.payment_intent !== "string") throw new Error("Paid checkout has no verifiable payment intent");
+    const intent = await stripe(`/v1/payment_intents/${encodeURIComponent(session.payment_intent)}?expand[]=latest_charge`);
+    if (intent.id !== session.payment_intent || intent.livemode !== live() || intent.status !== "succeeded" || intent.currency !== "usd"
+      || intent.amount_received !== 4900 || intent.amount !== 4900
+      || intent.metadata?.project_id !== String(row.projectId)
+      || !intent.latest_charge || typeof intent.latest_charge !== "object"
+      || intent.latest_charge.livemode !== live()
+      || intent.latest_charge.payment_intent !== intent.id
+      || intent.latest_charge.amount !== 4900 || intent.latest_charge.currency !== "usd"
+      || intent.latest_charge.paid !== true || intent.latest_charge.refunded
+      || intent.latest_charge.amount_refunded !== 0 || intent.latest_charge.disputed) {
+      throw new Error("Payment intent is not a settled, unrefunded review payment");
+    }
   }
   await db.transaction(async (tx) => {
     const [stored] = await tx.select().from(pitchReviewCheckoutsTable)
@@ -173,15 +201,15 @@ async function reconcileOne(row: typeof pitchReviewCheckoutsTable.$inferSelect):
     const [project] = await tx.select().from(projectsTable)
       .where(eq(projectsTable.id, row.projectId)).for("update");
     if (!project || !project.slug || project.hidden || project.approved || project.showcaseRequested || project.reviewPaidAt) {
-      throw new Error("Paid pitch is missing or no longer eligible; manual fulfillment required");
+      throw new Error("Completed review pitch is missing or no longer eligible; manual fulfillment required");
     }
     await tx.update(pitchReviewCheckoutsTable)
-      .set({ state: "paid", paidAt: new Date() })
+      .set({ state: kind, paidAt: kind === "paid" ? new Date() : null })
       .where(eq(pitchReviewCheckoutsTable.sessionId, row.sessionId));
     await tx.update(projectsTable)
-      .set({ reviewPaidAt: new Date(), showcaseRequested: true, reviewDecision: null })
+      .set({ reviewPaidAt: kind === "paid" ? new Date() : null, showcaseRequested: true, reviewDecision: null })
       .where(eq(projectsTable.id, row.projectId));
-    await tx.execute(referralRewardSyncSql());
+    if (kind === "paid") await tx.execute(referralRewardSyncSql());
   });
 }
 

@@ -1470,6 +1470,7 @@ export const GetPitchReviewCheckoutStatusHeader = zod.object({
 
 export const GetPitchReviewCheckoutStatusResponse = zod.object({
   "paid": zod.boolean(),
+  "fee_waived": zod.boolean(),
   "pending": zod.boolean(),
   "approved": zod.boolean(),
   "declined": zod.boolean()

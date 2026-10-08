@@ -40,3 +40,4 @@
 - [Pitch editing experience](pitch-editing-experience.md) — owner approved materials inside pitch details, a separate editor, explicit detail saves, and warnings before switching.
 - [Project deletion evidence](project-deletion-evidence.md) — preserve signatures/payments; empty Queues includes confirmed test call/chat requests, not just projects.
 - [Review fee waiver](review-fee-waiver.md) — owner requested FREE99 for 100% off editorial review; verify Stripe coupon and promotion code before implementation.
+- [Esbuild module identity](esbuild-module-identity.md) — canonicalize plugin-resolved paths so aliased stateful fixtures share one module instance.

@@ -7,7 +7,7 @@ import {
   requireMatchingFilmmakerContext,
   type FilmmakerIdentity,
 } from "../lib/filmmaker-auth";
-import { reconcileReviewCheckouts, reviewCheckoutConfig, startReviewCheckout } from "../lib/pitch-review-payments";
+import { reconcileReviewCheckouts, reviewCheckoutConfig, startReviewCheckout, reviewFeeWaived } from "../lib/pitch-review-payments";
 import { verifyPitchReviewProof } from "../lib/pitch-review-proof";
 import { requireAccountAgeConfirmation } from "../lib/age-confirmation";
 
@@ -119,7 +119,7 @@ router.post("/filmmakers/review-checkout", async (req, res): Promise<void> => {
     return;
   }
   const latest = await getCompletedFilmmakerResult(visitorId);
-  if (latest?.project?.reviewPaidAt) {
+  if (latest?.project?.reviewPaidAt || await reviewFeeWaived(project.id)) {
     res.json({ url: null, already_submitted: true });
     return;
   }
@@ -144,7 +144,7 @@ router.get("/filmmakers/review-checkout/status", async (req, res): Promise<void>
     await reconcileReviewCheckouts(context.project.id);
   } catch (error) {
     req.log.error({ error }, "Could not verify review payment");
-    res.status(503).json({ error: "We could not verify your payment yet. Please try again; do not pay twice." });
+    res.status(503).json({ error: "We could not verify your checkout yet. Please try again; do not complete another checkout." });
     return;
   }
   const refreshed = await getCompletedFilmmakerResult(context.visitorId);
@@ -155,6 +155,7 @@ router.get("/filmmakers/review-checkout/status", async (req, res): Promise<void>
   }
   res.json({
     paid: Boolean(project.reviewPaidAt),
+    fee_waived: await reviewFeeWaived(project.id),
     pending: Boolean(project.showcaseRequested && !project.approved && project.reviewDecision !== "declined"),
     approved: Boolean(project.approved && project.showcaseRequested),
     declined: project.reviewDecision === "declined",
