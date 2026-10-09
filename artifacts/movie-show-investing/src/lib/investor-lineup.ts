@@ -19,6 +19,19 @@ export function canUseSingleProjectDraft(
   return !unallocated && lineup.every(row => row.project_id === targetId);
 }
 
+/**
+ * A project-page pledge opened while signed out cannot know the visitor already
+ * pledged. After sign-in, a confirmed backer continues as a new, separate signed
+ * entry (repeat interest) instead of being sent to their earlier confirmation.
+ */
+export function projectPageNeedsNewEntry(input: {
+  oneProject: boolean;
+  newEntry: boolean;
+  intentStatus: string | null | undefined;
+}): boolean {
+  return input.oneProject && !input.newEntry && input.intentStatus === 'confirmed';
+}
+
 /** One-project pledge: the whole amount goes to the selected project. */
 export function singleProjectLineup(projectId: number, amount: number) {
   return [{ project_id: projectId, amount }];

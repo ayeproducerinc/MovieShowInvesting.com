@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { InvestorNotificationPermissionControl } from '@/components/investor-notification-permission';
 import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
-import { Link, useLocation } from 'wouter';
+import { Link, useLocation, useSearch } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetCurrentInvestorIntentQueryKey, getGetExploreQueryKey, getGetPublicProjectQueryKey, getGetFlowProgressQueryKey, useConfirmInvestorIntent, useConfirmAge, useGetCurrentInvestorIntent, useGetExplore, useGetPublicProject, useGetFlowProgress, useGetPriceGroup, useMatchInvestor, useSaveFlowProgress, useSaveInvestorIntent } from '@workspace/api-client-react';
 import type { ExploreProject, InvestorIntentInput } from '@workspace/api-client-react';
@@ -11,7 +11,7 @@ import { ProposalSummary } from '@/components/proposal-summary';
 import { InvestorResultCard } from '@/components/investor-result-card';
 import { trackInvestorEvent } from '@/lib/analytics';
 import { LocationPicker } from '@/components/location-picker';
-import { canUseSingleProjectDraft, cap, MAX_PROJECTS, PROJECT_MINIMUM, selectAutoBuildProjects, singleProjectLineup, split } from '@/lib/investor-lineup';
+import { canUseSingleProjectDraft, cap, projectPageNeedsNewEntry, MAX_PROJECTS, PROJECT_MINIMUM, selectAutoBuildProjects, singleProjectLineup, split } from '@/lib/investor-lineup';
 import { investorReviewKey, minimaForSelectedStages } from '@/lib/investor-review';
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
@@ -139,7 +139,8 @@ export default function Investor() {
   const queryClient = useQueryClient();
   const identityId = firebaseUser?.uid ?? 'visitor';
   const expectedOwner = firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
-  const search = window.location.search;
+  // Re-render when only the query changes (e.g. a returning backer moved to &new=1).
+  const search = useSearch();
   if (!firebaseReady) return <section className="inv"><div className="page-wrap inv-state" role="status" aria-label="Checking sign-in"><div className="inv-skeleton" style={{height:95}}/><div className="inv-skeleton"/></div></section>;
   if (!firebaseUser) {
     return <InvestorSignInGate firebaseReady={firebaseReady} queryClient={queryClient} projectSlug={new URLSearchParams(search).get('project')} />;
@@ -219,6 +220,8 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
   useEffect(()=>{
     if (initialised.current) return;
     if (!explore.isSuccess || !current.isSuccess || !progress.data && !progress.isError) return;
+    // A returning backer is moved to the new-entry address below; don't initialise here.
+    if (projectPageNeedsNewEntry({oneProject,newEntry,intentStatus:current.data.intent?.status})) return;
     const target = projectList?.find(p=>p.slug===targetSlug && !p.is_owner);
     if (targetSlug && !target) return;
     if (newEntry && current.data.intent?.status==='confirmed') {
@@ -272,7 +275,15 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
     restoredMatchStarted.current=true;
     void findCandidates(a,false).catch(()=>setError('We could not restore your project matches. Browse available projects manually, or retry matching.'));
   },[ready,selectionNeeded,screen,explore.isSuccess,matchState]);
-  useEffect(()=>{if (current.data?.intent && !newEntry && !revise && !progress.isLoading && progress.error?.status!==409) navigate('/invest/done');},[current.data?.intent,progress.isLoading,progress.error,navigate]);
+  useEffect(()=>{
+    if (!current.data?.intent) return;
+    // From a project page, someone who already pledged gets a new, separate entry for this project.
+    if (projectPageNeedsNewEntry({oneProject,newEntry,intentStatus:current.data.intent.status})) {
+      navigate(`/invest?project=${encodeURIComponent(targetSlug ?? '')}&one=1&new=1`,{replace:true});
+      return;
+    }
+    if (!newEntry && !revise && !progress.isLoading && progress.error?.status!==409) navigate('/invest/done');
+  },[current.data?.intent,progress.isLoading,progress.error,navigate]);
   useEffect(()=>{
     if (!ready || selectionNeeded) return;
     const json=JSON.stringify({screen,a});

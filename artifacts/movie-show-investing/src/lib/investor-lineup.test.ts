@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canUseSingleProjectDraft, cap, singleProjectLineup } from './investor-lineup.js';
+import { canUseSingleProjectDraft, cap, projectPageNeedsNewEntry, singleProjectLineup } from './investor-lineup.js';
+
+test('a returning backer from a project page gets a new pledge, not their old confirmation', () => {
+  assert.equal(projectPageNeedsNewEntry({ oneProject: true, newEntry: false, intentStatus: 'confirmed' }), true);
+  assert.equal(projectPageNeedsNewEntry({ oneProject: true, newEntry: true, intentStatus: 'confirmed' }), false);
+  assert.equal(projectPageNeedsNewEntry({ oneProject: true, newEntry: false, intentStatus: 'saved' }), false);
+  assert.equal(projectPageNeedsNewEntry({ oneProject: true, newEntry: false, intentStatus: null }), false);
+  assert.equal(projectPageNeedsNewEntry({ oneProject: false, newEntry: false, intentStatus: 'confirmed' }), false);
+});
 
 test('project counts follow $100 per project, up to 5', () => {
   assert.equal(cap(100), 1);
