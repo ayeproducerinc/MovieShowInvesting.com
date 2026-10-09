@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
-import { getPublicProjectBySlug } from "@workspace/db";
+import { getConfirmedPledgeTotal, getPublicProjectBySlug } from "@workspace/db";
 import {
   GetProjectShareMetadataParams,
   GetProjectShareMetadataResponse,
@@ -171,7 +171,9 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
       ? `/api/projects/${encodeURIComponent(project.slug)}/pitch-deck`
       : null,
     pitch_deck_name: listingEligible && project.pitchDeckStoragePath ? project.pitchDeckName : null,
-    confirmed_pledge_total: project.confirmedPledgeTotal,
+    // Before approval only the project's own filmmaker sees its confirmed total.
+    confirmed_pledge_total: listingEligible ? project.confirmedPledgeTotal
+      : isOwner ? await getConfirmedPledgeTotal(project.id) : 0,
     approved: project.approved,
     showcase_requested: project.showcaseRequested,
     phone_verified: project.phoneVerified,

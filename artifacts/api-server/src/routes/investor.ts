@@ -14,7 +14,7 @@ import {
 import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 import { deliverInterestAlertEmail } from "../lib/interest-alert-email";
 import { requireAccountAgeConfirmation } from "../lib/age-confirmation";
-import { allocationLimitError } from "../lib/pledge-policy";
+import { acceptsPledges, allocationLimitError } from "../lib/pledge-policy";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -268,16 +268,14 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
     }
     if (allocations.length) {
       const ids = allocations.map((allocation) => allocation.project_id);
-      const visible = await client.query<{ id: number }>(
-        `select id from projects where id = any($1::int[])
-          and approved = true and showcase_requested = true and hidden = false
-          and stage in ('idea', 'production', 'distribution')
-          for share`,
+      // Open pledging: submitted and not hidden, approved or not.
+      const candidates = await client.query<{ id: number; hidden: boolean; stage: string | null }>(
+        "select id, hidden, stage from projects where id = any($1::int[]) for share",
         [ids],
       );
-      if (visible.rows.length !== ids.length) {
+      if (candidates.rows.length !== ids.length || !candidates.rows.every(acceptsPledges)) {
         await client.query("rollback");
-        res.status(400).json({ error: "Every allocated project must be approved, visible, and available for showcase." });
+        res.status(400).json({ error: "Every project must be submitted and not hidden to receive pledges." });
         return;
       }
       const ownProjects = await client.query<{ id: number }>(`

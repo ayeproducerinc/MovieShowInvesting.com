@@ -3,7 +3,7 @@ import { InvestorNotificationPermissionControl } from '@/components/investor-not
 import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { getGetCurrentInvestorIntentQueryKey, getGetExploreQueryKey, getGetPublicProjectQueryKey, getGetFlowProgressQueryKey, useConfirmInvestorIntent, useConfirmAge, useGetCurrentInvestorIntent, useGetExplore, useGetFlowProgress, useGetPriceGroup, useMatchInvestor, useSaveFlowProgress, useSaveInvestorIntent } from '@workspace/api-client-react';
+import { getGetCurrentInvestorIntentQueryKey, getGetExploreQueryKey, getGetPublicProjectQueryKey, getGetFlowProgressQueryKey, useConfirmInvestorIntent, useConfirmAge, useGetCurrentInvestorIntent, useGetExplore, useGetPublicProject, useGetFlowProgress, useGetPriceGroup, useMatchInvestor, useSaveFlowProgress, useSaveInvestorIntent } from '@workspace/api-client-react';
 import type { ExploreProject, InvestorIntentInput } from '@workspace/api-client-react';
 import { InvestorProjectCard } from '@/components/investor-project-card';
 import { AgeAcknowledgment, useAgeStatus } from '@/components/age-acknowledgment';
@@ -163,6 +163,20 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
     refetchOnMount:'always',
     refetchOnWindowFocus:true,
   }});
+  // Open pledging: a project-page link may target a submitted project that is
+  // not approved yet, so it is not in Explore. Load it from its public page.
+  const inExplore = !!targetSlug && !!explore.data?.projects.some(p=>p.slug===targetSlug);
+  const loadPageTarget = oneProject && explore.isSuccess && !inExplore;
+  const publicTarget = useGetPublicProject(targetSlug ?? '', {query:{queryKey:[...getGetPublicProjectQueryKey(targetSlug ?? ''),expectedOwner],enabled:loadPageTarget,retry:false}});
+  const pageTarget: ExploreProject | null = loadPageTarget && publicTarget.data ? {
+    id:publicTarget.data.id, slug:publicTarget.data.slug, title:publicTarget.data.title, logline:publicTarget.data.logline ?? null,
+    format:publicTarget.data.format ?? null, genre:publicTarget.data.genre ?? null, stage:publicTarget.data.stage ?? null,
+    poster_url:null, pitch_deck_url:null, pitch_deck_name:null,
+    // An unapproved project's offer is not public, so no payback goal is shown.
+    offer_per_100:null, confirmed_pledge_total:0, is_owner:publicTarget.data.is_owner,
+  } : null;
+  const waitingForPageTarget = loadPageTarget && publicTarget.isPending;
+  const projectList = explore.data ? [...explore.data.projects, ...(pageTarget ? [pageTarget] : [])] : undefined;
   const match = useMatchInvestor();
   const save = useSaveFlowProgress();
   const submit = useSaveInvestorIntent();
@@ -205,7 +219,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
   useEffect(()=>{
     if (initialised.current) return;
     if (!explore.isSuccess || !current.isSuccess || !progress.data && !progress.isError) return;
-    const target = explore.data.projects.find(p=>p.slug===targetSlug && !p.is_owner);
+    const target = projectList?.find(p=>p.slug===targetSlug && !p.is_owner);
     if (targetSlug && !target) return;
     if (newEntry && current.data.intent?.status==='confirmed') {
       if (identityId==='visitor') return;
@@ -248,7 +262,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
       setSingle(oneProject && !!target);
       setReady(true);
     }
-  },[progress.data,progress.error,explore.isSuccess,current.isSuccess]);
+  },[progress.data,progress.error,explore.isSuccess,current.isSuccess,publicTarget.data]);
   useEffect(()=>{
     if(!ready || identityId==='visitor' || !signedInEmail) return;
     setA(current=>current.email.trim()?current:{...current,email:signedInEmail});
@@ -318,8 +332,8 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
     catch {setError('We could not save your answers. Check your connection and try again.');throw new Error('Save failed');}
     finally {if(queue.current===operation)setSaving(false);}
   }
-  const available = explore.data?.projects.filter(project=>!project.is_owner) || [];
-  const ownedProjects = explore.data?.projects.filter(project=>project.is_owner) || [];
+  const available = projectList?.filter(project=>!project.is_owner) || [];
+  const ownedProjects = projectList?.filter(project=>project.is_owner) || [];
   const selected = available.filter(p=>a.lineup.some(row=>row.project_id===p.id));
   const allocated = a.lineup.reduce((sum,row)=>sum+Number(row.amount||0),0);
   const rating = !a.unallocated ? spreadRating(a.amount,a.lineup) : null;
@@ -484,10 +498,10 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
     change('lineup',split(a.amount,projects));
     trackInvestorEvent('lineup_add', { project_id: project.id });
   }
-  if (targetSlug && explore.isSuccess && !available.some(p=>p.slug===targetSlug)) return <section className="inv"><div className="page-wrap inv-state" role="alert"><h1>{ownedProjects.some(p=>p.slug===targetSlug) ? 'This is your project.' : 'This project is not available for new interest.'}</h1><p>{ownedProjects.some(p=>p.slug===targetSlug) ? 'You can manage it, but you can’t pledge interest in your own project.' : 'No saved or signed interest was changed.'}</p><Link href={ownedProjects.some(p=>p.slug===targetSlug) ? '/me/projects' : '/explore'} className="inv-button">{ownedProjects.some(p=>p.slug===targetSlug) ? 'Manage project' : 'Explore available projects'}</Link></div></section>;
+  if (targetSlug && explore.isSuccess && !waitingForPageTarget && !available.some(p=>p.slug===targetSlug)) return <section className="inv"><div className="page-wrap inv-state" role="alert"><h1>{ownedProjects.some(p=>p.slug===targetSlug) ? 'This is your project.' : 'This project is not available for new interest.'}</h1><p>{ownedProjects.some(p=>p.slug===targetSlug) ? 'You can manage it, but you can’t pledge interest in your own project.' : 'No saved or signed interest was changed.'}</p><Link href={ownedProjects.some(p=>p.slug===targetSlug) ? '/me/projects' : '/explore'} className="inv-button">{ownedProjects.some(p=>p.slug===targetSlug) ? 'Manage project' : 'Explore available projects'}</Link></div></section>;
   if(progress.isError && progress.error?.status===409) return <section className="inv"><GuestDraftConflictState/></section>;
   if(visitor.isError || progress.isError && progress.error?.status!==404 || current.isError && current.error?.status!==404 || explore.isError) return <section className="inv"><ErrorState retry={()=>{void visitor.refetch();void progress.refetch();void current.refetch();void explore.refetch();}}/></section>;
-  if(visitor.isPending || progress.isLoading || current.isLoading || explore.isLoading || !ready && !progress.isError && !visitor.isError) return <section className="inv"><div className="page-wrap inv-state" aria-label="Loading investor worksheet"><p className="inv-kicker">Opening your worksheet</p><div className="inv-skeleton" style={{height:85}}/><div className="inv-skeleton" style={{height:150}}/></div></section>;
+  if(visitor.isPending || progress.isLoading || current.isLoading || explore.isLoading || waitingForPageTarget || !ready && !progress.isError && !visitor.isError) return <section className="inv"><div className="page-wrap inv-state" aria-label="Loading investor worksheet"><p className="inv-kicker">Opening your worksheet</p><div className="inv-skeleton" style={{height:85}}/><div className="inv-skeleton" style={{height:150}}/></div></section>;
   if (newEntry && (identityId==='visitor' || !current.data?.history.length) || revise && current.data?.intent?.status!=='saved') return <section className="inv"><div className="page-wrap inv-state"><h1>This worksheet cannot be started here.</h1><p>Review your saved interest first. A separate entry requires previously confirmed account interest.</p><Link href="/lineup" className="inv-button">View my lineup</Link></div></section>;
   if (selectionNeeded) {
     const target=available.find(p=>p.slug===targetSlug)!;

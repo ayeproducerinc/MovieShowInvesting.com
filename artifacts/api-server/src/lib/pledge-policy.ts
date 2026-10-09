@@ -12,6 +12,17 @@ export function maxProjectsFor(total: number): number {
   return Math.max(1, Math.min(MAX_PROJECTS, Math.floor(total / PROJECT_MINIMUM)));
 }
 
+const PLEDGE_STAGES = ["idea", "production", "distribution"];
+
+/**
+ * Open pledging (DECISIONS.md › Product and scope): a submitted project accepts
+ * pledges while it is not hidden, whether or not it is approved. A projects row
+ * exists only after final submission; drafts live in flow_progress.
+ */
+export function acceptsPledges(project: { hidden: boolean; stage: string | null }): boolean {
+  return !project.hidden && PLEDGE_STAGES.includes(project.stage ?? "");
+}
+
 export function allocationLimitError(total: number, amounts: number[]): string | null {
   if (amounts.some((amount) => amount < PROJECT_MINIMUM)) {
     return `Each project needs at least $${PROJECT_MINIMUM}.`;

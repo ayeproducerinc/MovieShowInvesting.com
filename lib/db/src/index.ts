@@ -1237,6 +1237,20 @@ export async function removeOwnedFilmmakerImage(input: {
   });
 }
 
+/**
+ * Confirmed pledge total for one project, for its own filmmaker before approval.
+ * Public pages still show a total only for listing-eligible projects.
+ */
+export async function getConfirmedPledgeTotal(projectId: number): Promise<number> {
+  const [pledges] = await db.select({ total: sql<number>`coalesce(sum(${schema.pledgesTable.amount}), 0)` })
+    .from(schema.pledgesTable)
+    .where(and(
+      eq(schema.pledgesTable.projectId, projectId),
+      eq(schema.pledgesTable.confirmed, true),
+    ));
+  return Number(pledges.total);
+}
+
 export async function getPublicProjectBySlug(slug: string) {
   const [project] = await db.select({
     budget: projectsTable.budget,

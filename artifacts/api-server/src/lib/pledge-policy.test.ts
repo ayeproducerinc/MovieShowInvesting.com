@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allocationLimitError, maxProjectsFor, PROJECT_MINIMUM, MAX_PROJECTS } from "./pledge-policy";
+import { acceptsPledges, allocationLimitError, maxProjectsFor, PROJECT_MINIMUM, MAX_PROJECTS } from "./pledge-policy";
+
+test("a submitted, non-hidden project accepts pledges whether or not it is approved", () => {
+  assert.equal(acceptsPledges({ hidden: false, stage: "idea" }), true);
+  assert.equal(acceptsPledges({ hidden: false, stage: "production" }), true);
+  assert.equal(acceptsPledges({ hidden: false, stage: "distribution" }), true);
+  assert.equal(acceptsPledges({ hidden: true, stage: "idea" }), false);
+  assert.equal(acceptsPledges({ hidden: false, stage: null }), false);
+  assert.equal(acceptsPledges({ hidden: false, stage: "other" }), false);
+});
 
 test("new pledges need $100 per project and allow up to 5 projects", () => {
   assert.equal(PROJECT_MINIMUM, 100);

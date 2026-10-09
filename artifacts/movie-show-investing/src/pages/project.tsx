@@ -10,6 +10,7 @@ import { money } from './filmmaker-calculator';
 import { ProposalSummary } from '@/components/proposal-summary';
 import { youtubeEmbedUrl } from '@/lib/youtube-embed';
 import { bunnyEmbedUrl } from '@/lib/bunny-embed';
+import { pledgePanel } from '@/lib/pledge-panel';
 import './project.css';
 
 const securitiesNotice = "Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.";
@@ -87,6 +88,7 @@ export default function Project() {
   const filmmakerName = data.public_filmmaker_name?.trim() || null;
   const labels = [data.format, data.genre, data.stage].filter(Boolean).join(' / ');
   const eligible = data.approved && data.showcase_requested && ['idea', 'production', 'distribution'].includes(data.stage || '');
+  const panel = pledgePanel(data);
   const intent = current.data?.intent;
   const previousHere = current.data?.history.some(entry => entry.allocations.some(row => row.project_id === data.id));
   // one=1 opens the two-screen, single-project pledge (DECISIONS.md › Investor pledge limits).
@@ -106,9 +108,9 @@ export default function Project() {
       : trailer ? <a className="pj-external" href={trailer} target="_blank" rel="noopener noreferrer" data-testid="link-project-trailer"><span className="dossier-kicker">The trailer</span><strong>Watch the trailer in a new tab <ArrowUpRight size={15} style={{ display: 'inline' }}/></strong><small>This trailer can’t be played on this page.</small></a>
       : (poster || thumbnail) ? <img className="pj-poster" src={poster || thumbnail || ''} alt={`${data.title} project artwork`} data-testid="img-project-artwork" loading="lazy"/> : null}
     </div>
-    {eligible && <div className="pj-panel" data-testid="project-interest-action">
+    {panel.show && <div className="pj-panel" data-testid="project-interest-action">
       <span className="dossier-kicker">Pledge interest</span>
-      <div className="pj-total"><p className="pj-total-num" data-testid="text-confirmed-pledge-total">{money(data.confirmed_pledge_total)}</p><p>Confirmed, non-binding interest. Only signed interest is counted. This is not an investment or payment.</p></div>
+      {panel.showTotal && <div className="pj-total"><p className="pj-total-num" data-testid="text-confirmed-pledge-total">{money(data.confirmed_pledge_total)}</p><p>Confirmed, non-binding interest. Only signed interest is counted. This is not an investment or payment.</p>{panel.ownerOnlyTotal && <p data-testid="text-owner-only-total">Only you can see this total until your project is approved and listed.</p>}</div>}
       {data.is_owner ? <p>You can manage this project, but you can’t pledge interest in your own project.</p> :
         current.isPending || current.isFetching ? <p role="status">Checking your saved interest…</p> :
         current.isError ? <p role="alert">We couldn’t check your saved interest. <button type="button" className="pj-linkbtn" onClick={() => void current.refetch()}>Try again</button></p> :
