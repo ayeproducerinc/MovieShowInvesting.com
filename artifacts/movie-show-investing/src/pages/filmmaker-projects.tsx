@@ -22,6 +22,7 @@ import { FilmmakerInterestAlerts } from '@/components/filmmaker-interest-alerts'
 import { useFilmmakerAuth } from '@/hooks/use-filmmaker-auth';
 import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 import { FilmmakerStartOver } from '@/components/filmmaker-start-over';
+import { PHONE_VERIFICATION_ENABLED } from '@/lib/features';
 
 function accountError(error: unknown): string {
   if (error && typeof error === 'object' && 'status' in error) {
@@ -84,7 +85,7 @@ export default function FilmmakerProjects() {
     setClaiming(true);
     setClaimError('');
     try {
-      if (user) {
+      if (user && PHONE_VERIFICATION_ENABLED) {
         try {
           await synchronizeFilmmakerPhone(user);
         } catch (error) {
@@ -105,7 +106,7 @@ export default function FilmmakerProjects() {
         await claimFilmmakerProject({
           headers: draftId ? { 'X-MSI-Draft-Id': String(draftId) } : {},
         });
-        if (user) await synchronizeFilmmakerPhone(user);
+        if (user && PHONE_VERIFICATION_ENABLED) await synchronizeFilmmakerPhone(user);
         await queryClient.invalidateQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
         const requestedStart = hasPendingStartAction()
           || new URLSearchParams(window.location.search).get('action') === 'start';
@@ -192,7 +193,7 @@ export default function FilmmakerProjects() {
       loading={projects.isPending || claiming}
       busy={acting || claiming}
       error={projects.isError ? accountError(projects.error) : null}
-      phoneVerificationSlot={auth.user ? <FilmmakerPhoneVerification user={auth.user} verified={projects.data?.phone_verified ?? false} /> : null}
+      phoneVerificationSlot={auth.user && PHONE_VERIFICATION_ENABLED ? <FilmmakerPhoneVerification user={auth.user} verified={projects.data?.phone_verified ?? false} /> : null}
       onStart={() => void perform(() => start.mutateAsync(), '/start/filmmaker')}
       onResume={() => void perform(() => resume.mutateAsync(), '/start/filmmaker')}
       onOpen={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}
