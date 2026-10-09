@@ -14,6 +14,7 @@ import { ArrowDownToLine, ArrowRight, ArrowUpRight, Clapperboard, Eye, FileText,
 import { ProposalSummary } from '@/components/proposal-summary';
 import { AdminReferrals } from '@/components/admin-referrals';
 import { AdminInvestors } from '@/components/admin-investors';
+import { AdminProjectUpdates } from '@/components/admin-project-updates';
 import { PitchProvenance, ReviewNotesForm } from '@/components/admin-pitch-extras';
 import { ReadableValue } from '@/components/admin-readable';
 import { AdminConversations } from '@/components/admin-conversations';
@@ -418,6 +419,7 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
       <h2 data-testid="text-table-title">{section.id === 'queues' ? 'Showcase requests and other queues' : data?.title || section.label}</h2>
       <span className="admin-mono admin-count" data-testid="text-row-total">{data ? `${data.total.toLocaleString()} ${data.total === 1 ? 'record' : 'records'}` : 'Unavailable'}</span>
     </div>
+    {section.id === 'queues' && <AdminProjectUpdates userId={userId} />}
     {section.id === 'queues' && <p data-testid="text-showcase-queue-guidance">Paid pitch reviews appear as “Showcase request” with status “Awaiting review.” Earlier requests remain available without retroactive fees. Approval adds a pitch to public discovery; declining keeps its free page unlisted.</p>}
     {result?.message && <p className={`admin-review-feedback ${result.failed ? 'error' : ''}`} role={result.failed ? 'alert' : 'status'} data-testid="status-review-result">{result.message}</p>}
     {isError ? <Notice icon={<ShieldAlert size={20} />} title="This view could not be loaded" action="Try again" onAction={() => void refetch()}>
