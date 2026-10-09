@@ -1,5 +1,5 @@
 import { getGetFilmmakerProjectBackersQueryKey, useGetFilmmakerProjectBackers } from '@workspace/api-client-react';
-import { backerLabel, backersErrorText, pledgeSummary, progressLines } from '@/lib/backer-display';
+import { backerLabel, backersErrorText, progressLines } from '@/lib/backer-display';
 
 const dollars = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 const day = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
@@ -10,17 +10,6 @@ export function useProjectBackers(projectId: number, identityId: string) {
     queryKey: [...getGetFilmmakerProjectBackersQueryKey(projectId), identityId],
     retry: false,
   } });
-}
-
-/** Compact total for the project's status box; private to the filmmaker until listed. */
-export function PledgedSoFar({ projectId, identityId, listed }: { projectId: number; identityId: string; listed: boolean }) {
-  const backers = useProjectBackers(projectId, identityId);
-  if (!backers.isSuccess) return null;
-  return <div className="dossier-line" data-testid="status-pledged-so-far">
-    <span className="dossier-kicker">Pledged so far</span>
-    <p style={{ fontSize: 22, color: '#f4f0e7', margin: '8px 0 4px' }} data-testid="text-pledged-so-far">{pledgeSummary(backers.data, dollars)}</p>
-    <p>{listed ? 'Your listed project shows this total publicly.' : 'Only you can see this total until your project is approved and listed.'} Pledges are non-binding; no money is collected.</p>
-  </div>;
 }
 
 /** Private to the project's filmmaker (DECISIONS.md › Backer names). */
@@ -35,7 +24,6 @@ export function FilmmakerBackers({ projectId, identityId }: { projectId: number;
       })()
       : !backers.data.backers.length ? <p data-testid="text-no-backers">No confirmed pledges yet. Share your project link so people can pledge.</p>
       : <>
-        <p data-testid="text-backers-total"><strong>{pledgeSummary(backers.data, dollars)}</strong></p>
         <ul className="dossier-links" data-testid="list-backer-progress" style={{ marginBottom: 18 }}>
           {progressLines(backers.data, dollars, day).map(line => <li key={line}>{line}</li>)}
         </ul>
@@ -45,6 +33,6 @@ export function FilmmakerBackers({ projectId, identityId }: { projectId: number;
             {backer.email && <> · <a href={`mailto:${backer.email}`}>{backer.email}</a></>}
           </li>)}</ul>
       </>}
-    <p className="dossier-status">Names, emails and amounts are shown only to you and Movie Show Investing admins. Pledges are non-binding; no money is collected.</p>
+    <p className="dossier-status">Names, emails and amounts are shown only to you and Movie Show Investing admins.</p>
   </section>;
 }

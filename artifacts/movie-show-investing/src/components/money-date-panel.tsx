@@ -4,8 +4,12 @@ import { monthsLeftText, neededByStatus } from '@/lib/money-date';
 
 const dollars = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 
+/** Lets the project page reveal the tab that holds Edit pitch details. */
+export const OPEN_PITCH_DETAILS_EVENT = 'msi:open-pitch-details';
+
 /** Opens Edit pitch details at the timeline so the filmmaker can add or change a date. */
 function openTimelineEditor() {
+  window.dispatchEvent(new Event(OPEN_PITCH_DETAILS_EVENT));
   const details = document.querySelector<HTMLDetailsElement>('[data-testid="details-edit-pitch"]');
   if (details) details.open = true;
   window.setTimeout(() => document.getElementById('edit-your-timeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
