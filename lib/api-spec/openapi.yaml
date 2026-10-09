@@ -968,6 +968,234 @@ paths:
           description: Per-draft or server upload capacity reached
         "502":
           description: Bunny Storage upload failed
+  /filmmakers/draft-materials/trailer/session:
+    post:
+      operationId: startFilmmakerDraftTrailerUpload
+      tags: [filmmakers]
+      summary: Start a pieced trailer upload for a draft; the API creates a size-bounded Bunny Stream TUS upload
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FilmmakerTrailerUploadStart" }
+      responses:
+        "200":
+          description: Sealed upload session token and piece size
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerTrailerUploadSession" }
+        "400": { description: "Invalid size, type or filename" }
+        "502": { description: Bunny Stream could not start the upload }
+        "503": { description: Bunny Stream is not configured }
+  /filmmakers/draft-materials/trailer/chunk:
+    post:
+      operationId: uploadFilmmakerDraftTrailerChunk
+      tags: [filmmakers]
+      summary: Forward one piece (at most 16 MB) of a pieced trailer upload to Bunny Stream
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Upload-Token
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 4096 }
+        - name: X-MSI-Upload-Offset
+          in: header
+          required: true
+          schema: { type: integer, minimum: 0 }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Bytes stored so far
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerTrailerUploadProgress" }
+        "400": { description: Invalid piece or expired session }
+        "409":
+          description: Upload position differs; resume from the returned offset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerTrailerUploadProgress" }
+        "413": { description: Piece exceeds 16 MB }
+        "502": { description: Bunny Stream rejected the piece }
+  /filmmakers/draft-materials/trailer/complete:
+    post:
+      operationId: completeFilmmakerDraftTrailerUpload
+      tags: [filmmakers]
+      summary: Verify a fully uploaded pieced trailer and save it to the draft
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Upload-Token
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 4096 }
+      responses:
+        "200":
+          description: Saved materials snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerMaterialSnapshot" }
+        "400": { description: Expired session }
+        "409": { description: Upload is not complete yet }
+        "502": { description: Bunny Stream could not verify the trailer }
+  /filmmakers/draft-materials/trailer/cancel:
+    post:
+      operationId: cancelFilmmakerDraftTrailerUpload
+      tags: [filmmakers]
+      summary: Abandon an unfinished pieced trailer upload and remove its Bunny Stream video
+      security:
+        - firebaseBearer: []
+        - {}
+      parameters:
+        - name: X-MSI-Draft-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Upload-Token
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 4096 }
+      responses:
+        "200":
+          description: Cancellation result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerTrailerUploadCancel" }
+  /filmmakers/project-materials/trailer/session:
+    post:
+      operationId: startFilmmakerProjectTrailerUpload
+      tags: [filmmakers]
+      summary: Start a pieced trailer upload for a account-owned project; the API creates a size-bounded Bunny Stream TUS upload
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FilmmakerTrailerUploadStart" }
+      responses:
+        "200":
+          description: Sealed upload session token and piece size
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerTrailerUploadSession" }
+        "400": { description: "Invalid size, type or filename" }
+        "502": { description: Bunny Stream could not start the upload }
+        "503": { description: Bunny Stream is not configured }
+  /filmmakers/project-materials/trailer/chunk:
+    post:
+      operationId: uploadFilmmakerProjectTrailerChunk
+      tags: [filmmakers]
+      summary: Forward one piece (at most 16 MB) of a pieced trailer upload to Bunny Stream
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Upload-Token
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 4096 }
+        - name: X-MSI-Upload-Offset
+          in: header
+          required: true
+          schema: { type: integer, minimum: 0 }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Bytes stored so far
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerTrailerUploadProgress" }
+        "400": { description: Invalid piece or expired session }
+        "409":
+          description: Upload position differs; resume from the returned offset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerTrailerUploadProgress" }
+        "413": { description: Piece exceeds 16 MB }
+        "502": { description: Bunny Stream rejected the piece }
+  /filmmakers/project-materials/trailer/complete:
+    post:
+      operationId: completeFilmmakerProjectTrailerUpload
+      tags: [filmmakers]
+      summary: Verify a fully uploaded pieced trailer and save it to the account-owned project
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Upload-Token
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 4096 }
+      responses:
+        "200":
+          description: Saved materials snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerMaterialSnapshot" }
+        "400": { description: Expired session }
+        "409": { description: Upload is not complete yet }
+        "502": { description: Bunny Stream could not verify the trailer }
+  /filmmakers/project-materials/trailer/cancel:
+    post:
+      operationId: cancelFilmmakerProjectTrailerUpload
+      tags: [filmmakers]
+      summary: Abandon an unfinished pieced trailer upload and remove its Bunny Stream video
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: X-MSI-Project-Id
+          in: header
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: X-MSI-Upload-Token
+          in: header
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 4096 }
+      responses:
+        "200":
+          description: Cancellation result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FilmmakerTrailerUploadCancel" }
   /filmmakers/draft-materials/trailer:
     post:
       operationId: uploadFilmmakerDraftTrailer
@@ -2451,6 +2679,34 @@ components:
         authority_checked: { type: boolean }
         questions_resolved: { type: boolean }
         updated_at: { type: ["string", "null"] }
+    FilmmakerTrailerUploadStart:
+      type: object
+      additionalProperties: false
+      required: [size, type, filename]
+      properties:
+        size: { type: integer, minimum: 1, maximum: 524288000 }
+        type: { type: string, enum: [video/mp4, video/webm, video/quicktime] }
+        filename: { type: string, minLength: 1, maxLength: 200 }
+    FilmmakerTrailerUploadSession:
+      type: object
+      additionalProperties: false
+      required: [token, chunk_bytes]
+      properties:
+        token: { type: string }
+        chunk_bytes: { type: integer, minimum: 1 }
+    FilmmakerTrailerUploadProgress:
+      type: object
+      additionalProperties: false
+      required: [offset]
+      properties:
+        offset: { type: integer, minimum: 0 }
+        error: { type: string }
+    FilmmakerTrailerUploadCancel:
+      type: object
+      additionalProperties: false
+      required: [cancelled]
+      properties:
+        cancelled: { type: boolean }
     QuestionConfig:
       type: object
       additionalProperties: false

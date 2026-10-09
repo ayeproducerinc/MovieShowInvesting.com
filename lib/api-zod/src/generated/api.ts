@@ -1063,6 +1063,214 @@ export const UploadFilmmakerDraftImageResponse = zod.object({
 
 
 /**
+ * @summary Start a pieced trailer upload for a draft; the API creates a size-bounded Bunny Stream TUS upload
+ */
+
+
+
+export const StartFilmmakerDraftTrailerUploadHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1)
+})
+
+export const startFilmmakerDraftTrailerUploadBodySizeMax = 524288000;
+
+export const startFilmmakerDraftTrailerUploadBodyFilenameMax = 200;
+
+
+
+export const StartFilmmakerDraftTrailerUploadBody = zod.object({
+  "size": zod.number().int().min(1).max(startFilmmakerDraftTrailerUploadBodySizeMax),
+  "type": zod.enum(['video/mp4', 'video/webm', 'video/quicktime']),
+  "filename": zod.string().min(1).max(startFilmmakerDraftTrailerUploadBodyFilenameMax)
+})
+
+
+
+
+export const StartFilmmakerDraftTrailerUploadResponse = zod.object({
+  "token": zod.string(),
+  "chunk_bytes": zod.number().int().min(1)
+})
+
+
+/**
+ * @summary Forward one piece (at most 16 MB) of a pieced trailer upload to Bunny Stream
+ */
+
+export const uploadFilmmakerDraftTrailerChunkHeaderXMSIUploadTokenMax = 4096;
+
+export const uploadFilmmakerDraftTrailerChunkHeaderXMSIUploadOffsetMin = 0;
+
+
+
+export const UploadFilmmakerDraftTrailerChunkHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1),
+  "X-MSI-Upload-Token": zod.string().min(1).max(uploadFilmmakerDraftTrailerChunkHeaderXMSIUploadTokenMax),
+  "X-MSI-Upload-Offset": zod.number().int().min(uploadFilmmakerDraftTrailerChunkHeaderXMSIUploadOffsetMin)
+})
+
+export const uploadFilmmakerDraftTrailerChunkResponseOffsetMin = 0;
+
+
+
+export const UploadFilmmakerDraftTrailerChunkResponse = zod.object({
+  "offset": zod.number().int().min(uploadFilmmakerDraftTrailerChunkResponseOffsetMin),
+  "error": zod.string().optional()
+})
+
+
+/**
+ * @summary Verify a fully uploaded pieced trailer and save it to the draft
+ */
+
+export const completeFilmmakerDraftTrailerUploadHeaderXMSIUploadTokenMax = 4096;
+
+
+
+export const CompleteFilmmakerDraftTrailerUploadHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1),
+  "X-MSI-Upload-Token": zod.string().min(1).max(completeFilmmakerDraftTrailerUploadHeaderXMSIUploadTokenMax)
+})
+
+export const completeFilmmakerDraftTrailerUploadResponseTrailerUrlMax = 2048;
+
+export const completeFilmmakerDraftTrailerUploadResponsePitchDeckNameMax = 200;
+
+
+
+export const CompleteFilmmakerDraftTrailerUploadResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(completeFilmmakerDraftTrailerUploadResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(completeFilmmakerDraftTrailerUploadResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * @summary Abandon an unfinished pieced trailer upload and remove its Bunny Stream video
+ */
+
+export const cancelFilmmakerDraftTrailerUploadHeaderXMSIUploadTokenMax = 4096;
+
+
+
+export const CancelFilmmakerDraftTrailerUploadHeader = zod.object({
+  "X-MSI-Draft-Id": zod.number().int().min(1),
+  "X-MSI-Upload-Token": zod.string().min(1).max(cancelFilmmakerDraftTrailerUploadHeaderXMSIUploadTokenMax)
+})
+
+export const CancelFilmmakerDraftTrailerUploadResponse = zod.object({
+  "cancelled": zod.boolean()
+})
+
+
+/**
+ * @summary Start a pieced trailer upload for a account-owned project; the API creates a size-bounded Bunny Stream TUS upload
+ */
+
+
+
+export const StartFilmmakerProjectTrailerUploadHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1)
+})
+
+export const startFilmmakerProjectTrailerUploadBodySizeMax = 524288000;
+
+export const startFilmmakerProjectTrailerUploadBodyFilenameMax = 200;
+
+
+
+export const StartFilmmakerProjectTrailerUploadBody = zod.object({
+  "size": zod.number().int().min(1).max(startFilmmakerProjectTrailerUploadBodySizeMax),
+  "type": zod.enum(['video/mp4', 'video/webm', 'video/quicktime']),
+  "filename": zod.string().min(1).max(startFilmmakerProjectTrailerUploadBodyFilenameMax)
+})
+
+
+
+
+export const StartFilmmakerProjectTrailerUploadResponse = zod.object({
+  "token": zod.string(),
+  "chunk_bytes": zod.number().int().min(1)
+})
+
+
+/**
+ * @summary Forward one piece (at most 16 MB) of a pieced trailer upload to Bunny Stream
+ */
+
+export const uploadFilmmakerProjectTrailerChunkHeaderXMSIUploadTokenMax = 4096;
+
+export const uploadFilmmakerProjectTrailerChunkHeaderXMSIUploadOffsetMin = 0;
+
+
+
+export const UploadFilmmakerProjectTrailerChunkHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1),
+  "X-MSI-Upload-Token": zod.string().min(1).max(uploadFilmmakerProjectTrailerChunkHeaderXMSIUploadTokenMax),
+  "X-MSI-Upload-Offset": zod.number().int().min(uploadFilmmakerProjectTrailerChunkHeaderXMSIUploadOffsetMin)
+})
+
+export const uploadFilmmakerProjectTrailerChunkResponseOffsetMin = 0;
+
+
+
+export const UploadFilmmakerProjectTrailerChunkResponse = zod.object({
+  "offset": zod.number().int().min(uploadFilmmakerProjectTrailerChunkResponseOffsetMin),
+  "error": zod.string().optional()
+})
+
+
+/**
+ * @summary Verify a fully uploaded pieced trailer and save it to the account-owned project
+ */
+
+export const completeFilmmakerProjectTrailerUploadHeaderXMSIUploadTokenMax = 4096;
+
+
+
+export const CompleteFilmmakerProjectTrailerUploadHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1),
+  "X-MSI-Upload-Token": zod.string().min(1).max(completeFilmmakerProjectTrailerUploadHeaderXMSIUploadTokenMax)
+})
+
+export const completeFilmmakerProjectTrailerUploadResponseTrailerUrlMax = 2048;
+
+export const completeFilmmakerProjectTrailerUploadResponsePitchDeckNameMax = 200;
+
+
+
+export const CompleteFilmmakerProjectTrailerUploadResponse = zod.object({
+  "synopsis": zod.string().nullable(),
+  "trailer_url": zod.string().max(completeFilmmakerProjectTrailerUploadResponseTrailerUrlMax).nullable(),
+  "poster_url": zod.string().url().nullable(),
+  "share_image_url": zod.string().url().nullable(),
+  "pitch_deck_url": zod.string().nullable().describe('Protected app-routed deck URL; never a Bunny CDN URL'),
+  "pitch_deck_name": zod.string().max(completeFilmmakerProjectTrailerUploadResponsePitchDeckNameMax).nullable()
+})
+
+
+/**
+ * @summary Abandon an unfinished pieced trailer upload and remove its Bunny Stream video
+ */
+
+export const cancelFilmmakerProjectTrailerUploadHeaderXMSIUploadTokenMax = 4096;
+
+
+
+export const CancelFilmmakerProjectTrailerUploadHeader = zod.object({
+  "X-MSI-Project-Id": zod.number().int().min(1),
+  "X-MSI-Upload-Token": zod.string().min(1).max(cancelFilmmakerProjectTrailerUploadHeaderXMSIUploadTokenMax)
+})
+
+export const CancelFilmmakerProjectTrailerUploadResponse = zod.object({
+  "cancelled": zod.boolean()
+})
+
+
+/**
  * @summary Server-bounded streaming upload of a trailer to the Movie Show Investing Bunny Stream collection
  */
 

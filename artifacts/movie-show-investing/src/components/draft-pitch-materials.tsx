@@ -40,6 +40,17 @@ export class UnsavedMaterialError extends Error {
   }
 }
 
+function errorStatus(error: unknown): number {
+  return error && typeof error === 'object' && 'status' in error ? Number((error as { status: unknown }).status) || 0 : 0;
+}
+
+/** The stored byte offset the API returns with a 409, so a piece upload can resume. */
+function serverOffset(error: unknown): number | null {
+  const data = error && typeof error === 'object' && 'data' in error ? (error as { data: unknown }).data : null;
+  const offset = data && typeof data === 'object' && 'offset' in data ? (data as { offset: unknown }).offset : null;
+  return typeof offset === 'number' && Number.isSafeInteger(offset) && offset >= 0 ? offset : null;
+}
+
 /** The server's own short JSON `error`, so failures name their real cause. */
 function serverErrorText(error: unknown): string | null {
   const data = error && typeof error === 'object' && 'data' in error ? (error as { data: unknown }).data : null;
@@ -341,6 +352,54 @@ export const DraftPitchMaterials = forwardRef<DraftPitchMaterialsHandle, DraftPi
     }
   }
 
+  // The deployment proxy refuses single requests over ~32 MB, so trailers go up
+  // in pieces; the API forwards each piece to Bunny Stream and enforces the cap.
+  async function uploadTrailerInPieces(file: File): Promise<SnapshotResponse> {
+    const session = await customFetch<{ token: string; chunk_bytes: number }>(`${base}/trailer/session`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ size: file.size, type: file.type, filename: file.name }),
+    });
+    const tokenHeaders = { ...headers, 'X-MSI-Upload-Token': session.token };
+    const retryable = (status: number) => status === 0 || status === 408 || status === 429 || status >= 500;
+    const pause = (attempt: number) => new Promise(resolve => window.setTimeout(resolve, 1000 * 2 ** attempt));
+    try {
+      let offset = 0;
+      while (offset < file.size) {
+        for (let attempt = 0; ; attempt++) {
+          try {
+            const stored = await customFetch<{ offset: number }>(`${base}/trailer/chunk`, {
+              method: 'POST',
+              headers: { ...tokenHeaders, 'Content-Type': 'application/octet-stream', 'X-MSI-Upload-Offset': String(offset) },
+              body: file.slice(offset, offset + session.chunk_bytes),
+            });
+            offset = stored.offset;
+            break;
+          } catch (error) {
+            const status = errorStatus(error);
+            const resumeAt = status === 409 ? serverOffset(error) : null;
+            if (resumeAt !== null) { offset = resumeAt; break; }
+            if (!retryable(status) || attempt >= 2) throw error;
+            await pause(attempt);
+          }
+        }
+        setUploadStatus(`Uploading trailer… ${Math.min(99, Math.floor((offset / file.size) * 100))}%`);
+      }
+      setUploadStatus('Finishing trailer upload…');
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await customFetch<SnapshotResponse>(`${base}/trailer/complete`, { method: 'POST', headers: tokenHeaders });
+        } catch (error) {
+          if (!retryable(errorStatus(error)) || attempt >= 2) throw error;
+          await pause(attempt);
+        }
+      }
+    } catch (error) {
+      void customFetch(`${base}/trailer/cancel`, { method: 'POST', headers: tokenHeaders }).catch(() => undefined);
+      throw error;
+    }
+  }
+
   async function upload(kind: UploadKind) {
     const file = selectedFiles[kind];
     if (!file || busy) return;
@@ -364,15 +423,17 @@ export const DraftPitchMaterials = forwardRef<DraftPitchMaterialsHandle, DraftPi
       const path = kind === 'poster' || kind === 'share'
         ? `${base}/images?kind=${kind}`
         : `${base}/${kind}`;
-      const next = await customFetch<SnapshotResponse>(path, {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Content-Type': file.type,
-          'X-MSI-Filename': encodeURIComponent(file.name),
-        },
-        body: file,
-      });
+      const next = kind === 'trailer'
+        ? await uploadTrailerInPieces(file)
+        : await customFetch<SnapshotResponse>(path, {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Type': file.type,
+            'X-MSI-Filename': encodeURIComponent(file.name),
+          },
+          body: file,
+        });
       commitSnapshot(next);
       setSelectedFiles(current => ({ ...current, [kind]: undefined }));
       if (kind === 'pitch-deck') setExpanded(current => ({ ...current, pitchDeck: true }));

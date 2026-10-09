@@ -36,7 +36,15 @@ import {
   UploadFilmmakerProjectImageResponse,
   UploadFilmmakerProjectPitchDeckResponse,
   UploadFilmmakerProjectTrailerResponse,
+  StartFilmmakerDraftTrailerUploadBody,
+  StartFilmmakerDraftTrailerUploadResponse,
+  UploadFilmmakerDraftTrailerChunkResponse,
+  CancelFilmmakerDraftTrailerUploadResponse,
 } from "@workspace/api-zod";
+import {
+  CHUNK_BYTES, SESSION_LIFETIME_SECONDS, bunnyTusSignature, openTrailerSession, sealTrailerSession, tusMetadata, validateChunk,
+  type TrailerUploadSession,
+} from "../lib/trailer-upload-session";
 import { authorizeAdminIdentity } from "../lib/admin-auth";
 import { logger } from "../lib/logger";
 import {
@@ -1019,6 +1027,50 @@ async function createStreamVideo(config: BunnyConfig, title: string): Promise<st
   return payload.guid;
 }
 
+// Bunny may briefly report "created" (0) right after the last byte lands, so
+// re-check a few times before treating the status as unverifiable.
+async function verifyStreamVideo(config: BunnyConfig, videoId: string): Promise<void> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, 1500));
+    const verified = await providerRequest(
+      `https://video.bunnycdn.com/library/${encodeURIComponent(config.libraryId)}/videos/${encodeURIComponent(videoId)}`,
+      { headers: { AccessKey: config.streamKey, accept: "application/json" } },
+    );
+    if (!verified.ok) {
+      await verified.body?.cancel().catch(() => undefined);
+      throw new RouteError(502, "Bunny Stream could not verify this trailer.");
+    }
+    const remote: unknown = await verified.json().catch(() => null);
+    const status = remote && typeof remote === "object" && "status" in remote && typeof remote.status === "number" ? remote.status : null;
+    if (status !== null && ACCEPTED_VIDEO_STATUSES.has(status)) return;
+    if (status !== 0) break;
+  }
+  throw new RouteError(502, "Bunny Stream returned an unverifiable trailer status.");
+}
+
+// Saves a verified Bunny video as the trailer. markCommitted runs once the
+// materials row references the video, so callers stop treating it as orphaned.
+async function persistTrailer(context: UploadContext, config: BunnyConfig, videoId: string, markCommitted: () => void) {
+  const url = `https://iframe.mediadelivery.net/embed/${encodeURIComponent(config.libraryId)}/${encodeURIComponent(videoId)}`;
+  const result = await persistAsset(context, { kind: "trailer", url, videoId });
+  if (!result) throw new RouteError(404, "Draft or project is no longer available.");
+  markCommitted();
+  const snapshot = context.type === "draft"
+    ? await currentDraftSnapshot(context)
+    : await currentProjectSnapshot(context);
+  if (!snapshot) throw new RouteError(404, "Draft or project is no longer available.");
+  if (context.type === "draft" && result.previousVideoId && result.previousVideoId !== videoId) {
+    await deleteCreatedVideo(config, result.previousVideoId);
+  }
+  return snapshot;
+}
+
+function sendTrailerSnapshot(res: ExpressResponse, context: UploadContext, snapshot: unknown): void {
+  res.set("Cache-Control", "private, no-store");
+  if (context.type === "draft") res.json(UploadFilmmakerDraftTrailerResponse.parse(snapshot));
+  else res.json(UploadFilmmakerProjectTrailerResponse.parse(snapshot));
+}
+
 async function uploadStreamVideo(
   req: Request,
   res: ExpressResponse,
@@ -1108,20 +1160,7 @@ async function uploadStreamVideo(
     if (!response.ok) throw new RouteError(502, "Bunny Stream could not store this trailer.");
     await finished(guard);
     if (clientDisconnected || controller.signal.aborted) throw new RouteError(400, "Trailer upload was aborted.");
-
-    const verified = await providerRequest(
-      `https://video.bunnycdn.com/library/${encodeURIComponent(config.libraryId)}/videos/${encodeURIComponent(videoId)}`,
-      { headers: { AccessKey: config.streamKey, accept: "application/json" } },
-    );
-    if (!verified.ok) {
-      await verified.body?.cancel().catch(() => undefined);
-      throw new RouteError(502, "Bunny Stream could not verify this trailer.");
-    }
-    const remote: unknown = await verified.json().catch(() => null);
-    if (!remote || typeof remote !== "object" || !("status" in remote)
-      || typeof remote.status !== "number" || !ACCEPTED_VIDEO_STATUSES.has(remote.status)) {
-      throw new RouteError(502, "Bunny Stream returned an unverifiable trailer status.");
-    }
+    await verifyStreamVideo(config, videoId);
   } catch (error) {
     controller.abort();
     req.unpipe(guard);
@@ -1158,20 +1197,9 @@ async function uploadTrailer(req: Request, res: ExpressResponse, context: Upload
   try {
     videoId = await createStreamVideo(config, filename);
     await uploadStreamVideo(req, res, config, videoId, expectedSize, type);
-    const url = `https://iframe.mediadelivery.net/embed/${encodeURIComponent(config.libraryId)}/${encodeURIComponent(videoId)}`;
-    const result = await persistAsset(context, { kind: "trailer", url, videoId });
-    if (!result) throw new RouteError(404, "Draft or project is no longer available.");
-    committed = true;
-    const snapshot = context.type === "draft"
-      ? await currentDraftSnapshot(context)
-      : await currentProjectSnapshot(context);
-    if (!snapshot) throw new RouteError(404, "Draft or project is no longer available.");
-    if (context.type === "draft" && result.previousVideoId && result.previousVideoId !== videoId) {
-      await deleteCreatedVideo(config, result.previousVideoId);
-    }
-    res.set("Cache-Control", "private, no-store");
-    if (context.type === "draft") res.json(UploadFilmmakerDraftTrailerResponse.parse(snapshot));
-    else res.json(UploadFilmmakerProjectTrailerResponse.parse(snapshot));
+    const createdVideoId = videoId;
+    const snapshot = await persistTrailer(context, config, createdVideoId, () => { committed = true; });
+    sendTrailerSnapshot(res, context, snapshot);
   } catch (error) {
     if (videoId && !committed) await deleteCreatedVideo(config, videoId);
     if (res.destroyed || res.writableEnded || !res.writable) return;
@@ -1211,6 +1239,220 @@ router.post("/filmmakers/project-materials/trailer", reserveUpload, async (req, 
     return;
   }
   await uploadTrailer(req, res, context, expectedSize);
+});
+
+// ---------------------------------------------------------------------------
+// Pieced trailer uploads. A single request over ~32 MB is refused by the
+// deployment proxy, so the browser sends <=16 MB pieces and this API acts as the
+// TUS client to Bunny Stream. The API sets Upload-Length when creating the TUS
+// upload, so Bunny itself refuses bytes past the declared (<=500 MB) size.
+// ---------------------------------------------------------------------------
+
+const TUS_ENDPOINT = "https://video.bunnycdn.com/tusupload";
+const TRAILER_SESSION_PATHS = ["/filmmakers/draft-materials/trailer/session", "/filmmakers/project-materials/trailer/session"];
+const TRAILER_CHUNK_PATHS = ["/filmmakers/draft-materials/trailer/chunk", "/filmmakers/project-materials/trailer/chunk"];
+const TRAILER_COMPLETE_PATHS = ["/filmmakers/draft-materials/trailer/complete", "/filmmakers/project-materials/trailer/complete"];
+const TRAILER_CANCEL_PATHS = ["/filmmakers/draft-materials/trailer/cancel", "/filmmakers/project-materials/trailer/cancel"];
+
+/** Resolves draft/project ownership (no single-upload lock: pieces are short requests). */
+function uploadSessionContext(req: Request, res: ExpressResponse, next: NextFunction): void {
+  void (async () => {
+    const context = await resolveUploadContext(req, res);
+    if (!context) return;
+    contextByRequest.set(req, context);
+    next();
+  })().catch(next);
+}
+
+function tusHeaders(config: BunnyConfig, session: Pick<TrailerUploadSession, "videoId" | "expire">): Record<string, string> {
+  return {
+    AuthorizationSignature: bunnyTusSignature(config.libraryId, config.streamKey, session.expire, session.videoId),
+    AuthorizationExpire: String(session.expire),
+    VideoId: session.videoId,
+    LibraryId: config.libraryId,
+    "Tus-Resumable": "1.0.0",
+  };
+}
+
+async function createTusUpload(config: BunnyConfig, videoId: string, size: number, type: string, filename: string, expire: number): Promise<string> {
+  const response = await providerRequest(TUS_ENDPOINT, {
+    method: "POST",
+    headers: {
+      ...tusHeaders(config, { videoId, expire }),
+      "Upload-Length": String(size),
+      "Upload-Metadata": tusMetadata({ filetype: type, title: filename, collection: config.collectionId }),
+    },
+  });
+  await response.body?.cancel().catch(() => undefined);
+  const location = response.headers.get("location");
+  if (response.status !== 201 || !location) throw new RouteError(502, "Bunny Stream could not start the trailer upload.");
+  const url = new URL(location, TUS_ENDPOINT);
+  // Only ever forward pieces to Bunny's own upload host.
+  if (url.protocol !== "https:" || url.hostname !== new URL(TUS_ENDPOINT).hostname) {
+    throw new RouteError(502, "Bunny Stream returned an unexpected upload location.");
+  }
+  return url.href;
+}
+
+async function tusOffset(config: BunnyConfig, session: TrailerUploadSession): Promise<number> {
+  const response = await providerRequest(session.tusUrl, { method: "HEAD", headers: tusHeaders(config, session) });
+  await response.body?.cancel().catch(() => undefined);
+  const offset = Number(response.headers.get("upload-offset"));
+  if (!response.ok || !Number.isSafeInteger(offset) || offset < 0) {
+    throw new RouteError(502, "Bunny Stream could not report the trailer upload progress.");
+  }
+  return offset;
+}
+
+async function tusPatch(config: BunnyConfig, session: TrailerUploadSession, offset: number, bytes: Buffer): Promise<number> {
+  const response = await providerRequest(session.tusUrl, {
+    method: "PATCH",
+    headers: {
+      ...tusHeaders(config, session),
+      "Upload-Offset": String(offset),
+      "Content-Type": "application/offset+octet-stream",
+      "Content-Length": String(bytes.length),
+    },
+    body: bytes,
+  }, 5 * 60 * 1000);
+  await response.body?.cancel().catch(() => undefined);
+  const next = Number(response.headers.get("upload-offset"));
+  if (response.status !== 204 || !Number.isSafeInteger(next) || next !== offset + bytes.length) {
+    throw new RouteError(502, "Bunny Stream did not accept this part of the trailer.");
+  }
+  return next;
+}
+
+function sendTrailerRouteError(req: Request, res: ExpressResponse, error: unknown, fallback: string): void {
+  if (res.headersSent) return;
+  if (error instanceof RouteError) {
+    res.status(error.statusCode).json({ error: error.message });
+    return;
+  }
+  req.log.warn({ error: error instanceof Error ? error.message : "Bunny Stream error" }, fallback);
+  res.status(502).json({ error: "Bunny Stream is temporarily unavailable." });
+}
+
+function openSessionOrReject(req: Request, res: ExpressResponse, context: UploadContext): TrailerUploadSession | null {
+  const session = openTrailerSession(req.get("X-MSI-Upload-Token"), context.ownerKey);
+  if (!session) res.status(400).json({ error: "This trailer upload session has expired or is invalid. Start the upload again." });
+  return session;
+}
+
+router.post(TRAILER_SESSION_PATHS, uploadSessionContext, async (req, res): Promise<void> => {
+  const context = contextFor(req);
+  if (!context) return;
+  const parsed = StartFilmmakerDraftTrailerUploadBody.safeParse(req.body);
+  const filename = parsed.success ? safeFilename(parsed.data.filename) : null;
+  if (!parsed.success || !filename || parsed.data.size > MAX_TRAILER_BYTES) {
+    res.status(400).json({ error: "Choose an MP4, WebM or MOV trailer no larger than 500 MB." });
+    return;
+  }
+  const config = readConfig().stream;
+  if (!config) {
+    res.status(503).json({ error: "Bunny Stream is not configured." });
+    return;
+  }
+  let videoId: string | null = null;
+  try {
+    videoId = await createStreamVideo(config, filename);
+    const expire = Math.floor(Date.now() / 1000) + SESSION_LIFETIME_SECONDS;
+    const tusUrl = await createTusUpload(config, videoId, parsed.data.size, parsed.data.type, filename, expire);
+    const token = sealTrailerSession({
+      videoId, tusUrl, size: parsed.data.size, type: parsed.data.type, filename, ownerKey: context.ownerKey, expire,
+    });
+    res.set("Cache-Control", "private, no-store");
+    res.json(StartFilmmakerDraftTrailerUploadResponse.parse({ token, chunk_bytes: CHUNK_BYTES }));
+  } catch (error) {
+    if (videoId) await deleteCreatedVideo(config, videoId);
+    sendTrailerRouteError(req, res, error, "Bunny Stream trailer session failed");
+  }
+});
+
+router.post(TRAILER_CHUNK_PATHS, uploadSessionContext, rawBody(CHUNK_BYTES, "Trailer piece"), async (req, res): Promise<void> => {
+  const context = contextFor(req);
+  if (!context) return;
+  const session = openSessionOrReject(req, res, context);
+  if (!session) return;
+  const config = readConfig().stream;
+  if (!config) {
+    res.status(503).json({ error: "Bunny Stream is not configured." });
+    return;
+  }
+  const rawOffset = req.get("X-MSI-Upload-Offset") ?? "";
+  const offset = /^\d+$/.test(rawOffset) ? Number(rawOffset) : -1;
+  const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  const invalid = validateChunk(session, offset, bytes.length);
+  if (invalid) {
+    res.status(400).json({ error: invalid });
+    return;
+  }
+  if (offset === 0 && !isTrailerBytes(bytes, session.type)) {
+    res.status(400).json({ error: "Trailer bytes do not match the declared MP4, WebM, or MOV type." });
+    return;
+  }
+  try {
+    const current = await tusOffset(config, session);
+    if (current !== offset) {
+      // A retried or interrupted piece: tell the browser where Bunny actually is.
+      res.status(409).json(UploadFilmmakerDraftTrailerChunkResponse.parse({ offset: current, error: "Resuming from the stored position." }));
+      return;
+    }
+    const next = await tusPatch(config, session, offset, bytes);
+    res.set("Cache-Control", "private, no-store");
+    res.json(UploadFilmmakerDraftTrailerChunkResponse.parse({ offset: next }));
+  } catch (error) {
+    sendTrailerRouteError(req, res, error, "Bunny Stream trailer piece failed");
+  }
+});
+
+router.post(TRAILER_COMPLETE_PATHS, uploadSessionContext, async (req, res): Promise<void> => {
+  const context = contextFor(req);
+  if (!context) return;
+  const session = openSessionOrReject(req, res, context);
+  if (!session) return;
+  const config = readConfig().stream;
+  if (!config) {
+    res.status(503).json({ error: "Bunny Stream is not configured." });
+    return;
+  }
+  let committed = false;
+  try {
+    const stored = await tusOffset(config, session);
+    if (stored !== session.size) {
+      res.status(409).json({ error: "The trailer upload is not complete yet." });
+      return;
+    }
+    // A verification hiccup leaves the video in place so the browser can retry completion.
+    await verifyStreamVideo(config, session.videoId);
+    try {
+      const snapshot = await persistTrailer(context, config, session.videoId, () => { committed = true; });
+      sendTrailerSnapshot(res, context, snapshot);
+    } catch (error) {
+      if (!committed) await deleteCreatedVideo(config, session.videoId);
+      throw error;
+    }
+  } catch (error) {
+    sendTrailerRouteError(req, res, error, "Bunny Stream trailer completion failed");
+  }
+});
+
+router.post(TRAILER_CANCEL_PATHS, uploadSessionContext, async (req, res): Promise<void> => {
+  const context = contextFor(req);
+  if (!context) return;
+  const session = openSessionOrReject(req, res, context);
+  if (!session) return;
+  const config = readConfig().stream;
+  let cancelled = false;
+  if (config) {
+    // Never remove a video that has already been saved as this owner's trailer.
+    const snapshot = context.type === "draft" ? await currentDraftSnapshot(context) : await currentProjectSnapshot(context);
+    if (!snapshot?.trailer_url?.includes(session.videoId)) {
+      await deleteCreatedVideo(config, session.videoId);
+      cancelled = true;
+    }
+  }
+  res.json(CancelFilmmakerDraftTrailerUploadResponse.parse({ cancelled }));
 });
 
 router.get("/filmmakers/project-materials", async (req, res): Promise<void> => {
