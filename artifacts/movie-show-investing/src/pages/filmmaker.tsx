@@ -41,7 +41,7 @@ type Answers = {
 };
 const initial: Answers = {
   stage:null, no_project_yet:false, title:'', format:'movie', genre:'', genre_other:'', logline:'', trailer_url:'', pilot_url:'',
-  budget:0, budget_mode:'custom', deal_answer:null, offer_per100:null, offer_choice:'', offer_other_text:'', wants_lower:false,
+  budget:0, budget_mode:'example', deal_answer:null, offer_per100:null, offer_choice:'', offer_other_text:'', wants_lower:false,
   payback_terms:null, payback_terms_other:'', funding_sources:[], funding_other:'', reached_goal:null, funding_experience:'',
   flow_version:FLOW_VERSION, age_confirmed:false, decision:null, p_repayment:'', p_investor:'50', p_years:'5', p_early_on:false, p_early:String(EARLY_EXAMPLE), p_note:'', original_suggestion:null,
   name:'', email:'', phone:'', city:'', state:'', country:'', location_manual:false, favorite_genres:[], chat_opt_in:false,
@@ -103,10 +103,13 @@ function payload(a:Answers):FilmmakerSubmissionInput {
     title:a.title.trim(), format:a.format, genre:a.genre || undefined, genre_other:a.genre === 'Other' ? a.genre_other.trim() : undefined,
     logline:a.logline.trim(), pilot_url:a.stage === 'production' ? a.pilot_url.trim() || undefined : undefined,
     budget:a.budget, budget_from_example:a.budget_mode === 'example',
-    // Money date: optional; a skip is sent apart from a blank. The dates stay private.
-    development_amount:num(a.development_amount ?? ''),
-    filming_start_month:a.filming_start_skipped ? undefined : a.filming_start_month || undefined, filming_start_skipped:a.filming_start_skipped ?? false,
-    money_needed_by_month:a.money_needed_by_skipped ? undefined : a.money_needed_by_month || undefined, money_needed_by_skipped:a.money_needed_by_skipped ?? false,
+    // Money date: optional and private. Only answered fields are sent; a skip is sent apart from a blank.
+    // Distribution projects are already shot: no development amount or filming start.
+    ...(a.stage !== 'distribution' && a.development_amount ? { development_amount:num(a.development_amount) } : {}),
+    ...(a.stage !== 'distribution' && a.filming_start_skipped ? { filming_start_skipped:true } : {}),
+    ...(a.stage !== 'distribution' && !a.filming_start_skipped && a.filming_start_month ? { filming_start_month:a.filming_start_month } : {}),
+    ...(a.money_needed_by_skipped ? { money_needed_by_skipped:true } : {}),
+    ...(!a.money_needed_by_skipped && a.money_needed_by_month ? { money_needed_by_month:a.money_needed_by_month } : {}),
     proposal, offer_per100:proposal?.repayment_per100, deal_answer:proposal ? (proposal.decision === 'standard' ? 'yes' : 'maybe') : undefined,
     payback_terms:proposal ? (proposal.early_filmmaker_percent > 0 ? 'need_some' : 'works') : undefined, wants_lower:false,
     funding_sources:a.funding_sources, funding_other:a.funding_sources.includes('Other') ? a.funding_other.trim() : undefined,
@@ -652,7 +655,7 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail }: { identi
   const proposalCard = receipt && repNum !== null && <div className="fm-receipt" data-testid="receipt-deal">
     <h3>{negotiating ? 'Your proposal at a glance' : 'Suggested terms at a glance'}</h3><dl>
       <div><dt>Project budget</dt><dd data-testid="text-budget">{money(budget)}</dd></div>
-      {a.development_amount ? <div><dt>Development amount</dt><dd data-testid="text-development-amount">{money(Number(a.development_amount))}</dd></div> : null}
+      {a.stage !== 'distribution' && a.development_amount ? <div><dt>Development amount</dt><dd data-testid="text-development-amount">{money(Number(a.development_amount))}</dd></div> : null}
       <div><dt>1 · Investor repayment target · {money(repNum)} per $100, including original capital</dt><dd data-testid="text-investor-target">{money(receipt.investorTarget)}</dd></div>
       <div><dt>Platform fee, separate from the target · {feePct}% of budget</dt><dd data-testid="text-platform-fee">{money(receipt.platformFee)}</dd></div>
       <div className="fm-total"><dt>Combined project repayment threshold</dt><dd data-testid="text-combined-payback">{money(receipt.combinedPayback)}</dd></div>
@@ -672,9 +675,11 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail }: { identi
     </div>
     {a.budget_mode === 'example' ? <div className="fm-amounts">{budgetOptions.map(value=><Choice key={value} id={`budget-${value}`} name="example-budget" selected={a.budget===value} onClick={()=>updateBudget(value)}>{money(value)}</Choice>)}</div> :
       <div className="fm-field"><label htmlFor="custom-budget" className="fm-label">Your estimated budget · USD</label><input id="custom-budget" data-testid="input-custom-budget" className="fm-input" inputMode="numeric" value={a.budget ? a.budget.toLocaleString('en-US') : ''} onChange={e=>{ const raw=e.target.value.replace(/,/g,''); if (/^\d*$/.test(raw)) updateBudget(raw ? Number(raw) : 0); }} aria-invalid={!budgetValid} />{!budgetValid && <p className="fm-error" role="alert">Enter a positive whole-dollar amount.</p>}</div>}
+    {a.stage !== 'distribution' && <>
     <div className="fm-field" style={{ marginTop: 18 }}><label htmlFor="development-amount" className="fm-label">Development amount · USD <span className="fm-small">· optional</span></label>
       <input id="development-amount" data-testid="input-development-amount" className="fm-input" inputMode="numeric" value={a.development_amount ? Number(a.development_amount).toLocaleString('en-US') : ''} onChange={e=>change('development_amount', e.target.value.replace(/[^0-9]/g,''))} placeholder="For example: 15,000"/>
       <p className="fm-small">What you need to get the project ready to shoot, if that differs from the full budget. Shown next to the budget.</p></div>
+    </>}
     <div className="fm-section" data-testid="section-your-timeline" style={{ marginTop: 22 }}>
       <p className="fm-label">Your timeline</p>
       <p className="fm-small" style={{ marginBottom: 14 }}>Private to you and Movie Show Investing. Never shown on your project page, in Explore or in emails to backers.</p>
@@ -773,7 +778,7 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail }: { identi
                <div><dt>Stage</dt><dd>{phase(stage)}</dd></div>
                <div><dt>Title</dt><dd>{a.title || '—'}</dd></div>
                <div><dt>Budget</dt><dd data-testid="text-selected-budget">{money(budget)}</dd></div>
-               {a.development_amount ? <div><dt>Development amount</dt><dd data-testid="text-selected-development">{money(Number(a.development_amount))}</dd></div> : null}
+               {a.stage !== 'distribution' && a.development_amount ? <div><dt>Development amount</dt><dd data-testid="text-selected-development">{money(Number(a.development_amount))}</dd></div> : null}
                <div><dt>Decision</dt><dd>{negotiating ? 'Open to negotiation' : 'Looks good to me'}</dd></div>
                {repNum !== null && <div><dt>Repayment target</dt><dd>{money(repNum)} per $100 · {money(Math.round(budget*repNum)/100)}</dd></div>}
                {termsView && <div><dt>Backend</dt><dd>{termsView.inv}/{100-termsView.inv} for {termsView.years} yr{termsView.early ? ` · early share ${termsView.early}%` : ''}</dd></div>}

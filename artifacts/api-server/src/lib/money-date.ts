@@ -36,7 +36,8 @@ export function asksFilmingStart(stage: string | null | undefined): boolean {
 }
 
 export function validateMoneyDate(input: MoneyDateInput, stage?: string | null): { ok: true; value: MoneyDateValue } | { ok: false; error: string } {
-  const amount = input.development_amount;
+  // Distribution projects are already shot, so they have no development amount either.
+  const amount = stage === "distribution" ? null : input.development_amount;
   if (amount !== undefined && amount !== null && (!Number.isSafeInteger(amount) || amount < 0 || amount > MAX_AMOUNT)) {
     return { ok: false, error: "Enter the development amount as whole dollars." };
   }

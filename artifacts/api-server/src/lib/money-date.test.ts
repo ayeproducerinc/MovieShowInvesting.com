@@ -10,6 +10,8 @@ test("only Idea and Production projects are asked when filming starts; Distribut
   const distribution = validateMoneyDate({ filming_start_month: "2027-03", filming_start_skipped: true, money_needed_by_month: "2027-01" }, "distribution");
   assert.ok(distribution.ok && distribution.value.filming_start_month === null && distribution.value.filming_start_skipped === false);
   assert.ok(distribution.ok && distribution.value.money_needed_by_month === "2027-01");
+  const shot = validateMoneyDate({ development_amount: 15000 }, "distribution");
+  assert.ok(shot.ok && shot.value.development_amount === null);
 });
 
 test("a skip is recorded separately from a blank", () => {
