@@ -231,28 +231,43 @@ export interface AdminReviewNotesInput {
   updated_at?: string | null;
 }
 
-export interface AuthUser {
-  id: string;
-  email: string;
-  /** @nullable */
-  firstName: string | null;
-  /** @nullable */
-  lastName: string | null;
-  /** @nullable */
-  profileImageUrl: string | null;
-}
+export type FilmmakerTrailerUploadStartType = typeof FilmmakerTrailerUploadStartType[keyof typeof FilmmakerTrailerUploadStartType];
 
-export interface AuthUserEnvelope {
-  user: AuthUser | null;
-}
 
-export interface LogoutSessionEnvelope {
-  success: true;
+export const FilmmakerTrailerUploadStartType = {
+  'video/mp4': 'video/mp4',
+  'video/webm': 'video/webm',
+  'video/quicktime': 'video/quicktime',
+} as const;
+
+export interface FilmmakerTrailerUploadStart {
+  /**
+     * @minimum 1
+     * @maximum 524288000
+     */
+  size: number;
+  type: FilmmakerTrailerUploadStartType;
   /**
      * @minLength 1
-     * @maxLength 2048
+     * @maxLength 200
      */
-  returnTo: string;
+  filename: string;
+}
+
+export interface FilmmakerTrailerUploadSession {
+  token: string;
+  /** @minimum 1 */
+  chunk_bytes: number;
+}
+
+export interface FilmmakerTrailerUploadProgress {
+  /** @minimum 0 */
+  offset: number;
+  error?: string;
+}
+
+export interface FilmmakerTrailerUploadCancel {
+  cancelled: boolean;
 }
 
 export interface QuestionConfig {
@@ -1141,8 +1156,8 @@ export interface InvestorAllocationInput {
   /** @minimum 1 */
   project_id: number;
   /**
-     * Whole-dollar allocation of at least $25
-     * @minimum 25
+     * Whole-dollar allocation of at least $100 per project (new pledges)
+     * @minimum 100
      * @maximum 2147483647
      */
   amount: number;
@@ -1181,7 +1196,7 @@ export interface InvestorIntentInput {
      */
   amount: number;
   /**
-     * Distinct projects only; at most 4 projects for totals below $150 and 5 otherwise. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.
+     * Distinct projects only; up to 5 projects at $100 or more each. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.
      * @maxItems 5
      */
   allocations: InvestorAllocationInput[];
@@ -1678,18 +1693,6 @@ export type GetAdminReferralsParams = {
  * @minimum 1
  */
 page?: number;
-};
-
-export type BeginBrowserLoginParams = {
-returnTo?: string;
-};
-
-export type LogoutBrowserSessionParams = {
-/**
- * Optional local path returned for post-logout navigation.
- * @maxLength 2048
- */
-returnTo?: string;
 };
 
 export type SearchLocationsParams = {

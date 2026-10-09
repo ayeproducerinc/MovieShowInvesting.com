@@ -35,8 +35,6 @@ import type {
   AdminTestProjectCleanupResult,
   AgeConfirmation,
   AgeConfirmationInput,
-  AuthUserEnvelope,
-  BeginBrowserLoginParams,
   CleanupUnfinishedDrafts200,
   Conversation,
   ConversationDetail,
@@ -76,6 +74,10 @@ import type {
   FilmmakerSubmissionConfig,
   FilmmakerSubmissionInput,
   FilmmakerTrailerUpload,
+  FilmmakerTrailerUploadCancel,
+  FilmmakerTrailerUploadProgress,
+  FilmmakerTrailerUploadSession,
+  FilmmakerTrailerUploadStart,
   FirebaseConfig,
   Flow,
   FlowProgress,
@@ -97,8 +99,6 @@ import type {
   InvestorNotificationInput,
   InvestorNotificationPermission,
   LocationSearchPayload,
-  LogoutBrowserSessionParams,
-  LogoutSessionEnvelope,
   MessagingConfig,
   PriceGroup,
   PublicProject,
@@ -992,325 +992,6 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getConfirmAgeMutationOptions(options));
-    }
-
-export const getGetCurrentAuthUserUrl = () => {
-
-
-
-
-  return `/api/auth/user`
-}
-
-/**
- * @summary Get the current browser session user
- */
-export const getCurrentAuthUser = async ( options?: Parameters<typeof customFetch>[1]): Promise<AuthUserEnvelope> => {
-
-  return customFetch<AuthUserEnvelope>(getGetCurrentAuthUserUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetCurrentAuthUserQueryKey = () => {
-    return [
-    `/api/auth/user`
-    ] as const;
-    }
-
-
-export const getGetCurrentAuthUserQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentAuthUser>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentAuthUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetCurrentAuthUserQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentAuthUser>>> = ({ signal }) => getCurrentAuthUser({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentAuthUser>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetCurrentAuthUserQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentAuthUser>>>
-export type GetCurrentAuthUserQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Get the current browser session user
- */
-
-export function useGetCurrentAuthUser<TData = Awaited<ReturnType<typeof getCurrentAuthUser>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentAuthUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetCurrentAuthUserQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getBeginBrowserLoginUrl = (params?: BeginBrowserLoginParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/login?${stringifiedParams}` : `/api/login`
-}
-
-/**
- * @summary Redirect legacy login links to the Google sign-in screen
- */
-export const beginBrowserLogin = async (params?: BeginBrowserLoginParams, options?: Parameters<typeof customFetch>[1]): Promise<unknown> => {
-
-  return customFetch<unknown>(getBeginBrowserLoginUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getBeginBrowserLoginQueryKey = (params?: BeginBrowserLoginParams,) => {
-    return [
-    `/api/login`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getBeginBrowserLoginQueryOptions = <TData = Awaited<ReturnType<typeof beginBrowserLogin>>, TError = ErrorType<void>>(params?: BeginBrowserLoginParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof beginBrowserLogin>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getBeginBrowserLoginQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof beginBrowserLogin>>> = ({ signal }) => beginBrowserLogin(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof beginBrowserLogin>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type BeginBrowserLoginQueryResult = NonNullable<Awaited<ReturnType<typeof beginBrowserLogin>>>
-export type BeginBrowserLoginQueryError = ErrorType<void>
-
-
-/**
- * @summary Redirect legacy login links to the Google sign-in screen
- */
-
-export function useBeginBrowserLogin<TData = Awaited<ReturnType<typeof beginBrowserLogin>>, TError = ErrorType<void>>(
- params?: BeginBrowserLoginParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof beginBrowserLogin>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getBeginBrowserLoginQueryOptions(params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getHandleBrowserLoginCallbackUrl = () => {
-
-
-
-
-  return `/api/callback`
-}
-
-/**
- * @summary Reject deprecated browser OIDC callbacks
- */
-export const handleBrowserLoginCallback = async ( options?: Parameters<typeof customFetch>[1]): Promise<unknown> => {
-
-  return customFetch<unknown>(getHandleBrowserLoginCallbackUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getHandleBrowserLoginCallbackQueryKey = () => {
-    return [
-    `/api/callback`
-    ] as const;
-    }
-
-
-export const getHandleBrowserLoginCallbackQueryOptions = <TData = Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getHandleBrowserLoginCallbackQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof handleBrowserLoginCallback>>> = ({ signal }) => handleBrowserLoginCallback({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type HandleBrowserLoginCallbackQueryResult = NonNullable<Awaited<ReturnType<typeof handleBrowserLoginCallback>>>
-export type HandleBrowserLoginCallbackQueryError = ErrorType<void>
-
-
-/**
- * @summary Reject deprecated browser OIDC callbacks
- */
-
-export function useHandleBrowserLoginCallback<TData = Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof handleBrowserLoginCallback>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getHandleBrowserLoginCallbackQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getLogoutBrowserSessionUrl = (params?: LogoutBrowserSessionParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/logout?${stringifiedParams}` : `/api/logout`
-}
-
-/**
- * @summary End the browser session using a same-origin request
- */
-export const logoutBrowserSession = async (params?: LogoutBrowserSessionParams, options?: Parameters<typeof customFetch>[1]): Promise<LogoutSessionEnvelope> => {
-
-  return customFetch<LogoutSessionEnvelope>(getLogoutBrowserSessionUrl(params),
-  {
-    ...options,
-    method: 'POST'
-
-
-  }
-);}
-
-
-
-
-
-export const getLogoutBrowserSessionMutationKey = () => ['logoutBrowserSession'] as const;
-
-export const getLogoutBrowserSessionMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutBrowserSession>>, TError,LogoutBrowserSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof logoutBrowserSession>>, TError,LogoutBrowserSessionMutationVariables, TContext> => {
-
-const mutationKey = getLogoutBrowserSessionMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutBrowserSession>>, LogoutBrowserSessionMutationVariables> = (props) => {
-          const {params} = props ?? {};
-
-          return  logoutBrowserSession(params,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type LogoutBrowserSessionMutationResult = NonNullable<Awaited<ReturnType<typeof logoutBrowserSession>>>
-
-    export type LogoutBrowserSessionMutationError = ErrorType<void>
-    export type LogoutBrowserSessionMutationVariables = {params?: LogoutBrowserSessionParams}
-
-    /**
- * @summary End the browser session using a same-origin request
- */
-export const useLogoutBrowserSession = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutBrowserSession>>, TError,LogoutBrowserSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof logoutBrowserSession>>,
-        TError,
-        LogoutBrowserSessionMutationVariables,
-        TContext
-      > => {
-      return useMutation(getLogoutBrowserSessionMutationOptions(options));
     }
 
 export const getGetQuestionConfigUrl = () => {
@@ -3828,6 +3509,654 @@ export const useUploadFilmmakerDraftImage = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUploadFilmmakerDraftImageMutationOptions(options));
+    }
+
+export const getStartFilmmakerDraftTrailerUploadUrl = () => {
+
+
+
+
+  return `/api/filmmakers/draft-materials/trailer/session`
+}
+
+/**
+ * @summary Start a pieced trailer upload for a draft; the API creates a size-bounded Bunny Stream TUS upload
+ */
+export const startFilmmakerDraftTrailerUpload = async (filmmakerTrailerUploadStart: FilmmakerTrailerUploadStart, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerTrailerUploadSession> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerTrailerUploadSession>(getStartFilmmakerDraftTrailerUploadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(filmmakerTrailerUploadStart)
+  }
+);}
+
+
+
+
+
+export const getStartFilmmakerDraftTrailerUploadMutationKey = () => ['startFilmmakerDraftTrailerUpload'] as const;
+
+export const getStartFilmmakerDraftTrailerUploadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startFilmmakerDraftTrailerUpload>>, TError,StartFilmmakerDraftTrailerUploadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startFilmmakerDraftTrailerUpload>>, TError,StartFilmmakerDraftTrailerUploadMutationVariables, TContext> => {
+
+const mutationKey = getStartFilmmakerDraftTrailerUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startFilmmakerDraftTrailerUpload>>, StartFilmmakerDraftTrailerUploadMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  startFilmmakerDraftTrailerUpload(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartFilmmakerDraftTrailerUploadMutationResult = NonNullable<Awaited<ReturnType<typeof startFilmmakerDraftTrailerUpload>>>
+    export type StartFilmmakerDraftTrailerUploadMutationBody = BodyType<FilmmakerTrailerUploadStart>
+    export type StartFilmmakerDraftTrailerUploadMutationError = ErrorType<void>
+    export type StartFilmmakerDraftTrailerUploadMutationVariables = {data: BodyType<FilmmakerTrailerUploadStart>}
+
+    /**
+ * @summary Start a pieced trailer upload for a draft; the API creates a size-bounded Bunny Stream TUS upload
+ */
+export const useStartFilmmakerDraftTrailerUpload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startFilmmakerDraftTrailerUpload>>, TError,StartFilmmakerDraftTrailerUploadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startFilmmakerDraftTrailerUpload>>,
+        TError,
+        StartFilmmakerDraftTrailerUploadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getStartFilmmakerDraftTrailerUploadMutationOptions(options));
+    }
+
+export const getUploadFilmmakerDraftTrailerChunkUrl = () => {
+
+
+
+
+  return `/api/filmmakers/draft-materials/trailer/chunk`
+}
+
+/**
+ * @summary Forward one piece (at most 16 MB) of a pieced trailer upload to Bunny Stream
+ */
+export const uploadFilmmakerDraftTrailerChunk = async (uploadFilmmakerDraftTrailerChunkBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerTrailerUploadProgress> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerTrailerUploadProgress>(getUploadFilmmakerDraftTrailerChunkUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadFilmmakerDraftTrailerChunkBody
+  }
+);}
+
+
+
+
+
+export const getUploadFilmmakerDraftTrailerChunkMutationKey = () => ['uploadFilmmakerDraftTrailerChunk'] as const;
+
+export const getUploadFilmmakerDraftTrailerChunkMutationOptions = <TError = ErrorType<void | FilmmakerTrailerUploadProgress>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftTrailerChunk>>, TError,UploadFilmmakerDraftTrailerChunkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftTrailerChunk>>, TError,UploadFilmmakerDraftTrailerChunkMutationVariables, TContext> => {
+
+const mutationKey = getUploadFilmmakerDraftTrailerChunkMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadFilmmakerDraftTrailerChunk>>, UploadFilmmakerDraftTrailerChunkMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadFilmmakerDraftTrailerChunk(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadFilmmakerDraftTrailerChunkMutationResult = NonNullable<Awaited<ReturnType<typeof uploadFilmmakerDraftTrailerChunk>>>
+    export type UploadFilmmakerDraftTrailerChunkMutationBody = BodyType<Blob>
+    export type UploadFilmmakerDraftTrailerChunkMutationError = ErrorType<void | FilmmakerTrailerUploadProgress>
+    export type UploadFilmmakerDraftTrailerChunkMutationVariables = {data: BodyType<Blob>}
+
+    /**
+ * @summary Forward one piece (at most 16 MB) of a pieced trailer upload to Bunny Stream
+ */
+export const useUploadFilmmakerDraftTrailerChunk = <TError = ErrorType<void | FilmmakerTrailerUploadProgress>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerDraftTrailerChunk>>, TError,UploadFilmmakerDraftTrailerChunkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadFilmmakerDraftTrailerChunk>>,
+        TError,
+        UploadFilmmakerDraftTrailerChunkMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadFilmmakerDraftTrailerChunkMutationOptions(options));
+    }
+
+export const getCompleteFilmmakerDraftTrailerUploadUrl = () => {
+
+
+
+
+  return `/api/filmmakers/draft-materials/trailer/complete`
+}
+
+/**
+ * @summary Verify a fully uploaded pieced trailer and save it to the draft
+ */
+export const completeFilmmakerDraftTrailerUpload = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+  return customFetch<FilmmakerMaterialSnapshot>(getCompleteFilmmakerDraftTrailerUploadUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCompleteFilmmakerDraftTrailerUploadMutationKey = () => ['completeFilmmakerDraftTrailerUpload'] as const;
+
+export const getCompleteFilmmakerDraftTrailerUploadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeFilmmakerDraftTrailerUpload>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeFilmmakerDraftTrailerUpload>>, TError,void, TContext> => {
+
+const mutationKey = getCompleteFilmmakerDraftTrailerUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeFilmmakerDraftTrailerUpload>>, void> = () => {
+
+
+          return  completeFilmmakerDraftTrailerUpload(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteFilmmakerDraftTrailerUploadMutationResult = NonNullable<Awaited<ReturnType<typeof completeFilmmakerDraftTrailerUpload>>>
+
+    export type CompleteFilmmakerDraftTrailerUploadMutationError = ErrorType<void>
+
+
+    /**
+ * @summary Verify a fully uploaded pieced trailer and save it to the draft
+ */
+export const useCompleteFilmmakerDraftTrailerUpload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeFilmmakerDraftTrailerUpload>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeFilmmakerDraftTrailerUpload>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCompleteFilmmakerDraftTrailerUploadMutationOptions(options));
+    }
+
+export const getCancelFilmmakerDraftTrailerUploadUrl = () => {
+
+
+
+
+  return `/api/filmmakers/draft-materials/trailer/cancel`
+}
+
+/**
+ * @summary Abandon an unfinished pieced trailer upload and remove its Bunny Stream video
+ */
+export const cancelFilmmakerDraftTrailerUpload = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerTrailerUploadCancel> => {
+
+  return customFetch<FilmmakerTrailerUploadCancel>(getCancelFilmmakerDraftTrailerUploadUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCancelFilmmakerDraftTrailerUploadMutationKey = () => ['cancelFilmmakerDraftTrailerUpload'] as const;
+
+export const getCancelFilmmakerDraftTrailerUploadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelFilmmakerDraftTrailerUpload>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelFilmmakerDraftTrailerUpload>>, TError,void, TContext> => {
+
+const mutationKey = getCancelFilmmakerDraftTrailerUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelFilmmakerDraftTrailerUpload>>, void> = () => {
+
+
+          return  cancelFilmmakerDraftTrailerUpload(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelFilmmakerDraftTrailerUploadMutationResult = NonNullable<Awaited<ReturnType<typeof cancelFilmmakerDraftTrailerUpload>>>
+
+    export type CancelFilmmakerDraftTrailerUploadMutationError = ErrorType<unknown>
+
+
+    /**
+ * @summary Abandon an unfinished pieced trailer upload and remove its Bunny Stream video
+ */
+export const useCancelFilmmakerDraftTrailerUpload = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelFilmmakerDraftTrailerUpload>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelFilmmakerDraftTrailerUpload>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCancelFilmmakerDraftTrailerUploadMutationOptions(options));
+    }
+
+export const getStartFilmmakerProjectTrailerUploadUrl = () => {
+
+
+
+
+  return `/api/filmmakers/project-materials/trailer/session`
+}
+
+/**
+ * @summary Start a pieced trailer upload for a account-owned project; the API creates a size-bounded Bunny Stream TUS upload
+ */
+export const startFilmmakerProjectTrailerUpload = async (filmmakerTrailerUploadStart: FilmmakerTrailerUploadStart, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerTrailerUploadSession> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerTrailerUploadSession>(getStartFilmmakerProjectTrailerUploadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(filmmakerTrailerUploadStart)
+  }
+);}
+
+
+
+
+
+export const getStartFilmmakerProjectTrailerUploadMutationKey = () => ['startFilmmakerProjectTrailerUpload'] as const;
+
+export const getStartFilmmakerProjectTrailerUploadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startFilmmakerProjectTrailerUpload>>, TError,StartFilmmakerProjectTrailerUploadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startFilmmakerProjectTrailerUpload>>, TError,StartFilmmakerProjectTrailerUploadMutationVariables, TContext> => {
+
+const mutationKey = getStartFilmmakerProjectTrailerUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startFilmmakerProjectTrailerUpload>>, StartFilmmakerProjectTrailerUploadMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  startFilmmakerProjectTrailerUpload(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartFilmmakerProjectTrailerUploadMutationResult = NonNullable<Awaited<ReturnType<typeof startFilmmakerProjectTrailerUpload>>>
+    export type StartFilmmakerProjectTrailerUploadMutationBody = BodyType<FilmmakerTrailerUploadStart>
+    export type StartFilmmakerProjectTrailerUploadMutationError = ErrorType<void>
+    export type StartFilmmakerProjectTrailerUploadMutationVariables = {data: BodyType<FilmmakerTrailerUploadStart>}
+
+    /**
+ * @summary Start a pieced trailer upload for a account-owned project; the API creates a size-bounded Bunny Stream TUS upload
+ */
+export const useStartFilmmakerProjectTrailerUpload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startFilmmakerProjectTrailerUpload>>, TError,StartFilmmakerProjectTrailerUploadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startFilmmakerProjectTrailerUpload>>,
+        TError,
+        StartFilmmakerProjectTrailerUploadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getStartFilmmakerProjectTrailerUploadMutationOptions(options));
+    }
+
+export const getUploadFilmmakerProjectTrailerChunkUrl = () => {
+
+
+
+
+  return `/api/filmmakers/project-materials/trailer/chunk`
+}
+
+/**
+ * @summary Forward one piece (at most 16 MB) of a pieced trailer upload to Bunny Stream
+ */
+export const uploadFilmmakerProjectTrailerChunk = async (uploadFilmmakerProjectTrailerChunkBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerTrailerUploadProgress> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerTrailerUploadProgress>(getUploadFilmmakerProjectTrailerChunkUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: uploadFilmmakerProjectTrailerChunkBody
+  }
+);}
+
+
+
+
+
+export const getUploadFilmmakerProjectTrailerChunkMutationKey = () => ['uploadFilmmakerProjectTrailerChunk'] as const;
+
+export const getUploadFilmmakerProjectTrailerChunkMutationOptions = <TError = ErrorType<void | FilmmakerTrailerUploadProgress>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectTrailerChunk>>, TError,UploadFilmmakerProjectTrailerChunkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectTrailerChunk>>, TError,UploadFilmmakerProjectTrailerChunkMutationVariables, TContext> => {
+
+const mutationKey = getUploadFilmmakerProjectTrailerChunkMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadFilmmakerProjectTrailerChunk>>, UploadFilmmakerProjectTrailerChunkMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  uploadFilmmakerProjectTrailerChunk(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadFilmmakerProjectTrailerChunkMutationResult = NonNullable<Awaited<ReturnType<typeof uploadFilmmakerProjectTrailerChunk>>>
+    export type UploadFilmmakerProjectTrailerChunkMutationBody = BodyType<Blob>
+    export type UploadFilmmakerProjectTrailerChunkMutationError = ErrorType<void | FilmmakerTrailerUploadProgress>
+    export type UploadFilmmakerProjectTrailerChunkMutationVariables = {data: BodyType<Blob>}
+
+    /**
+ * @summary Forward one piece (at most 16 MB) of a pieced trailer upload to Bunny Stream
+ */
+export const useUploadFilmmakerProjectTrailerChunk = <TError = ErrorType<void | FilmmakerTrailerUploadProgress>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadFilmmakerProjectTrailerChunk>>, TError,UploadFilmmakerProjectTrailerChunkMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadFilmmakerProjectTrailerChunk>>,
+        TError,
+        UploadFilmmakerProjectTrailerChunkMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUploadFilmmakerProjectTrailerChunkMutationOptions(options));
+    }
+
+export const getCompleteFilmmakerProjectTrailerUploadUrl = () => {
+
+
+
+
+  return `/api/filmmakers/project-materials/trailer/complete`
+}
+
+/**
+ * @summary Verify a fully uploaded pieced trailer and save it to the account-owned project
+ */
+export const completeFilmmakerProjectTrailerUpload = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerMaterialSnapshot> => {
+
+  return customFetch<FilmmakerMaterialSnapshot>(getCompleteFilmmakerProjectTrailerUploadUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCompleteFilmmakerProjectTrailerUploadMutationKey = () => ['completeFilmmakerProjectTrailerUpload'] as const;
+
+export const getCompleteFilmmakerProjectTrailerUploadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeFilmmakerProjectTrailerUpload>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeFilmmakerProjectTrailerUpload>>, TError,void, TContext> => {
+
+const mutationKey = getCompleteFilmmakerProjectTrailerUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeFilmmakerProjectTrailerUpload>>, void> = () => {
+
+
+          return  completeFilmmakerProjectTrailerUpload(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteFilmmakerProjectTrailerUploadMutationResult = NonNullable<Awaited<ReturnType<typeof completeFilmmakerProjectTrailerUpload>>>
+
+    export type CompleteFilmmakerProjectTrailerUploadMutationError = ErrorType<void>
+
+
+    /**
+ * @summary Verify a fully uploaded pieced trailer and save it to the account-owned project
+ */
+export const useCompleteFilmmakerProjectTrailerUpload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeFilmmakerProjectTrailerUpload>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeFilmmakerProjectTrailerUpload>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCompleteFilmmakerProjectTrailerUploadMutationOptions(options));
+    }
+
+export const getCancelFilmmakerProjectTrailerUploadUrl = () => {
+
+
+
+
+  return `/api/filmmakers/project-materials/trailer/cancel`
+}
+
+/**
+ * @summary Abandon an unfinished pieced trailer upload and remove its Bunny Stream video
+ */
+export const cancelFilmmakerProjectTrailerUpload = async ( options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerTrailerUploadCancel> => {
+
+  return customFetch<FilmmakerTrailerUploadCancel>(getCancelFilmmakerProjectTrailerUploadUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCancelFilmmakerProjectTrailerUploadMutationKey = () => ['cancelFilmmakerProjectTrailerUpload'] as const;
+
+export const getCancelFilmmakerProjectTrailerUploadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelFilmmakerProjectTrailerUpload>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelFilmmakerProjectTrailerUpload>>, TError,void, TContext> => {
+
+const mutationKey = getCancelFilmmakerProjectTrailerUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelFilmmakerProjectTrailerUpload>>, void> = () => {
+
+
+          return  cancelFilmmakerProjectTrailerUpload(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelFilmmakerProjectTrailerUploadMutationResult = NonNullable<Awaited<ReturnType<typeof cancelFilmmakerProjectTrailerUpload>>>
+
+    export type CancelFilmmakerProjectTrailerUploadMutationError = ErrorType<unknown>
+
+
+    /**
+ * @summary Abandon an unfinished pieced trailer upload and remove its Bunny Stream video
+ */
+export const useCancelFilmmakerProjectTrailerUpload = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelFilmmakerProjectTrailerUpload>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelFilmmakerProjectTrailerUpload>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCancelFilmmakerProjectTrailerUploadMutationOptions(options));
     }
 
 export const getUploadFilmmakerDraftTrailerUrl = () => {
