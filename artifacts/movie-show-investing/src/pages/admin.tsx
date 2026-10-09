@@ -28,8 +28,8 @@ const SECTIONS: { id: AdminSection; label: string; description: string }[] = [
   { id: 'funnels', label: 'Funnels', description: 'A view of progress through the filmmaker and investor journeys.' },
   { id: 'market', label: 'Market', description: 'Responses that help characterize the emerging market.' },
   { id: 'price-test', label: 'Price test', description: 'Results from the current price-test assignment.' },
-  { id: 'queues', label: 'Queues', description: 'Showcase requests awaiting review, alongside other recorded follow-up queues.' },
-  { id: 'messages', label: 'Messages', description: 'Messages received through the site.' },
+  { id: 'queues', label: 'Review queue', description: 'Showcase requests awaiting review, alongside other recorded follow-up queues.' },
+  { id: 'messages', label: 'Contact form', description: 'Messages received through the site contact form.' },
   { id: 'channels', label: 'Channels', description: 'Campaign and referral attribution in one place.' },
   { id: 'email-log', label: 'Email log', description: 'A record of outgoing email activity.' },
   { id: 'quiet', label: 'Quiet projects', description: 'Projects with no approved update in 30 days. A list only; nothing is sent automatically.' },
@@ -422,7 +422,7 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
       <span className="admin-mono admin-count" data-testid="text-row-total">{data ? `${data.total.toLocaleString()} ${data.total === 1 ? 'record' : 'records'}` : 'Unavailable'}</span>
     </div>
     {section.id === 'queues' && <AdminProjectUpdates userId={userId} />}
-    {section.id === 'queues' && <p data-testid="text-showcase-queue-guidance">Paid pitch reviews appear as “Showcase request” with status “Awaiting review.” Earlier requests remain available without retroactive fees. Approval adds a pitch to public discovery; declining keeps its free page unlisted.</p>}
+    {section.id === 'queues' && <p data-testid="text-showcase-queue-guidance">Approve to list a pitch in Explore; decline keeps its free page unlisted.</p>}
     {result?.message && <p className={`admin-review-feedback ${result.failed ? 'error' : ''}`} role={result.failed ? 'alert' : 'status'} data-testid="status-review-result">{result.message}</p>}
     {isError ? <Notice icon={<ShieldAlert size={20} />} title="This view could not be loaded" action="Try again" onAction={() => void refetch()}>
       {error?.status === 403 ? 'Access to this data was denied. Your account may no longer have administrator access.' : 'The connection to this section failed. Your other sections are still available.'}
@@ -445,47 +445,59 @@ function SectionData({ section, userId }: { section: (typeof SECTIONS)[number]; 
     </div> : <Notice icon={<Clapperboard size={20} />} title="Nothing recorded here yet">
       When submissions reach this section, the actual records will appear here. An empty CSV with the table headers is still available.
     </Notice>}
-    <p className="admin-footnote">{isFetching ? 'Checking for updates…' : 'Showing data returned by the administration API.'} Expressions of interest are non-binding; this site does not collect funds.</p>
+    {isFetching && <p className="admin-footnote">Checking for updates…</p>}
   </>;
 }
 
+type AdminView = AdminSection | 'conversations' | 'investors' | 'referrals';
+const CUSTOM_VIEWS: { id: Exclude<AdminView, AdminSection>; label: string; description: string }[] = [
+  { id: 'conversations', label: 'Project threads', description: 'Investor–filmmaker threads, reports, and auditable moderation actions.' },
+  { id: 'investors', label: 'Investors', description: 'Private self-reported intake and non-binding interest. Not KYC, accreditation verification or approval to invest.' },
+  { id: 'referrals', label: 'Referrals', description: 'Referrer and referred signups, with payment and listing milestones. Manual payouts only.' },
+];
+const NAV_GROUPS: { label: string; views: AdminView[] }[] = [
+  { label: 'To do', views: ['queues', 'quiet'] },
+  { label: 'People', views: ['investors', 'pledges', 'referrals'] },
+  { label: 'Messages', views: ['conversations', 'messages'] },
+  { label: 'Reports', views: ['summary', 'funnels', 'location', 'market', 'channels', 'price-test', 'research', 'email-log'] },
+];
+const VIEWS: { id: AdminView; label: string; description: string }[] = [...SECTIONS, ...CUSTOM_VIEWS];
+
 function Dashboard({ userId, email, onSignOut }: { userId: string; email: string; onSignOut: () => void }) {
-  const [active, setActive] = useState<AdminSection>('summary');
-  const [conversationMode, setConversationMode] = useState(false);
-  const [investorMode, setInvestorMode] = useState(false);
-  const [referralMode, setReferralMode] = useState(false);
-  const section = SECTIONS.find(item => item.id === active)!;
+  const [active, setActive] = useState<AdminView>('queues');
+  const view = VIEWS.find(item => item.id === active)!;
+  const section = SECTIONS.find(item => item.id === active);
+  const group = NAV_GROUPS.find(item => item.views.includes(active))?.label;
   // The active table is read here for the export control; SectionData shares its query cache.
-  const { data, isFetching } = useGetAdminTable(active, {
-    query: { queryKey: [...getGetAdminTableQueryKey(active), userId], retry: false, staleTime: 20_000, refetchOnWindowFocus: true },
+  const { data, isFetching } = useGetAdminTable(section?.id ?? 'summary', {
+    query: { queryKey: [...getGetAdminTableQueryKey(section?.id ?? 'summary'), userId], enabled: !!section, retry: false, staleTime: 20_000, refetchOnWindowFocus: true },
   });
   return <Frame email={email} onSignOut={onSignOut}>
     <div className="admin-stage">
       <aside className="admin-sidebar" aria-label="Administration sections">
-        <div className="admin-sidebar-label admin-mono">Index / 13 views</div>
         <nav className="admin-nav" aria-label="Data sections">
-          {SECTIONS.map((item, i) => <button key={item.id} type="button" aria-current={!conversationMode && !investorMode && !referralMode && active === item.id ? 'page' : undefined} onClick={() => { setActive(item.id); setConversationMode(false); setInvestorMode(false); setReferralMode(false); }} data-testid={`button-section-${item.id}`}>
-            <span className="admin-nav-number">{String(i + 1).padStart(2, '0')}</span>{item.label}
-          </button>)}
-          <button type="button" aria-current={conversationMode ? 'page' : undefined} onClick={() => { setConversationMode(true); setInvestorMode(false); setReferralMode(false); }} data-testid="button-section-conversations"><span className="admin-nav-number">11</span>Conversations</button>
-          <button type="button" aria-current={investorMode ? 'page' : undefined} onClick={() => { setInvestorMode(true); setConversationMode(false); setReferralMode(false); }} data-testid="button-section-investors"><span className="admin-nav-number">12</span>Investors</button>
-          <button type="button" aria-current={referralMode ? 'page' : undefined} onClick={() => { setReferralMode(true); setConversationMode(false); setInvestorMode(false); }} data-testid="button-section-referrals"><span className="admin-nav-number">13</span>Referrals</button>
+          {NAV_GROUPS.map(navGroup => <div key={navGroup.label} className="admin-nav-group" role="group" aria-label={navGroup.label}>
+            <div className="admin-sidebar-label admin-mono">{navGroup.label}</div>
+            {navGroup.views.map(id => <button key={id} type="button" aria-current={active === id ? 'page' : undefined} onClick={() => setActive(id)} data-testid={`button-section-${id}`}>
+              {VIEWS.find(item => item.id === id)!.label}
+            </button>)}
+          </div>)}
         </nav>
-          <div className="admin-sidebar-foot">Private administration<br />{email}<br /><br />No payments are collected here.</div>
+        <div className="admin-sidebar-foot">{email}</div>
       </aside>
       <main className="admin-main">
         <div className="admin-main-inner">
           <div className="admin-title-row">
             <div>
-               <div className="admin-overline admin-mono">Administration / {referralMode ? '13' : investorMode ? '12' : conversationMode ? '11' : String(SECTIONS.indexOf(section) + 1).padStart(2, '0')}</div>
-               <h1 className="admin-page-title" data-testid="text-section-heading">{referralMode ? 'Referrals' : investorMode ? 'Investors' : conversationMode ? 'Conversations' : section.label}</h1>
-               <p className="admin-lede">{referralMode ? 'Referrer and referred signups, with payment and listing milestones. Manual payouts only.' : investorMode ? 'Private self-reported intake and non-binding interest. Not KYC, accreditation verification or approval to invest.' : conversationMode ? 'Project threads, reports, and auditable moderation actions.' : section.description}</p>
+              <div className="admin-overline admin-mono">Administration / {group}</div>
+              <h1 className="admin-page-title" data-testid="text-section-heading">{view.label}</h1>
+              <p className="admin-lede">{view.description}</p>
             </div>
-             {!conversationMode && !investorMode && !referralMode && <button type="button" className="admin-button" disabled={!data || isFetching} onClick={() => data && downloadCsv(data, active)} data-testid={`button-download-${active}`} title={!data ? 'Available when this section loads' : `Download ${section.label} as CSV`}>
+            {section && <button type="button" className="admin-button" disabled={!data || isFetching} onClick={() => data && downloadCsv(data, section.id)} data-testid={`button-download-${section.id}`} title={!data ? 'Available when this section loads' : `Download ${section.label} as CSV`}>
               <ArrowDownToLine size={16} /> Download CSV
-             </button>}
+            </button>}
           </div>
-            {referralMode ? <AdminReferrals key={userId} userId={userId}/> : investorMode ? <AdminInvestors key={userId} userId={userId}/> : conversationMode ? <AdminConversations uid={userId}/> : <SectionData key={`${active}-${userId}`} section={section} userId={userId} />}
+          {active === 'referrals' ? <AdminReferrals key={userId} userId={userId}/> : active === 'investors' ? <AdminInvestors key={userId} userId={userId}/> : active === 'conversations' ? <AdminConversations uid={userId}/> : section && <SectionData key={`${active}-${userId}`} section={section} userId={userId} />}
         </div>
       </main>
     </div>
