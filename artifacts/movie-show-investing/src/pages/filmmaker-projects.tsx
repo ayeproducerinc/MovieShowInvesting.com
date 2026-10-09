@@ -16,9 +16,7 @@ import {
   phoneSyncErrorMessage,
   synchronizeFilmmakerPhone,
 } from '@/components/filmmaker-phone-verification';
-import { FilmmakerQuestionsDesk } from '@/components/filmmaker-questions-desk';
-import { FilmmakerConversationsDesk } from '@/components/filmmaker-conversations-desk';
-import { FilmmakerInterestAlerts } from '@/components/filmmaker-interest-alerts';
+import { FilmmakerActivity } from '@/components/filmmaker-activity';
 import { useFilmmakerAuth } from '@/hooks/use-filmmaker-auth';
 import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 import { FilmmakerStartOver } from '@/components/filmmaker-start-over';
@@ -185,24 +183,22 @@ export default function FilmmakerProjects() {
   }));
   return <>
     {claimError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{claimError} <Link href="/start/filmmaker">Open this browser’s worksheet</Link> · <button type="button" onClick={() => void linkCurrentVisit()}>Try linking again</button></div>}
-    {(claimError || actionError || projects.data?.has_resumable_draft) && <div className="page-wrap"><FilmmakerStartOver disabled={acting || claiming}/></div>}
+    {(claimError || actionError) && <div className="page-wrap"><FilmmakerStartOver disabled={acting || claiming}/></div>}
     {actionError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{actionError} {actionError.includes('Keep this original browser draft') && <Link href="/start/filmmaker">Open this browser’s worksheet</Link>}</div>}
     <ProjectHubView
       email={auth.user?.email ?? ''}
-      initiallyOpen={initialAction === 'manage'}
       projects={items}
       draftAvailable={projects.data?.has_resumable_draft ?? false}
       loading={projects.isPending || claiming}
       busy={acting || claiming}
       error={projects.isError ? accountError(projects.error) : null}
+      draftActions={!claimError && !actionError ? <FilmmakerStartOver disabled={acting || claiming}/> : null}
       phoneVerificationSlot={auth.user && PHONE_VERIFICATION_ENABLED ? <FilmmakerPhoneVerification user={auth.user} verified={projects.data?.phone_verified ?? false} /> : null}
       onStart={() => void perform(() => start.mutateAsync(), '/start/filmmaker')}
       onResume={() => void perform(() => resume.mutateAsync(), '/start/filmmaker')}
       onOpen={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}
       onRetry={() => { void projects.refetch(); void linkCurrentVisit(); }}
     />
-    {!projects.isPending && !projects.isError && !claiming && identityId && <FilmmakerInterestAlerts key={identityId} uid={identityId} busy={acting} onOpenProject={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}/>}
-    {!projects.isPending && !projects.isError && !claiming && <FilmmakerQuestionsDesk projects={projects.data?.projects ?? []}/>}
-    {!projects.isPending && !projects.isError && !claiming && identityId && identityProvider && <FilmmakerConversationsDesk key={`${identityProvider}:${identityId}`} provider={identityProvider} uid={identityId} projectIds={(projects.data?.projects ?? []).map(project => project.id)}/>}
+    {!projects.isPending && !projects.isError && !claiming && identityId && identityProvider && <FilmmakerActivity key={`${identityProvider}:${identityId}`} uid={identityId} provider={identityProvider} busy={acting} projectIds={(projects.data?.projects ?? []).map(project => project.id)} onOpenProject={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}/>}
   </>;
 }

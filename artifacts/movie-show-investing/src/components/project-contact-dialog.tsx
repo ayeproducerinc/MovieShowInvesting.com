@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ProjectConversationEntry } from '@/components/project-conversation-entry';
-import { ProjectQuestionForm } from '@/components/project-question-form';
 
 export function ProjectContactDialog({ slug, title, filmmakerName, resetKey }: { slug: string; title: string; filmmakerName?: string | null; resetKey: string }) {
   const [open, setOpen] = useState(false);
@@ -16,7 +15,6 @@ export function ProjectContactDialog({ slug, title, filmmakerName, resetKey }: {
         <DialogTitle className="pj-dialog-title">{who ? `Message ${who} about ${title}` : `Message the filmmaker of ${title}`}</DialogTitle>
         <DialogDescription className="pj-dialog-desc">Private, text-only correspondence about this film. It is not an investment commitment.</DialogDescription>
         <ProjectConversationEntry slug={slug}/>
-        <details className="pj-quick" data-testid="details-quick-question"><summary>Prefer to send a one-off question?</summary><ProjectQuestionForm slug={slug} title={title}/></details>
       </DialogContent>
     </Dialog>;
 }
