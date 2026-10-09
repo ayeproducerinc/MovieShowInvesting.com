@@ -28,6 +28,12 @@ export interface InvestorIntentInput {
   allocations: InvestorAllocationInput[];
   /** True for Just pledge; requires zero project allocations */
   unallocated: boolean;
+  /**
+     * Approved project update whose email led to this pledge; kept only when that update's project is in the allocations
+     * @minimum 1
+     * @nullable
+     */
+  source_update_id?: number | null;
   accredited: boolean;
   experience: string[];
   motivations: string[];

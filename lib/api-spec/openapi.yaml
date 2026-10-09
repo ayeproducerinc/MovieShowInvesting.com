@@ -3694,6 +3694,7 @@ components:
           items:
             $ref: "#/components/schemas/InvestorAllocationInput"
         unallocated: { type: boolean, description: True for Just pledge; requires zero project allocations }
+        source_update_id: { type: ["integer", "null"], minimum: 1, description: "Approved project update whose email led to this pledge; kept only when that update's project is in the allocations" }
         accredited: { type: boolean }
         experience:
           type: array

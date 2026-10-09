@@ -16,9 +16,11 @@ import {
   CONSENTING_BACKERS_SQL, TEAM_ROLES, emailDecision, filmmakerUpdateView, milestoneLabel, milestonesForStage,
   nextStatus, publicUpdateView, validateUpdateInput, type UpdateRow,
 } from "../lib/project-updates";
+import { deliverUpdateEmails, queueUpdateEmails } from "../lib/project-update-email";
+import { logger } from "../lib/logger";
 
-// Project updates (DECISIONS.md › Project updates). Approval sends nothing yet;
-// backer emails are added in step 9.7. Nothing here changes a project's stage.
+// Project updates (DECISIONS.md › Project updates). Approval queues one email per
+// consenting confirmed backer, subject to the 14-day rule. Nothing here changes a project's stage.
 const router: IRouter = Router();
 const postLimit = perIpLimit({ limit: 20, windowMs: 3_600_000, message: "Too many updates. Please try again later." });
 
@@ -127,7 +129,7 @@ async function review(action: "approve" | "reject", updateId: number, reviewer: 
   const client = await pool.connect();
   try {
     await client.query("begin");
-    const { rows } = await client.query<{ status: string }>("select status from project_updates where id = $1 for update", [updateId]);
+    const { rows } = await client.query<{ status: string; project_id: number }>("select status, project_id from project_updates where id = $1 for update", [updateId]);
     if (!rows[0]) { await client.query("rollback"); return { status: 404 as const }; }
     const next = nextStatus(rows[0].status, action);
     if (!next) { await client.query("rollback"); return { status: 409 as const }; }
@@ -135,7 +137,10 @@ async function review(action: "approve" | "reject", updateId: number, reviewer: 
       "update project_updates set status = $2, reviewed_by = $3, reviewed_at = now() where id = $1",
       [updateId, next, reviewer],
     );
+    const emailIds = next === "approved" ? await queueUpdateEmails(client, updateId, rows[0].project_id) : [];
     await client.query("commit");
+    // Deliver after commit; a provider failure never undoes the approval.
+    if (emailIds.length) void deliverUpdateEmails(emailIds).catch(() => logger.warn({ updateId }, "Project update email delivery stopped early"));
     return { status: 200 as const };
   } catch (error) {
     await client.query("rollback").catch(() => undefined);

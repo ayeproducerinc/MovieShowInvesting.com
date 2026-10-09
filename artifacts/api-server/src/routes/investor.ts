@@ -454,9 +454,22 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
         investorId = inserted.rows[0].id;
       }
 
-      const { expected_investor_owner: _owner, ...submittedQuestionnaire } = data;
+      // Which approved update's email led to this pledge, counted per update later.
+      // Kept only for an approved update whose project is in this pledge.
+      let sourceUpdateId: number | null = null;
+      if (data.source_update_id && allocations.length) {
+        const { rows: [table] } = await client.query<{ ok: boolean }>("select to_regclass('public.project_updates') is not null as ok");
+        if (table?.ok) {
+          const { rows: [source] } = await client.query<{ project_id: number }>(
+            "select project_id from project_updates where id = $1 and status = 'approved'", [data.source_update_id],
+          );
+          if (source && allocations.some((allocation) => allocation.project_id === source.project_id)) sourceUpdateId = data.source_update_id;
+        }
+      }
+      const { expected_investor_owner: _owner, source_update_id: _source, ...submittedQuestionnaire } = data;
       const snapshot = JSON.stringify({
         ...submittedQuestionnaire,
+        ...(sourceUpdateId ? { source_update_id: sourceUpdateId } : {}),
         saved_at: new Date().toISOString(),
         verified_account_email: identity.email,
         ground_rules_version: "investor-ground-rules-v1",

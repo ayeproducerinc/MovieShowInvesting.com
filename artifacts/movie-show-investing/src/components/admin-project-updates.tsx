@@ -5,9 +5,6 @@ import {
 } from '@workspace/api-client-react';
 import { adminEmailNotice } from '@/lib/project-update-display';
 
-// Backer update emails are built in step 9.7. Until then approval adds the update
-// to the timeline only; remove this note when sending is switched on.
-const UPDATE_EMAILS_LIVE = false;
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
 /** Pending project updates for owner review (DECISIONS.md › Project updates, rule a and c). */
@@ -27,7 +24,7 @@ export function AdminProjectUpdates({ userId }: { userId: string }) {
     try {
       if (action === 'approve') await approve.mutateAsync({ updateId });
       else await reject.mutateAsync({ updateId });
-      setResult({ text: action === 'approve' ? 'Update approved. It now appears on the project timeline.' : 'Update rejected. It won’t be shown or emailed.', failed: false });
+      setResult({ text: action === 'approve' ? 'Update approved. It now appears on the project timeline, and any update emails are on their way.' : 'Update rejected. It won’t be shown or emailed.', failed: false });
     } catch (cause) {
       const status = cause && typeof cause === 'object' && 'status' in cause ? (cause as { status?: number }).status : undefined;
       setResult({ text: status === 409 ? 'This update was already reviewed.' : 'That didn’t save. Please try again.', failed: true });
@@ -37,7 +34,6 @@ export function AdminProjectUpdates({ userId }: { userId: string }) {
 
   return <section data-testid="section-admin-project-updates" style={{ marginBottom: 32, overflowWrap: 'anywhere' }}>
     <h3 style={{ margin: '0 0 8px' }}>Project updates awaiting review</h3>
-    {!UPDATE_EMAILS_LIVE && <p className="admin-mono" data-testid="text-update-emails-off">Update emails aren’t switched on yet. Approving adds an update to the project timeline only.</p>}
     {result && <p className={`admin-review-feedback ${result.failed ? 'error' : ''}`} role={result.failed ? 'alert' : 'status'} data-testid="status-update-review">{result.text}</p>}
     {pending.isPending ? <p role="status">Loading updates…</p>
       : pending.isError ? <p role="alert">Updates couldn’t load. <button type="button" className="underline" onClick={() => void pending.refetch()}>Try again</button></p>

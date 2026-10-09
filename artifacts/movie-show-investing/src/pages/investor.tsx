@@ -152,6 +152,8 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
   const params = new URLSearchParams(window.location.search);
   const targetSlug = params.get('project');
   const newEntry = params.get('new') === '1';
+  // Set when the pledge started from a project-update email's "Increase my pledge" button.
+  const fromUpdate = Number(params.get('from_update')) || null;
   const revise = params.get('revise') === '1';
   const oneProject = Boolean(targetSlug) && params.get('one') === '1' && !revise;
   const [,navigate] = useLocation();
@@ -281,7 +283,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
     if (!current.data?.intent) return;
     // From a project page, someone who already pledged gets a new, separate entry for this project.
     if (projectPageNeedsNewEntry({oneProject,newEntry,intentStatus:current.data.intent.status})) {
-      navigate(`/invest?project=${encodeURIComponent(targetSlug ?? '')}&one=1&new=1`,{replace:true});
+      navigate(`/invest?project=${encodeURIComponent(targetSlug ?? '')}&one=1&new=1${fromUpdate ? `&from_update=${fromUpdate}` : ''}`,{replace:true});
       return;
     }
     if (!newEntry && !revise && !progress.isLoading && progress.error?.status!==409) navigate('/invest/done');
@@ -445,7 +447,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
           ...input, minima:minimaForSelectedStages(a.minima,a.stages),
           ground_rules_accepted: a.terms_read === true ? true : undefined,
           expected_investor_owner:expectedOwner,new_entry:!startFresh && (newEntry || current.data?.intent?.entry_id != null && current.data.intent.status==='saved'),
-          start_fresh:startFresh,name:reviewed.name,email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,
+          start_fresh:startFresh,source_update_id:single && fromUpdate ? fromUpdate : undefined,name:reviewed.name,email:a.email.trim(),phone:a.phone?.trim() || undefined,city:a.city.trim(),state:a.state?.trim() || undefined,zip:a.zip?.trim() || undefined,
           allocations:reviewed.allocations,unallocated:reviewed.unallocated,
         }});
         pendingSaved.current = { ...saved, reviewKey, draftKey };

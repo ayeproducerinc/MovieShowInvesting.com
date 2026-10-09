@@ -2256,6 +2256,7 @@ export const saveInvestorIntentBodyAllocationsItemAmountMax = 2147483647;
 
 export const saveInvestorIntentBodyAllocationsMax = 5;
 
+
 export const saveInvestorIntentBodyMinimaDistributionMin = 125;
 
 export const saveInvestorIntentBodyMinimaProductionMin = 125;
@@ -2277,6 +2278,7 @@ export const SaveInvestorIntentBody = zod.object({
   "amount": zod.number().int().min(saveInvestorIntentBodyAllocationsItemAmountMin).max(saveInvestorIntentBodyAllocationsItemAmountMax).describe('Whole-dollar allocation of at least $100 per project (new pledges)')
 })).max(saveInvestorIntentBodyAllocationsMax).describe('Distinct projects only; up to 5 projects at $100 or more each. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.'),
   "unallocated": zod.boolean().describe('True for Just pledge; requires zero project allocations'),
+  "source_update_id": zod.number().int().min(1).nullish().describe('Approved project update whose email led to this pledge; kept only when that update\'s project is in the allocations'),
   "accredited": zod.boolean(),
   "experience": zod.array(zod.string()),
   "motivations": zod.array(zod.string()),

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowUpRight, RotateCcw, Share2 } from 'lucide-react';
-import { Link, useParams } from 'wouter';
+import { Link, useLocation, useParams } from 'wouter';
 import { getGetCurrentInvestorIntentQueryKey, getGetPublicProjectQueryKey, useGetCurrentInvestorIntent, useGetPublicProject } from '@workspace/api-client-react';
 import type { PublicProject } from '@workspace/api-client-react';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
@@ -45,6 +45,14 @@ export default function Project() {
     refetchOnMount: 'always',
   } });
   const [dismissed, setDismissed] = useState(false);
+  // "Increase my pledge" from an update email lands here with ?increase=<update id>,
+  // then continues to the normal one-project pledge (sign-in happens there; no tokens).
+  const [, navigate] = useLocation();
+  const increaseFrom = Number(new URLSearchParams(window.location.search).get('increase')) || null;
+  useEffect(() => {
+    if (!increaseFrom || !data || data.is_owner || !pledgePanel(data).show) return;
+    navigate(`/invest?project=${encodeURIComponent(data.slug)}&one=1&from_update=${increaseFrom}`, { replace: true });
+  }, [increaseFrom, data, navigate]);
   const [storyOpen, setStoryOpen] = useState(false);
   useEffect(() => { setDismissed(false); setStoryOpen(false); }, [slug]);
   useEffect(() => {
