@@ -24,6 +24,19 @@ export function timelineEntries(updates: TimelineUpdate[], listedAt: string | nu
   return entries;
 }
 
+export const TIMELINE_PREVIEW = 3;
+
+/**
+ * Collapsed view: the newest few updates; the listing line ends the list only
+ * when nothing is hidden. Expanded: everything.
+ */
+export function visibleTimeline(entries: TimelineEntry[], expanded: boolean, limit = TIMELINE_PREVIEW) {
+  const updates = entries.filter(entry => entry.kind === 'update');
+  const hiddenCount = Math.max(0, updates.length - limit);
+  if (expanded || !hiddenCount) return { shown: entries, hiddenCount: expanded ? 0 : hiddenCount, total: updates.length };
+  return { shown: updates.slice(0, limit), hiddenCount, total: updates.length };
+}
+
 export function timelineDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
