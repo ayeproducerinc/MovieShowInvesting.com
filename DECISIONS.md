@@ -9,7 +9,7 @@ These product rules are locked for the MVP. Change them only when the owner expl
 - Filmmakers launch first. Investor signup and pledges launch later, after approved projects are available.
 - The project is unlisted by default. “Private” means accessible to people with its link, not access-controlled. Do not describe an unlisted page as confidential or password-protected.
 - A filmmaker can request to showcase a project, but it appears in Explore only after admin approval and only while it is not hidden.
-- Do not add investor payments, banking, escrow, Greenlights, leaderboards, public Q&A, unrestricted direct messages, or tiered rates. The owner approved a separate $49 one-time editorial pitch-review fee, with a free unlisted pitch option; paid review does not guarantee public listing. Investor allocations within one non-binding lineup may be edited. Approved messaging exception: one private, text-only investor–filmmaker conversation per project and investor, accessible only to verified participants and authorized admins, with reporting, admin review/lock controls, and an audit trail. Do not open it to real users until owner-approved messaging privacy wording and moderation controls are in place.
+- Do not add investor payments, banking, escrow, Greenlights, leaderboards, public Q&A, unrestricted direct messages, or tiered rates. The owner approved a separate $49 one-time editorial pitch-review fee, with a free unlisted pitch option; paid review does not guarantee public listing. Investor allocations within one non-binding lineup may be edited. Approved messaging exception: one private, text-only investor–filmmaker conversation per project and investor, accessible only to verified participants and authorized admins, with reporting, admin review/lock controls, and an audit trail. Do not open it to real users until owner-approved messaging privacy wording and moderation controls are in place. Approved outreach exception: Project Updates emails (see “Project updates” below), sent only to consenting confirmed backers after owner approval. No other automatic outreach.
 - Share loglines and synopses, not full scripts.
 - The owner does not have Cloudflare yet and deferred Turnstile until the build is complete. No Cloudflare challenge is part of the current filmmaker submission; existing honeypot and rate limits still apply. Stray Cloudflare settings must not gate the form. A future Turnstile integration requires a separate owner-approved launch and proper verification. Do not claim the form has Cloudflare protection before it does.
 
@@ -93,6 +93,61 @@ The owner approved these terms for new proposals. They supersede the historical 
 - Optional synopsis, trailer links/uploads, posters, share images, and a single uploaded pitch deck belong on the filmmaker title/logline step behind checkbox-revealed controls. Materials must persist with the draft through refresh and sign-in and attach to the correct submitted project; hiding a control must not silently delete saved material.
 - The owner wants pitch decks publicly viewable from eligible approved Explore listings and their project pages, and all pitch answers/attachments available to authorized admin review. Tell filmmakers that approved decks will be public before uploading. Draft/hidden/ineligible decks are not exposed through the public document route, and replacing approved content follows the existing re-review rules.
 - This onboarding change prevents new guest submissions from being stranded; it does not add recovery for older guest submissions when their original browser proof is gone.
+
+## Project updates
+
+Filmmakers look for money last, after the script, cast and budget are done. Project updates keep the people who pledged informed from day one: a filmmaker posts a milestone, the owner approves it, and each consenting confirmed backer gets an email with one button to increase their pledge. The measure the owner needs is how many backers increased, and how many new pledges came in, after each update.
+
+### Locked rules
+
+1. The backer email has exactly one action button: **“Increase my pledge”**. Do not add “I'm still in”, “step back”, “withdraw”, or any re-confirmation.
+2. Increasing uses the existing repeat-interest flow: a new, separate signed entry. Never edit an earlier signed record. Do not add a second signature to the normal investor journey.
+3. Public pledge counts stay as they are: confirmed pledges only, and only on projects eligible for discovery (approved and not hidden). Unlisted pages keep showing no count.
+4. A milestone never changes a project's stage. Stage still sets the payback goal and is changed only through the existing reviewed path.
+5. The owner approves every update in admin before it appears publicly or is emailed.
+6. At most one update email per project every 14 days. If an email already went out in that window, the approved update still shows on the timeline but no email is sent. Tell the admin which will happen before they approve.
+7. Email only confirmed backers of that project whose latest notification-permission record (`investor_notification_events`) is “allowed”. A missing choice is not consent.
+
+### Milestone list (fixed keys, grouped by stage)
+
+The filmmaker sees their own stage's group plus the “Any stage” group.
+
+| Group | Milestone | Key |
+|---|---|---|
+| Idea | Script draft finished | `script_draft_finished` |
+| Idea | Script locked | `script_locked` |
+| Idea | Budget and schedule done | `budget_schedule_done` |
+| Idea | Lead cast attached | `lead_cast_attached` |
+| Idea | Pitch trailer or proof of concept out | `proof_of_concept_out` |
+| Production | Locations secured | `locations_secured` |
+| Production | Shoot dates set | `shoot_dates_set` |
+| Production | Filming started | `filming_started` |
+| Production | Filming wrapped | `filming_wrapped` |
+| Production | Final cut locked | `final_cut_locked` |
+| Distribution | Festival selection | `festival_selection` |
+| Distribution | Award or notable press | `award_or_press` |
+| Distribution | Sales agent or distributor signed | `distributor_signed` |
+| Distribution | Release date set | `release_date_set` |
+| Distribution | Released | `released` |
+| Any stage | Team member joined | `team_member_joined` |
+| Any stage | Other funding secured | `other_funding_secured` |
+| Any stage | Other (filmmaker writes a short label) | `other` |
+
+- “Team member joined” asks for a role (Producer, Director, Writer, Executive producer, Cinematographer, Casting director, Other) and an optional name. A name is stored and shown only if the filmmaker ticks a box confirming that person agreed to be named publicly. It can be used more than once.
+- An optional filmmaker note is capped at 500 characters and appears only after owner approval.
+
+### Email content
+
+- Project title, the milestone, the approved note, the backer's own confirmed pledge amount for that project, and the single button.
+- Next to the pledge amount, verbatim: **“Returns aren't guaranteed. You may get back less, or nothing.”**
+- End with, verbatim: **“Pledges are non-binding. No money is collected. This is not an offer to sell securities.”**
+- Do not call the payback goal a return, earnings, or an expectation. Do not name The AYeList.
+- The button links to the project page and requires normal sign-in; no login tokens in the link. After sign-in it opens the existing repeat-interest flow with that project selected. A later increase records which update it came from.
+- Delivery uses the existing Mailjet helper and email log; rows are claimed before contacting the provider and an uncertain send is never retried automatically.
+
+### Do not add
+
+Reminders or scheduled jobs, “still in” tracking, funding targets or progress bars, stage changes from milestones, a digest email, push or SMS, or anything involving payments.
 
 ## Open decisions — do not guess
 

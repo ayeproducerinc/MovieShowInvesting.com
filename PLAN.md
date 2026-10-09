@@ -118,6 +118,23 @@ The owner supplied `support@ayeproducer.com` as the data-deletion contact. The p
 
 **Gate:** Filmmaker F1–F11 and investor I1–I12 launch scenarios pass on the launch domain; neither side is called launch-ready before this final gate.
 
+## Phase 9 — Project updates
+
+**Status:** not started. Rules and the milestone list are in DECISIONS.md › Project updates. Work in four sub-phases; stop at each gate, report “ready for testing” with raw evidence, and wait for the owner to continue.
+**Deliverables:**
+
+- **9a Data and API:** project-updates table (project, filmmaker, milestone key, optional role, optional name with name-consent flag, optional custom label, optional note capped at 500 characters, pending/approved/rejected status, reviewer and review time, created time) and update-emails table (one row per update and backer, `interest_alerts` status pattern with the uncertain flag, unique per update and backer). OpenAPI-first endpoints: filmmaker creates and lists own updates; admin lists pending, approves, rejects; public reads approved updates. Ownership checks match existing filmmaker project routes. Tests in the repo's existing style.
+- **9b Filmmaker post and admin approval:** “Post an update” in the filmmaker project area (milestone picker for the project's stage plus Any stage, role/name fields when needed, optional note, real database count of backers who will be emailed); “Waiting for review” after posting; admin pending queue with approve/reject and the 14-day email notice. Mobile first; text wraps, nothing overflows.
+- **9c Backer email:** on approval, send through the existing Mailjet helper and email log to consenting confirmed backers only, claiming each row before the provider call and never auto-retrying an uncertain send. Required copy per DECISIONS.md. The single button opens the project page, requires normal sign-in, then the existing repeat-interest flow with the project selected; a later increase records its source update.
+- **9d Timeline and backer summary:** public “Progress” timeline of approved updates, newest first, ending with the listing date; filmmaker totals-only summary (backers, total pledged, increases and amount, new pledges since the last update, last update date); admin per-update emails sent, increases, and new pledges in the 14 days after.
+
+**Gates:**
+
+- **9a:** migration SQL and the exact command are written for the owner to run; nothing is run against a real database. Tests pass for ownership, approve/reject, approved-only public reads, and the per-update-and-backer unique constraint. Existing CHECK constraints are inspected rather than assumed altered by a schema push; legacy `replit_uid` columns are kept.
+- **9b:** the backer count shown to the filmmaker is a real database value; “Waiting for review” appears after posting; the admin queue states before approval whether an email will be sent or skipped under the 14-day rule; mobile layout does not overflow.
+- **9c:** only confirmed backers whose latest notification permission is allowed receive rows; rows are claimed before the provider call; uncertain sends are not retried; copy matches DECISIONS.md verbatim; the button requires sign-in and opens repeat interest for that project; increases record their source update. Without Mailjet secrets rows are recorded as `unconfigured`; real delivery is checked once Mailjet is configured.
+- **9d:** the timeline shows approved updates only, newest first, ending at the listing date; filmmaker summary shows totals only; admin shows per-update emails sent, increases, and new pledges in the following 14 days; this section is updated with evidence.
+
 ## FAQ copy
 
 Use these five questions and answers on `/faq`:

@@ -7,7 +7,7 @@ Keep this product a straightforward pledge-first MVP. The owner said of crowdfun
 
 **Why:** The owner approved a compact expansion, not a broad financing or compliance platform.
 
-**How to apply:** Use brief optional project specifics and manual clarification of other campaigns. Do not add mandatory uploads, campaign questionnaires, formal KYC/AML, automatic outreach or a second investment-interest signature.
+**How to apply:** Use brief optional project specifics and manual clarification of other campaigns. Do not add mandatory uploads, campaign questionnaires, formal KYC/AML, automatic outreach (except owner-approved Project Updates emails to consenting confirmed backers; see DECISIONS.md › Project updates) or a second investment-interest signature.
 
 Recaps are short summaries and sharing destinations, not another intake form. Sharing serves two separate audiences: prospective investors viewing a specific pitch, and filmmakers invited to post their own project.
 

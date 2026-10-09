@@ -33,7 +33,7 @@
 - [Mounted public query observers](mounted-public-query-observers.md) — preserve public aggregate query objects during auth changes; clearing them can leave mounted pages stale.
 - [Proposal consent boundary](proposal-consent-boundary.md) — an unfinished legacy draft must explicitly review new economics; an old acceptance cannot manufacture backend agreement.
 - [Single investor confirmation](investor-single-confirmation.md) — confirm once in the final worksheet before Submit; Screen 3 explains only selected stages for beginners.
-- [Pledge-first MVP boundary](pledge-first-mvp-boundary.md) — compact crowdfunding, preserved pay-later popup, manual review/outreach, and honest original evidence.
+- [Pledge-first MVP boundary](pledge-first-mvp-boundary.md) — compact crowdfunding, preserved pay-later popup, manual review/outreach (Project Updates emails are the one approved exception), and honest original evidence.
 - [Public project media priority](public-project-media-priority.md) — desktop and mobile show trailer or poster, never both; prominent pledge panel follows the media.
 - [Explore story-first recaps](explore-story-first-recaps.md) — all existing and future Explore cards show a brief story recap, never standard or negotiated deal breakdowns.
 - [Public filmmaker credit consent](public-filmmaker-credit-consent.md) — private contact names are not public credits; filmmakers explicitly choose their project’s public name.
