@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { ArrowUpRight, Copy, Share2 } from 'lucide-react';
-import { getGetProjectShareMetadataUrl } from '@workspace/api-client-react';
+import { Link } from 'wouter';
+import { getGetMyReferralsQueryKey, getGetProjectShareMetadataUrl, useGetMyReferrals } from '@workspace/api-client-react';
+import { useReferralIdentity } from '@/components/referral-claim';
+import { useReferralClaim } from '@/lib/referral-attribution';
 
 export function projectShareUrl(slug: string) {
   return new URL(getGetProjectShareMetadataUrl(slug), window.location.origin).href;
@@ -66,13 +69,20 @@ export function ProjectShare({ slug, title, genre, logline, approved = false, sh
   </div>;
 }
 
-export function filmmakerInviteUrl() {
-  return new URL(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/start/filmmaker`, window.location.origin).href;
+export function filmmakerInviteUrl(referralCode?: string | null) {
+  const url = new URL(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/start/filmmaker`, window.location.origin);
+  if (referralCode) url.searchParams.set('ref', referralCode);
+  return url.href;
 }
 
 export function FilmmakerInvite() {
   const [feedback, setFeedback] = useState('');
-  const url = filmmakerInviteUrl();
+  // Same query and cache as My referrals; the plain link is used until a code is available.
+  const identity = useReferralIdentity();
+  const claim = useReferralClaim();
+  const referrals = useGetMyReferrals({ query: { queryKey: [...getGetMyReferralsQueryKey(), identity], enabled: !!identity && claim.identity === identity && claim.status === 'done', retry: false, staleTime: 30_000 } });
+  const referralCode = identity ? referrals.data?.code ?? null : null;
+  const url = filmmakerInviteUrl(referralCode);
   const text = 'Working on a film or show? Post your project on Movie Show Investing and let potential investors pledge non-binding interest. No investment or payment is made.';
   async function copy() {
     try { await navigator.clipboard.writeText(url); setFeedback('Invitation link copied.'); }
@@ -86,6 +96,7 @@ export function FilmmakerInvite() {
   return <div className="dossier-notice" data-testid="section-filmmaker-invite" style={{ marginTop: 0 }}>
     <strong>Invite a filmmaker</strong>
     <p>Share the filmmaker entry page so another filmmaker can post a project they are working on. It does not open your pitch or draft.</p>
+    {referralCode && <p data-testid="text-filmmaker-invite-referral">This link includes your referral code. See <Link href="/referrals">My referrals</Link> for rewards.</p>}
     <div className="dossier-actions" style={{ marginTop: 12 }}>
       <button type="button" className="dossier-button dossier-button-outline" data-testid="button-share-filmmaker-invite" onClick={() => void share()}><Share2 size={16}/> Invite a filmmaker</button>
       <button type="button" className="dossier-button dossier-button-outline" data-testid="button-copy-filmmaker-invite" onClick={() => void copy()}><Copy size={16}/> Copy invite link</button>
