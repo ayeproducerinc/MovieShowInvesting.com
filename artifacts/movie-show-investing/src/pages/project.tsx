@@ -40,7 +40,8 @@ export default function Project() {
   const data = project.data as PublicProjectWithPitchDeck | undefined;
   const current = useGetCurrentInvestorIntent({ query: {
     queryKey: [...getGetCurrentInvestorIntentQueryKey(), identityId],
-    enabled: authReady && !!data?.approved && !!data?.showcase_requested && !data.is_owner,
+    // Same rule as the pledge box: any visible project, listed or not.
+    enabled: authReady && !!data && pledgePanel(data).show && !data.is_owner,
     refetchOnMount: 'always',
   } });
   const [dismissed, setDismissed] = useState(false);
