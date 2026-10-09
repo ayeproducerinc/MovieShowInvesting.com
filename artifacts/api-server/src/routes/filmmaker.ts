@@ -225,7 +225,7 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
   }
 
   // Money date (DECISIONS.md › Money date): optional; a skip is stored apart from a blank.
-  const moneyDate = validateMoneyDate(data);
+  const moneyDate = validateMoneyDate(data, data.stage);
   if (!moneyDate.ok) {
     res.status(400).json({ error: moneyDate.error });
     return;
@@ -453,7 +453,7 @@ router.patch("/filmmakers/showcase", async (req, res): Promise<void> => {
     const dates = validateMoneyDate({
       filming_start_month: filmingMonth, filming_start_skipped: filmingSkipped,
       money_needed_by_month: neededMonth, money_needed_by_skipped: neededSkipped,
-    });
+    }, current.project.stage);
     if (!dates.ok) {
       res.status(400).json({ error: dates.error });
       return;

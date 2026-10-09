@@ -30,12 +30,19 @@ function month(value: string | null | undefined, skipped: boolean | null | undef
   return { ok: true, month: text, skipped: false };
 }
 
-export function validateMoneyDate(input: MoneyDateInput): { ok: true; value: MoneyDateValue } | { ok: false; error: string } {
+/** Distribution projects are already filmed, so they have no filming start question. */
+export function asksFilmingStart(stage: string | null | undefined): boolean {
+  return stage === "idea" || stage === "production";
+}
+
+export function validateMoneyDate(input: MoneyDateInput, stage?: string | null): { ok: true; value: MoneyDateValue } | { ok: false; error: string } {
   const amount = input.development_amount;
   if (amount !== undefined && amount !== null && (!Number.isSafeInteger(amount) || amount < 0 || amount > MAX_AMOUNT)) {
     return { ok: false, error: "Enter the development amount as whole dollars." };
   }
-  const filming = month(input.filming_start_month, input.filming_start_skipped, "When do you plan to start filming?");
+  const filming = asksFilmingStart(stage)
+    ? month(input.filming_start_month, input.filming_start_skipped, "When do you plan to start filming?")
+    : { ok: true as const, month: null, skipped: false };
   if (!filming.ok) return filming;
   const needed = month(input.money_needed_by_month, input.money_needed_by_skipped, "When do you need the money by?");
   if (!needed.ok) return needed;

@@ -165,7 +165,7 @@ The filmmaker sees their own stage's group plus the “Any stage” group.
 
 ## Money date
 
-- In filmmaker intake and Edit pitch, a “Your timeline” section with two optional month-and-year fields: “When do you plan to start filming?” and “When do you need the money by?” Include “Skip for now”, recorded as a skip, separate from a blank.
+- In filmmaker intake and Edit pitch, a “Your timeline” section with two optional month-and-year fields: “When do you plan to start filming?” (Idea and Production projects only; Distribution projects are already filmed — owner decision 2026-10-09) and “When do you need the money by?” Include “Skip for now”, recorded as a skip, separate from a blank.
 - An optional “Development amount” next to the full budget, shown clearly labelled wherever the budget is shown today.
 - In the filmmaker's private project area: money needed by, time left in months, pledged so far (real confirmed total), development amount, and budget. If a date was skipped, prompt to add it. If it has passed, say so and offer to update it. If there is no budget, leave that line out; do not show a zero.
 - The dates and countdown are private to the filmmaker and admin: never on the public page, in Explore, or in any email to backers.

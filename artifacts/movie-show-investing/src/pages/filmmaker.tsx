@@ -678,8 +678,9 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail }: { identi
     <div className="fm-section" data-testid="section-your-timeline" style={{ marginTop: 22 }}>
       <p className="fm-label">Your timeline</p>
       <p className="fm-small" style={{ marginBottom: 14 }}>Private to you and Movie Show Investing. Never shown on your project page, in Explore or in emails to backers.</p>
-      <MonthYearField id="filming-start" label="When do you plan to start filming?" value={a.filming_start_month ?? ''} skipped={a.filming_start_skipped ?? false}
-        onChange={next=>{change('filming_start_month', next.value); change('filming_start_skipped', next.skipped);}}/>
+      {/* Distribution projects are already filmed, so there is no filming start question. */}
+      {(a.stage === 'idea' || a.stage === 'production') && <MonthYearField id="filming-start" label="When do you plan to start filming?" value={a.filming_start_month ?? ''} skipped={a.filming_start_skipped ?? false}
+        onChange={next=>{change('filming_start_month', next.value); change('filming_start_skipped', next.skipped);}}/>}
       <MonthYearField id="money-needed-by" label="When do you need the money by?" value={a.money_needed_by_month ?? ''} skipped={a.money_needed_by_skipped ?? false}
         onChange={next=>{change('money_needed_by_month', next.value); change('money_needed_by_skipped', next.skipped);}}/>
     </div>
