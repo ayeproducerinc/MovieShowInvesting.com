@@ -8,6 +8,22 @@
 
 export interface FilmmakerShowcaseUpdate {
   /**
+     * YYYY-MM; private to the filmmaker and admin
+     * @nullable
+     * @pattern ^[0-9]{4}-(0[1-9]|1[0-2])$
+     */
+  filming_start_month?: string | null;
+  /** Skip for now; recorded separately from a blank */
+  filming_start_skipped?: boolean;
+  /**
+     * YYYY-MM; private to the filmmaker and admin
+     * @nullable
+     * @pattern ^[0-9]{4}-(0[1-9]|1[0-2])$
+     */
+  money_needed_by_month?: string | null;
+  /** Skip for now; recorded separately from a blank */
+  money_needed_by_skipped?: boolean;
+  /**
      * Name explicitly chosen for public display; null removes the public credit without changing private contact information
      * @maxLength 120
      * @nullable

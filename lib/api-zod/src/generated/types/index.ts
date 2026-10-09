@@ -89,6 +89,7 @@ export * from './filmmakerMaterialTextUpdate';
 export * from './filmmakerMediaConfig';
 export * from './filmmakerMediaConfigImageTypesItem';
 export * from './filmmakerMediaConfigTrailerTypesItem';
+export * from './filmmakerMoneyDate';
 export * from './filmmakerPhoneVerification';
 export * from './filmmakerPitchDeckBinary';
 export * from './filmmakerProjectBackers';

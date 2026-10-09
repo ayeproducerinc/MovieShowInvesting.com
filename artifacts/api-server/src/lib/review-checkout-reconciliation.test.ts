@@ -14,6 +14,7 @@ import "./project-updates.test";
 import "./project-update-email.test";
 import "./update-email-preference.test";
 import "./update-metrics.test";
+import "./money-date.test";
 
 process.env.NODE_ENV = "production"; // Test-double provider only; never calls live Stripe.
 process.env.REPLIT_DOMAINS = "checkout-fixture.example";

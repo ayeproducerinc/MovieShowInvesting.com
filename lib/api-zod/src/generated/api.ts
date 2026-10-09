@@ -562,6 +562,11 @@ export const submitFilmmakerBodyProposalNoteMax = 2000;
 
 export const submitFilmmakerBodyBudgetMax = 2147483647;
 
+export const submitFilmmakerBodyDevelopmentAmountMin = 0;
+export const submitFilmmakerBodyDevelopmentAmountMax = 2147483647;
+
+export const submitFilmmakerBodyFilmingStartMonthRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
+export const submitFilmmakerBodyMoneyNeededByMonthRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
 export const submitFilmmakerBodyOfferPer100Min = 125;
 
 
@@ -602,6 +607,11 @@ export const SubmitFilmmakerBody = zod.object({
   "pilot_url": zod.string().optional(),
   "budget": zod.number().int().min(1).max(submitFilmmakerBodyBudgetMax).optional(),
   "budget_from_example": zod.boolean().optional(),
+  "development_amount": zod.number().int().min(submitFilmmakerBodyDevelopmentAmountMin).max(submitFilmmakerBodyDevelopmentAmountMax).nullish().describe('Optional development amount shown with the budget'),
+  "filming_start_month": zod.string().regex(submitFilmmakerBodyFilmingStartMonthRegExp).nullish().describe('YYYY-MM; private to the filmmaker and admin'),
+  "filming_start_skipped": zod.boolean().optional().describe('Skip for now; recorded separately from a blank'),
+  "money_needed_by_month": zod.string().regex(submitFilmmakerBodyMoneyNeededByMonthRegExp).nullish().describe('YYYY-MM; private to the filmmaker and admin'),
+  "money_needed_by_skipped": zod.boolean().optional().describe('Skip for now; recorded separately from a blank'),
   "deal_answer": zod.enum(['yes', 'maybe', 'no']).optional(),
   "offer_per100": zod.number().int().min(submitFilmmakerBodyOfferPer100Min).optional(),
   "offer_other_text": zod.string().optional(),
@@ -659,6 +669,11 @@ export const getFilmmakerResultResponseProposalOneOneEarlyFilmmakerPercentMax = 
 export const getFilmmakerResultResponseProposalOneOneNoteMax = 2000;
 
 
+export const getFilmmakerResultResponseMoneyDateOneDevelopmentAmountMin = 0;
+export const getFilmmakerResultResponseMoneyDateOneDevelopmentAmountMax = 2147483647;
+
+export const getFilmmakerResultResponseMoneyDateOneFilmingStartMonthRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
+export const getFilmmakerResultResponseMoneyDateOneMoneyNeededByMonthRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
 
 
 export const GetFilmmakerResultResponse = zod.object({
@@ -715,7 +730,14 @@ export const GetFilmmakerResultResponse = zod.object({
   "distribution_plan": zod.string().nullable(),
   "trailer_url": zod.string().url().nullable(),
   "poster_url": zod.string().url().nullable(),
-  "share_image_url": zod.string().url().nullable()
+  "share_image_url": zod.string().url().nullable(),
+  "money_date": zod.union([zod.object({
+  "development_amount": zod.number().int().min(getFilmmakerResultResponseMoneyDateOneDevelopmentAmountMin).max(getFilmmakerResultResponseMoneyDateOneDevelopmentAmountMax).nullable().describe('Optional development amount shown with the budget'),
+  "filming_start_month": zod.string().regex(getFilmmakerResultResponseMoneyDateOneFilmingStartMonthRegExp).nullable().describe('YYYY-MM; private to the filmmaker and admin'),
+  "filming_start_skipped": zod.boolean().describe('Skip for now; recorded separately from a blank'),
+  "money_needed_by_month": zod.string().regex(getFilmmakerResultResponseMoneyDateOneMoneyNeededByMonthRegExp).nullable().describe('YYYY-MM; private to the filmmaker and admin'),
+  "money_needed_by_skipped": zod.boolean().describe('Skip for now; recorded separately from a blank')
+}),zod.null()]).optional().describe('Private to the filmmaker; null when none was recorded')
 })
 
 
@@ -1266,6 +1288,8 @@ export const UpdateFilmmakerShowcaseHeader = zod.object({
   "X-MSI-Project-Id": zod.number().int().min(1).optional().describe('Required for account-linked visitors; must match the completed project resolved from the current visitor cookie.')
 })
 
+export const updateFilmmakerShowcaseBodyFilmingStartMonthRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
+export const updateFilmmakerShowcaseBodyMoneyNeededByMonthRegExp = new RegExp('^[0-9]{4}-(0[1-9]|1[0-2])$');
 export const updateFilmmakerShowcaseBodyPublicFilmmakerNameMax = 120;
 
 export const updateFilmmakerShowcaseBodyTeamInfoMax = 3000;
@@ -1299,6 +1323,10 @@ export const updateFilmmakerShowcaseBodyTrailerUrlRegExp = new RegExp('^https?:/
 
 
 export const UpdateFilmmakerShowcaseBody = zod.object({
+  "filming_start_month": zod.string().regex(updateFilmmakerShowcaseBodyFilmingStartMonthRegExp).nullish().describe('YYYY-MM; private to the filmmaker and admin'),
+  "filming_start_skipped": zod.boolean().optional().describe('Skip for now; recorded separately from a blank'),
+  "money_needed_by_month": zod.string().regex(updateFilmmakerShowcaseBodyMoneyNeededByMonthRegExp).nullish().describe('YYYY-MM; private to the filmmaker and admin'),
+  "money_needed_by_skipped": zod.boolean().optional().describe('Skip for now; recorded separately from a blank'),
   "public_filmmaker_name": zod.string().max(updateFilmmakerShowcaseBodyPublicFilmmakerNameMax).nullish().describe('Name explicitly chosen for public display; null removes the public credit without changing private contact information'),
   "team_info": zod.string().max(updateFilmmakerShowcaseBodyTeamInfoMax).nullish(),
   "crowdfunding_ran": zod.boolean().optional(),
@@ -2118,6 +2146,7 @@ export const GetPublicProjectResponse = zod.object({
   "public_filmmaker_name": zod.string().nullish().describe('Explicit public project credit'),
   "team_info": zod.string().nullish(),
   "budget": zod.number().int().nullish(),
+  "development_amount": zod.number().int().nullish().describe('Optional development amount'),
   "proposal": zod.union([zod.object({
   "decision": zod.enum(['standard', 'negotiation']),
   "repayment_per100": zod.number().int().min(getPublicProjectResponseProposalOneOneRepaymentPer100Min).max(getPublicProjectResponseProposalOneOneRepaymentPer100Max),
@@ -2229,6 +2258,7 @@ export const GetExploreResponse = zod.object({
   "amount": zod.number().int().min(1).describe('Sum of that backer\'s publicly shown confirmed pledges to this project')
 })).optional().describe('Backers who chose public display; only on approved, listed projects'),
   "budget": zod.number().int().nullish(),
+  "development_amount": zod.number().int().nullish().describe('Optional development amount'),
   "proposal": zod.union([zod.object({
   "decision": zod.enum(['standard', 'negotiation']),
   "repayment_per100": zod.number().int().min(getExploreResponseProjectsItemProposalOneOneRepaymentPer100Min).max(getExploreResponseProjectsItemProposalOneOneRepaymentPer100Max),
@@ -2313,6 +2343,7 @@ export const MatchInvestorResponse = zod.object({
   "amount": zod.number().int().min(1).describe('Sum of that backer\'s publicly shown confirmed pledges to this project')
 })).optional().describe('Backers who chose public display; only on approved, listed projects'),
   "budget": zod.number().int().nullish(),
+  "development_amount": zod.number().int().nullish().describe('Optional development amount'),
   "proposal": zod.union([zod.object({
   "decision": zod.enum(['standard', 'negotiation']),
   "repayment_per100": zod.number().int().min(matchInvestorResponseProjectsItemProposalOneOneRepaymentPer100Min).max(matchInvestorResponseProjectsItemProposalOneOneRepaymentPer100Max),

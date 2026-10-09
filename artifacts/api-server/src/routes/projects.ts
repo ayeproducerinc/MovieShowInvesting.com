@@ -10,6 +10,7 @@ import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 import { serveFilmmakerPitchDeck } from "./filmmaker-draft-materials";
 import { acceptsPledges } from "../lib/pledge-policy";
 import { CONFIRMED_BACKERS_SQL, publicBackers, type BackerRow } from "../lib/backer-visibility";
+import { readMoneyDate } from "../lib/money-date-store";
 
 const router: IRouter = Router();
 const thumbnailCache = new Map<string, { expiresAt: number; url: string | null }>();
@@ -156,6 +157,8 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
   const response = {
     id: project.id,
     budget: pageVisible || isOwner ? project.budget : null,
+    // Shown, labelled, wherever the budget is shown. The timeline dates are never public.
+    development_amount: pageVisible || isOwner ? (await readMoneyDate(project.id).catch(() => null))?.development_amount ?? null : null,
     proposal: pageVisible || isOwner ? project.proposal : null,
     slug: project.slug,
     title: project.title,

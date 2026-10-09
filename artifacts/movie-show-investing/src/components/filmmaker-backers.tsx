@@ -5,7 +5,7 @@ const dollars = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency
 const day = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
 
 /** One shared query for the project's private backer data (list and totals). */
-function useProjectBackers(projectId: number, identityId: string) {
+export function useProjectBackers(projectId: number, identityId: string) {
   return useGetFilmmakerProjectBackers(projectId, { query: {
     queryKey: [...getGetFilmmakerProjectBackersQueryKey(projectId), identityId],
     retry: false,

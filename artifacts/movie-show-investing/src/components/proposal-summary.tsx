@@ -4,7 +4,7 @@ import { illustrateReceipts } from '@/lib/proposal-receipts';
 type ProposalLike = Parameters<typeof proposalView>[0];
 
 /** Read-only account of the actual saved proposal. Never substitutes stage defaults for historical records. */
-export function ProposalSummary({ proposal, legacyRepayment, budget, stage, allocation, testId = 'proposal-summary' }: { proposal: ProposalLike; legacyRepayment?: number | null; budget?: number | null; stage?: string | null; allocation?: number; testId?: string }) {
+export function ProposalSummary({ proposal, legacyRepayment, budget, developmentAmount, stage, allocation, testId = 'proposal-summary' }: { proposal: ProposalLike; legacyRepayment?: number | null; developmentAmount?: number | null; budget?: number | null; stage?: string | null; allocation?: number; testId?: string }) {
   const view = proposalView(proposal, legacyRepayment);
   if (!view) return <p className="prop-small" data-testid={`${testId}-none`}>Repayment terms not specified.</p>;
   const knownStage = stage === 'distribution' || stage === 'production' || stage === 'idea' ? (stage as Stage) : null;
@@ -23,6 +23,7 @@ export function ProposalSummary({ proposal, legacyRepayment, budget, stage, allo
         : <div><dt>Backend split and duration</dt><dd data-testid={`${testId}-backend`}>Not specified in this earlier submission</dd></div>}
       {view.structured && <div><dt>Payment while investors repay</dt><dd data-testid={`${testId}-early`}>{view.early ? `Filmmaker proposes ${view.early}% / investors ${100 - view.early}% of available receipts while the target is outstanding` : 'Investors first; no early filmmaker revenue share'}</dd></div>}
       {deal && <div><dt>Project budget</dt><dd data-testid={`${testId}-budget`}>{money(budget!)}</dd></div>}
+      {developmentAmount != null && <div><dt>Development amount</dt><dd data-testid={`${testId}-development`}>{money(developmentAmount)}</dd></div>}
       {deal && <div><dt>Investor target for that budget</dt><dd>{money(deal.investorTarget)}</dd></div>}
       {deal && feePct !== null && <div><dt>Platform fee, separate · {feePct}% of budget</dt><dd>{money(Math.round(budget! * feePct) / 100)}</dd></div>}
       {target !== null && <div><dt>Your allocation of {money(allocation!)} → repayment target</dt><dd data-testid={`${testId}-allocation`}>{money(target)}</dd></div>}

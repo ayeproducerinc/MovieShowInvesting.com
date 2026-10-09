@@ -170,6 +170,7 @@ The filmmaker sees their own stage's group plus the “Any stage” group.
 - In the filmmaker's private project area: money needed by, time left in months, pledged so far (real confirmed total), development amount, and budget. If a date was skipped, prompt to add it. If it has passed, say so and offer to update it. If there is no budget, leave that line out; do not show a zero.
 - The dates and countdown are private to the filmmaker and admin: never on the public page, in Explore, or in any email to backers.
 - Admin shows both dates per project and includes them in the existing CSV export.
+- Implementation (2026-10-09): stored in a separate `project_money_dates` table so existing project queries are unaffected. The development amount is set at intake, like the budget; Edit pitch changes only the two dates, and those private edits never pause an approved listing.
 
 ## Admin follow-up and research
 

@@ -5,6 +5,8 @@ import { getFilmmakerResult, getGetFilmmakerResultQueryKey, useGetFilmmakerResul
 import type { FilmmakerResult, FilmmakerShowcaseUpdate, GetPitchReviewCheckoutStatus200 } from '@workspace/api-client-react';
 import { FilmmakerBackers, PledgedSoFar } from '@/components/filmmaker-backers';
 import { FilmmakerProjectUpdates } from '@/components/filmmaker-project-updates';
+import { MonthYearField } from '@/components/month-year-field';
+import { MoneyDatePanel } from '@/components/money-date-panel';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { closeGuestConfirmation, guestConfirmationVisible } from '@/lib/filmmaker-confirmation';
 import { setFilmmakerAction } from '@/lib/filmmaker-intent';
@@ -53,6 +55,11 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
   const [links, setLinks] = useState(result.team_links.join('\n'));
   const [moneyUse, setMoneyUse] = useState(result.money_use || '');
   const [distribution, setDistribution] = useState(result.distribution_plan || '');
+  // Private timeline (DECISIONS.md › Money date); saved with the other pitch details.
+  const [filmingMonth, setFilmingMonth] = useState(result.money_date?.filming_start_month ?? '');
+  const [filmingSkipped, setFilmingSkipped] = useState(result.money_date?.filming_start_skipped ?? false);
+  const [neededMonth, setNeededMonth] = useState(result.money_date?.money_needed_by_month ?? '');
+  const [neededSkipped, setNeededSkipped] = useState(result.money_date?.money_needed_by_skipped ?? false);
   const [teamInfo, setTeamInfo] = useState(result.team_info || '');
   const [cfRan, setCfRan] = useState<boolean | null>(result.crowdfunding_ran ?? null);
   const [cfCampaign, setCfCampaign] = useState(result.crowdfunding_campaign || '');
@@ -149,6 +156,8 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
       public_filmmaker_name: clean(publicName),
       money_use: clean(moneyUse),
       distribution_plan: clean(distribution),
+      filming_start_month: filmingSkipped ? null : filmingMonth || null, filming_start_skipped: filmingSkipped,
+      money_needed_by_month: neededSkipped ? null : neededMonth || null, money_needed_by_skipped: neededSkipped,
       // Collapsing preserves values; explicitly clearing this editor removes current team text.
       team_info: clean(teamInfo),
       crowdfunding_ran: cfRan ?? undefined,
@@ -228,6 +237,10 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
       <div className="dossier-field"><label htmlFor="showcase-links">Team links <small>· optional, one full URL per line, up to 8</small></label><textarea id="showcase-links" data-testid="input-showcase-links" value={links} onChange={e => setLinks(e.target.value)} placeholder={'https://example.com/team'} /></div>
       <div className="dossier-field"><label htmlFor="showcase-money-use">How the money would be used <small>· optional</small></label><textarea id="showcase-money-use" data-testid="input-showcase-money-use" maxLength={3000} value={moneyUse} onChange={e => setMoneyUse(e.target.value)} /></div>
       <div className="dossier-field"><label htmlFor="showcase-distribution">Distribution plan <small>· optional</small></label><textarea id="showcase-distribution" data-testid="input-showcase-distribution" maxLength={3000} value={distribution} onChange={e => setDistribution(e.target.value)} /></div>
+      <fieldset className="dossier-field" data-testid="group-edit-timeline" id="edit-your-timeline" style={{ border: 0, padding: 0 }}><legend>Your timeline <small>· private to you and Movie Show Investing; never public or emailed to backers</small></legend>
+        <MonthYearField id="edit-filming-start" label="When do you plan to start filming?" value={filmingMonth} skipped={filmingSkipped} onChange={next => { setFilmingMonth(next.value); setFilmingSkipped(next.skipped); }} />
+        <MonthYearField id="edit-money-needed-by" label="When do you need the money by?" value={neededMonth} skipped={neededSkipped} onChange={next => { setNeededMonth(next.value); setNeededSkipped(next.skipped); }} />
+      </fieldset>
       <fieldset className="dossier-field" data-testid="group-edit-crowdfunding" style={{ border: 0, padding: 0 }}><legend>Crowdfunding campaign <small>· optional, private to review</small></legend>
         <label><input type="checkbox" data-testid="checkbox-edit-crowdfunding-ran" checked={cfRan === true} onChange={e => setCfRan(e.target.checked ? true : false)} /> I ran a crowdfunding campaign</label>
         {cfRan === true && <>
@@ -480,17 +493,19 @@ function FilmmakerDoneContent({ identityId }: { identityId: string }) {
          {checkoutReturn !== 'return' && reviewStatus.data?.fee_waived && <p className="dossier-notice" data-testid="status-review-fee-waived">Your editorial review fee was waived with FREE99. No payment was required.</p>}
         <section className="dossier-section" data-testid="section-recap-summary"><span className="dossier-kicker">On file</span><p>{[data.format, data.genre === 'Other' ? data.genre_other || data.genre : data.genre, legacyStage ? `Legacy stage: ${legacyStage}` : stage].filter(Boolean).join(' · ')}</p>
           {(() => { const x = data; const rows: [string, string | null | undefined][] = [['Team', x.team_info || (data.team_links.length ? `${data.team_links.length} link${data.team_links.length === 1 ? '' : 's'}` : null)], ['Distribution plan', data.distribution_plan], ['Planned funding use', data.money_use]]; const shown = rows.filter(([, v]) => v); return shown.length ? <ul className="dossier-links" data-testid="list-recap-specifics">{shown.map(([k, v]) => <li key={k}><strong>{k}:</strong> {v!.length > 120 ? `${v!.slice(0, 117)}...` : v}</li>)}</ul> : null; })()}</section>
+           {user && data.project_id && <MoneyDatePanel projectId={data.project_id} identityId={identityId} moneyDate={data.money_date} budget={data.budget}/>}
            {user && data.project_id && <FilmmakerBackers projectId={data.project_id} identityId={identityId}/>}
            {user && data.project_id && <FilmmakerProjectUpdates projectId={data.project_id} identityId={identityId}/>}
            {data.project_slug && !activeShowcaseStatus?.hidden && <ShowcaseForm key={data.project_slug} result={{ ...data, approved: activeShowcaseStatus?.approved ?? data.approved, showcase_requested: activeShowcaseStatus?.showcase_requested ?? data.showcase_requested, hidden: activeShowcaseStatus?.hidden ?? data.hidden }} onSaved={refreshShowcaseStatus} reviewStatus={reviewStatus.data} reviewStatusState={reviewStatus.isSuccess ? 'verified' : reviewStatus.isError ? 'unavailable' : 'checking'} checkoutEnabled={checkoutEnabled} sandboxCheckout={sandboxCheckout} checkoutUnavailableText={checkoutUnavailableText} autoOpenReady={(reviewStatus.isSuccess || reviewStatus.isError) && checkoutReturn === null} reviewTriggerRef={reviewTriggerRef} onRetryStatus={() => { void reviewStatus.refetch(); void checkoutConfig.refetch(); }} statusFetching={reviewStatus.isFetching} />}
           {data.project_slug && activeShowcaseStatus?.hidden && <details className="dossier-fold" data-testid="details-edit-pitch"><summary style={{ cursor: 'pointer', fontWeight: 600 }}>Edit pitch details</summary><PitchMaterialsEntry/></details>}
         {deal && data.budget && repayment && <details className="dossier-section" data-testid="details-proposal"><summary style={{ cursor:'pointer', fontWeight:600 }}>Proposal and illustrative terms</summary><div className="fm-receipt" data-testid="receipt-result-deal"><h3>At a glance</h3><dl>
            <div><dt>{data.budget_from_example ? 'Illustrative example budget' : 'Your estimated project budget'}</dt><dd data-testid="text-result-budget">{money(data.budget)}</dd></div>
+           {data.money_date?.development_amount != null && <div><dt>Development amount</dt><dd data-testid="text-result-development">{money(data.money_date.development_amount)}</dd></div>}
           <div><dt>Investor payback target · {money(repayment!)} per $100 of budget</dt><dd data-testid="text-result-investor-target">{money(deal.investorTarget)}</dd></div>
           <div><dt>Platform fee · {money(deal.feeRate)} per $100 of budget</dt><dd data-testid="text-result-platform-fee">{money(deal.platformFee)}</dd></div>
           <div className="fm-total"><dt>Combined payback threshold</dt><dd data-testid="text-result-combined-payback">{money(deal.combinedPayback)}</dd></div>
           {!snapshot && <div><dt>After both targets are satisfied</dt><dd>Backend terms unspecified in this earlier submission</dd></div>}
-        </dl>{snapshot && <ProposalSummary proposal={snapshot} budget={data.budget} stage={stage} testId="result-proposal" />}<p className="fm-small" style={{ marginTop: 18 }}>Illustrative terms for conversation only. The investor target and platform fee are separate amounts. This is not a return forecast or an offer to invest.</p></div><p className="dossier-notice">After payment processing fees, project income is split proportionally between the investor payback target and the platform's one-time fee, so neither is paid off first. Income may vary, and investors may not reach their full target.</p></details>}
+        </dl>{snapshot && <ProposalSummary proposal={snapshot} budget={data.budget} developmentAmount={data.money_date?.development_amount} stage={stage} testId="result-proposal" />}<p className="fm-small" style={{ marginTop: 18 }}>Illustrative terms for conversation only. The investor target and platform fee are separate amounts. This is not a return forecast or an offer to invest.</p></div><p className="dossier-notice">After payment processing fees, project income is split proportionally between the investor payback target and the platform's one-time fee, so neither is paid off first. Income may vary, and investors may not reach their full target.</p></details>}
         {data.project_slug && !activeShowcaseStatus?.hidden && <><div id="section-project-share"><ProjectShare slug={data.project_slug} title={data.title || 'Untitled project'} genre={data.genre} logline={data.logline} approved={activeShowcaseStatus?.approved ?? false} showcaseRequested={activeShowcaseStatus?.showcase_requested ?? false} /></div><FilmmakerInvite/></>}
       </div>
           <aside className="dossier-side">

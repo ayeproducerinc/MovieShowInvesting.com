@@ -30,6 +30,8 @@ import { issuePitchReviewProof } from "../lib/pitch-review-proof";
 import { requireAccountAgeConfirmation } from "../lib/age-confirmation";
 import { reviewFeeWaived } from "../lib/pitch-review-payments";
 import { showcaseNeedsReviewFee } from "../lib/review-checkout-policy";
+import { hasMoneyDateFields, validateMoneyDate } from "../lib/money-date";
+import { readMoneyDate, saveMoneyDate } from "../lib/money-date-store";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -37,11 +39,13 @@ router.use(cookieParser());
 const VISITOR_COOKIE = "msi_visitor_id";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHOWCASE_FIELDS = new Set([
+  "filming_start_month", "filming_start_skipped", "money_needed_by_month", "money_needed_by_skipped",
   "public_filmmaker_name",
   "team_info", "crowdfunding_ran", "crowdfunding_campaign", "crowdfunding_same_project", "crowdfunding_goal", "crowdfunding_raised", "crowdfunding_obligations",
   "showcase_requested", "synopsis", "team_links", "money_use", "distribution_plan", "trailer_url",
 ]);
 const INPUT_FIELDS = new Set([
+  "development_amount", "filming_start_month", "filming_start_skipped", "money_needed_by_month", "money_needed_by_skipped",
   "team_info", "team_links", "money_use", "distribution_plan",
   "crowdfunding_ran", "crowdfunding_campaign", "crowdfunding_same_project", "crowdfunding_goal", "crowdfunding_raised", "crowdfunding_obligations",
   "proposal", "age_confirmed",
@@ -220,6 +224,13 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
     return;
   }
 
+  // Money date (DECISIONS.md › Money date): optional; a skip is stored apart from a blank.
+  const moneyDate = validateMoneyDate(data);
+  if (!moneyDate.ok) {
+    res.status(400).json({ error: moneyDate.error });
+    return;
+  }
+
   try {
     const result = await createFilmmakerSubmission({
       visitorId: cookieId,
@@ -228,6 +239,11 @@ router.post("/filmmakers", async (req, res): Promise<void> => {
       firebaseEmail: identity?.email,
       data: data as FilmmakerSubmissionData,
     });
+    if (result.projectId !== null && hasMoneyDateFields(data as Record<string, unknown>)) {
+      // Saved after the project exists; an optional answer must never block a submission.
+      await saveMoneyDate(result.projectId, moneyDate.value, true)
+        .catch(() => req.log.warn({ projectId: result.projectId }, "Money date could not be saved"));
+    }
     if (result.discardedDraftMaterials) {
       await cleanupDiscardedDraftMaterials({
         visitorId: cookieId,
@@ -338,6 +354,8 @@ router.get("/filmmakers/result", async (req, res): Promise<void> => {
     project_id: project?.id ?? null,
     project_slug: project?.slug ?? null,
     checkout_proof: project ? issuePitchReviewProof(project.id) : null,
+    // Private to the filmmaker (this result is only served to the project's owner).
+    money_date: project ? await readMoneyDate(project.id).catch(() => null) : null,
     stage: project?.stage ?? stringAnswer("stage"),
     stage_other: project?.stageOther ?? stringAnswer("stage_other"),
     title: project?.title ?? stringAnswer("title"),
@@ -426,10 +444,25 @@ router.patch("/filmmakers/showcase", async (req, res): Promise<void> => {
     res.status(402).json({ error: "Pay the $49 review fee before submitting this pitch for review." });
     return;
   }
-  const project = await updateOwnedFilmmakerShowcase({
-    visitorId: cookieId,
-    changes: parsed.data,
-  });
+  // Timeline dates are private and saved on their own; they never trigger re-review.
+  const {
+    filming_start_month: filmingMonth, filming_start_skipped: filmingSkipped,
+    money_needed_by_month: neededMonth, money_needed_by_skipped: neededSkipped, ...showcaseChanges
+  } = parsed.data;
+  if (hasMoneyDateFields(parsed.data as Record<string, unknown>)) {
+    const dates = validateMoneyDate({
+      filming_start_month: filmingMonth, filming_start_skipped: filmingSkipped,
+      money_needed_by_month: neededMonth, money_needed_by_skipped: neededSkipped,
+    });
+    if (!dates.ok) {
+      res.status(400).json({ error: dates.error });
+      return;
+    }
+    await saveMoneyDate(current.project.id, dates.value, false);
+  }
+  const project = Object.keys(showcaseChanges).length
+    ? await updateOwnedFilmmakerShowcase({ visitorId: cookieId, changes: showcaseChanges })
+    : current.project;
   if (!project?.slug) {
     res.status(404).json({ error: "No completed filmmaker project was found." });
     return;

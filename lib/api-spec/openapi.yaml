@@ -3153,6 +3153,11 @@ components:
         pilot_url: { type: string }
         budget: { type: integer, minimum: 1, maximum: 2147483647 }
         budget_from_example: { type: boolean }
+        development_amount: { type: ["integer", "null"], minimum: 0, maximum: 2147483647, description: Optional development amount shown with the budget }
+        filming_start_month: { type: ["string", "null"], pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", description: "YYYY-MM; private to the filmmaker and admin" }
+        filming_start_skipped: { type: boolean, description: "Skip for now; recorded separately from a blank" }
+        money_needed_by_month: { type: ["string", "null"], pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", description: "YYYY-MM; private to the filmmaker and admin" }
+        money_needed_by_skipped: { type: boolean, description: "Skip for now; recorded separately from a blank" }
         deal_answer: { type: string, enum: [yes, maybe, no] }
         offer_per100: { type: integer, minimum: 125 }
         offer_other_text: { type: string }
@@ -3255,6 +3260,21 @@ components:
         trailer_url: { type: ["string", "null"], format: uri }
         poster_url: { type: ["string", "null"], format: uri }
         share_image_url: { type: ["string", "null"], format: uri }
+        money_date:
+          oneOf:
+            - $ref: "#/components/schemas/FilmmakerMoneyDate"
+            - type: "null"
+          description: Private to the filmmaker; null when none was recorded
+    FilmmakerMoneyDate:
+      type: object
+      additionalProperties: false
+      required: [development_amount, filming_start_month, filming_start_skipped, money_needed_by_month, money_needed_by_skipped]
+      properties:
+        development_amount: { type: ["integer", "null"], minimum: 0, maximum: 2147483647, description: Optional development amount shown with the budget }
+        filming_start_month: { type: ["string", "null"], pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", description: "YYYY-MM; private to the filmmaker and admin" }
+        filming_start_skipped: { type: boolean, description: "Skip for now; recorded separately from a blank" }
+        money_needed_by_month: { type: ["string", "null"], pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", description: "YYYY-MM; private to the filmmaker and admin" }
+        money_needed_by_skipped: { type: boolean, description: "Skip for now; recorded separately from a blank" }
     FilmmakerProjects:
       type: object
       additionalProperties: false
@@ -3341,6 +3361,10 @@ components:
       additionalProperties: false
       minProperties: 1
       properties:
+        filming_start_month: { type: ["string", "null"], pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", description: "YYYY-MM; private to the filmmaker and admin" }
+        filming_start_skipped: { type: boolean, description: "Skip for now; recorded separately from a blank" }
+        money_needed_by_month: { type: ["string", "null"], pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", description: "YYYY-MM; private to the filmmaker and admin" }
+        money_needed_by_skipped: { type: boolean, description: "Skip for now; recorded separately from a blank" }
         public_filmmaker_name: { type: ["string", "null"], maxLength: 120, description: Name explicitly chosen for public display; null removes the public credit without changing private contact information }
         team_info: { type: ["string", "null"], maxLength: 3000 }
         crowdfunding_ran: { type: boolean }
@@ -3455,6 +3479,7 @@ components:
         public_filmmaker_name: { type: ["string", "null"], description: Explicit public project credit, never the filmmaker's private contact name }
         team_info: { type: ["string", "null"] }
         budget: { type: ["integer", "null"] }
+        development_amount: { type: ["integer", "null"], description: Optional development amount, shown labelled wherever the budget is shown }
         proposal:
           anyOf:
             - $ref: "#/components/schemas/FilmmakerProposal"
@@ -3657,6 +3682,7 @@ components:
           items:
             $ref: "#/components/schemas/PublicBacker"
         budget: { type: ["integer", "null"] }
+        development_amount: { type: ["integer", "null"], description: Optional development amount, shown labelled wherever the budget is shown }
         proposal:
           anyOf:
             - $ref: "#/components/schemas/FilmmakerProposal"

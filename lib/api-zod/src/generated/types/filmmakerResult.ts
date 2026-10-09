@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { FilmmakerMoneyDate } from './filmmakerMoneyDate';
 import type { FilmmakerProposal } from './filmmakerProposal';
 import type { FilmmakerResultPriceGroup } from './filmmakerResultPriceGroup';
 import type { FilmmakerResultStage } from './filmmakerResultStage';
@@ -92,4 +93,6 @@ export interface FilmmakerResult {
   poster_url: string | null;
   /** @nullable */
   share_image_url: string | null;
+  /** Private to the filmmaker; null when none was recorded */
+  money_date?: FilmmakerMoneyDate | null;
 }

@@ -99,6 +99,11 @@ router.get("/explore", async (req, res): Promise<void> => {
   });
 
   // Explore lists approved projects only, so opted-in names may show on every card.
+  // Development amount only (never the private dates). Tolerates a not-yet-migrated table.
+  const developmentAmounts = new Map<number, number | null>(filtered.length ? (await pool.query<{ project_id: number; development_amount: number | null }>(
+    "select project_id, development_amount from project_money_dates where project_id = any($1::int[])",
+    [filtered.map((project) => project.id)],
+  ).catch(() => ({ rows: [] as { project_id: number; development_amount: number | null }[] }))).rows.map((row) => [row.project_id, row.development_amount]) : []);
   const backerRows = filtered.length
     ? (await pool.query<BackerRow>(CONFIRMED_BACKERS_SQL, [filtered.map((project) => project.id)])).rows : [];
   const response = {
@@ -115,6 +120,7 @@ router.get("/explore", async (req, res): Promise<void> => {
       pitch_deck_name: project.has_pitch_deck ? project.pitch_deck_name : null,
       offer_per_100: project.offer_per_100,
       budget: project.budget,
+      development_amount: developmentAmounts.get(project.id) ?? null,
       proposal: project.proposal,
       confirmed_pledge_total: Number(project.confirmed_pledge_total),
       is_owner: project.is_owner,

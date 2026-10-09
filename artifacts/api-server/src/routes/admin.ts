@@ -139,7 +139,15 @@ async function getAdminTable(section: Section): Promise<AdminTable> {
   }
 
   if (section === "pledges") {
+    // Money date per project (private: admin and filmmaker only). Tolerates a not-yet-migrated table.
+    type MoneyDateRow = { project_id: number; development_amount: number | null; filming_start_month: string | null;
+      filming_start_skipped: boolean; money_needed_by_month: string | null; money_needed_by_skipped: boolean };
+    const moneyDates = new Map((await pool.query<MoneyDateRow>(
+      "select project_id, development_amount, filming_start_month, filming_start_skipped, money_needed_by_month, money_needed_by_skipped from project_money_dates",
+    ).catch(() => ({ rows: [] as MoneyDateRow[] }))).rows.map((row) => [row.project_id, row]));
+    const monthCell = (month: string | null | undefined, skipped: boolean | undefined) => month ?? (skipped ? "Skipped" : "");
     const rows = projects.map((project) => {
+      const money = moneyDates.get(project.id);
       const projectPledges = confirmedPledges.filter((pledge) => pledge.projectId === project.id);
       const people = new Set(projectPledges.map((pledge) => pledge.investorId).filter((id): id is number => id != null));
       const accreditedPeople = new Set([...people].filter((id) => investorById.get(id)?.accredited === "yes"));
@@ -157,9 +165,12 @@ async function getAdminTable(section: Section): Promise<AdminTable> {
         projectPledges.reduce((sum, pledge) => sum + pledge.amount, 0),
         accreditedPeople.size,
         topCity,
+        monthCell(money?.filming_start_month, money?.filming_start_skipped),
+        monthCell(money?.money_needed_by_month, money?.money_needed_by_skipped),
+        money?.development_amount ?? "",
       ];
     });
-    return buildTable(section, ["Project", "Slate", "Offer per $100", "Confirmed pledgers", "Confirmed pledged", "Accredited pledgers", "Top city"], rows);
+    return buildTable(section, ["Project", "Slate", "Offer per $100", "Confirmed pledgers", "Confirmed pledged", "Accredited pledgers", "Top city", "Start filming", "Money needed by", "Development amount"], rows);
   }
 
   if (section === "location") {

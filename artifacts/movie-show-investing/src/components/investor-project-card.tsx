@@ -29,7 +29,7 @@ export function InvestorProjectCard({ project, action, matched = false, showPitc
       <h2>{project.title}</h2>
       <p data-testid={`story-project-${project.id}`}>{recap ? exploreStoryHook(project.logline) : project.logline || 'Read the project dossier for more about this story.'}</p>
       {project.public_backers?.length ? <p className="inv-small" data-testid={`public-backers-${project.id}`} style={{overflowWrap:'anywhere'}}>Backed by {publicBackersLine(project.public_backers, whole)}. Returns aren’t guaranteed. You may get back less, or nothing.</p> : null}
-      {!recap && (project.proposal || project.budget) && <ProposalSummary proposal={project.proposal} budget={project.budget} stage={project.stage} testId={`proposal-${project.id}`} />}
+      {!recap && (project.proposal || project.budget) && <ProposalSummary proposal={project.proposal} budget={project.budget} developmentAmount={project.development_amount} stage={project.stage} testId={`proposal-${project.id}`} />}
       <div className="inv-project-links">
         <Link href={`/project/${project.slug}`} className={recap ? 'explore-view-project' : undefined} data-testid={`link-project-${project.id}`}>View project <ArrowUpRight size={13} className="inline"/></Link>
         {deckUrl && <a href={deckUrl} target="_blank" rel="noopener noreferrer" data-testid={`link-pitch-deck-${project.id}`}>View pitch deck <ArrowUpRight size={13} className="inline"/></a>}

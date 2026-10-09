@@ -13,6 +13,11 @@ export interface ExploreProject {
   public_backers?: PublicBacker[];
   /** @nullable */
   budget?: number | null;
+  /**
+     * Optional development amount
+     * @nullable
+     */
+  development_amount?: number | null;
   proposal?: FilmmakerProposal | null;
   /** @minimum 1 */
   id: number;
