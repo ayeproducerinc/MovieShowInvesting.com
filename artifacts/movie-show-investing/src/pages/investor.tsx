@@ -11,7 +11,7 @@ import { ProposalSummary } from '@/components/proposal-summary';
 import { InvestorResultCard } from '@/components/investor-result-card';
 import { trackInvestorEvent } from '@/lib/analytics';
 import { LocationPicker } from '@/components/location-picker';
-import { cap, MAX_PROJECTS, PROJECT_MINIMUM, selectAutoBuildProjects, split } from '@/lib/investor-lineup';
+import { canUseSingleProjectDraft, cap, MAX_PROJECTS, PROJECT_MINIMUM, selectAutoBuildProjects, singleProjectLineup, split } from '@/lib/investor-lineup';
 import { investorReviewKey, minimaForSelectedStages } from '@/lib/investor-review';
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
@@ -30,6 +30,14 @@ const descriptions = [
   'A starting point, not a recommendation. Adjust the lineup or leave your interest unallocated.',
   'Review your amount and projects, add your details, then sign and submit once. Your interest is non-binding and no money is collected.'
 ];
+/** One-project pledge from a project page: "Your pledge", then the shared review-and-sign screen. */
+const singleHeadings = ['Your pledge','Review and sign'];
+const singleDescriptions = [
+  'Choose your amount for this one project, read the ground rules, and confirm your age. This is a conversation, not a payment.',
+  'Check the project and amount, add your details, then sign and submit once. Your interest is non-binding and no money is collected.',
+];
+const PLEDGE_ENCOURAGEMENT = 'Every breakout film started with someone who believed in it first. Your pledge tells this filmmaker their story is worth telling, and helps show others it has an audience.';
+const goalDollars = (n:number) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);
 const genres = ['Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Romance','Action','Animation','Other'];
 const stages = [['distribution','Finished film / distribution'],['production','Short or pilot / production'],['idea','Script or idea']] as const;
 type MinimumStage = typeof stages[number][0];
@@ -144,6 +152,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
   const targetSlug = params.get('project');
   const newEntry = params.get('new') === '1';
   const revise = params.get('revise') === '1';
+  const oneProject = Boolean(targetSlug) && params.get('one') === '1' && !revise;
   const [,navigate] = useLocation();
   const queryClient = useQueryClient();
   const visitor = useGetPriceGroup();
@@ -172,6 +181,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
     setSignature('');
   }, [JSON.stringify(a)]);
   const [screen,setScreen] = useState(1);
+  const [single,setSingle] = useState(false);
   const [ready,setReady] = useState(false);
   const [selectionNeeded,setSelectionNeeded] = useState(false);
   const [matches,setMatches] = useState<ExploreProject[]>([]);
@@ -204,10 +214,12 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
       const context=`new:${targetSlug}:${previous.confirmed_at}`;
       const draft=progress.data?.answers as Answers | undefined;
       if (draft?.entry_context===context) {
-        setA({...blank,...draft});setScreen(mapStep(draft as unknown as Record<string,unknown>,progress.data!.last_screen));
+        const step=mapStep(draft as unknown as Record<string,unknown>,progress.data!.last_screen);
+        const one=oneProject && !!target && canUseSingleProjectDraft(draft.lineup ?? [],target.id,!!draft.unallocated);
+        setSingle(one);setA({...blank,...draft});setScreen(one && step<5 ? 1 : step);
       } else {
         const start:Answers={...blank,amount:100,name:previous.name,email:previous.email,phone:previous.phone ?? '',city:previous.city ?? '',state:previous.state ?? '',country:previous.country ?? '',zip:previous.zip ?? '',location_manual:true,accredited:previous.accredited,experience:previous.experience,motivations:previous.motivations,favorite_genres:previous.favorite_genres,stages:previous.stages,minima:previous.minima,call_opt_in:previous.call_opt_in,lineup:target?[{project_id:target.id,amount:100}]:[],entry_context:context};
-        setA(start); setScreen(1);
+        setSingle(oneProject && !!target); setA(start); setScreen(1);
       }
       setReady(true);
       return;
@@ -224,11 +236,16 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
       const restored = {...blank,...progress.data.answers, minima:{...blank.minima,...(progress.data.answers.minima as object || {})}} as Answers;
       if (!('location_manual' in progress.data.answers) && restored.city && !restored.country) restored.location_manual = true;
       const step = mapStep(progress.data.answers as Record<string,unknown>,progress.data.last_screen);
-      if (target && !restored.lineup.some(row=>row.project_id===target.id)) setSelectionNeeded(true);
-      setA(restored); setScreen(step); lastSaved.current=JSON.stringify({screen:step,a:restored}); setReady(true);
+      // A single-project link reuses a draft only when it holds nothing but this project.
+      const one = oneProject && !!target && canUseSingleProjectDraft(restored.lineup,target.id,restored.unallocated);
+      if (one) restored.lineup=singleProjectLineup(target.id,restored.amount);
+      else if (target && !restored.lineup.some(row=>row.project_id===target.id)) setSelectionNeeded(true);
+      const shown = one && step<5 ? 1 : step;
+      setSingle(one); setA(restored); setScreen(shown); lastSaved.current=JSON.stringify({screen:shown,a:restored}); setReady(true);
     } else if (progress.error?.status===404) {
       initialised.current=true;
       if(target) setA({...blank,lineup:[{project_id:target.id,amount:100}]});
+      setSingle(oneProject && !!target);
       setReady(true);
     }
   },[progress.data,progress.error,explore.isSuccess,current.isSuccess]);
@@ -258,6 +275,8 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
     return ()=>{if(timer.current!==null)window.clearTimeout(timer.current);};
   },[a,screen,ready,selectionNeeded]);
   const change = <K extends keyof Answers>(key:K,value:Answers[K])=>{setA(prev=>({...prev,[key]:value}));setError('');setCanStartFresh(false);};
+  /** One-project path: the whole amount always goes to the selected project. */
+  const setSingleAmount = (amount:number)=>{setA(prev=>({...prev,amount,unallocated:false,lineup:prev.lineup.length ? singleProjectLineup(prev.lineup[0].project_id,amount) : prev.lineup}));setError('');setCanStartFresh(false);};
   function minimumChoice(stage:MinimumStage) {
     if(otherMinimumSelected[stage]) return 'other';
     const value=a.minima[stage];
@@ -365,12 +384,14 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
         updated=await findCandidates(a,true);
       } catch {setError('We could not find matches right now. Please try again.');return;}
     }
-    try {await persist(screen+1,updated);setA(updated);setScreen(screen+1);window.scrollTo({top:0,behavior:'smooth'});}catch {/* error shown by persist */}
+    const to = single && screen===1 ? 5 : screen+1;
+    try {await persist(to,updated);setA(updated);setScreen(to);window.scrollTo({top:0,behavior:'smooth'});}catch {/* error shown by persist */}
   }
-  async function back() {setError('');setCanStartFresh(false);try{await persist(screen-1,a);setScreen(screen-1);window.scrollTo({top:0,behavior:'smooth'});}catch {/* error shown by persist */}}
+  async function back() {setError('');setCanStartFresh(false);const to = single && screen===5 ? 1 : screen-1;try{await persist(to,a);setScreen(to);window.scrollTo({top:0,behavior:'smooth'});}catch {/* error shown by persist */}}
   async function finish(startFresh=false) {
     if (finishingRef.current) return;
-    const issue=validate(5) || validate(4) || validate(3) || validate(2);
+    // The one-project path has no interest or repayment-preference screens.
+    const issue=validate(5) || validate(4) || (single ? '' : validate(3) || validate(2));
     if(issue){setError(issue);return;}
     if (!interestAccepted || signature !== a.name.trim()) {
       setError('Review your amount and projects, type your full name exactly as shown, and check the confirmation before submitting.');
@@ -472,12 +493,32 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
     const target=available.find(p=>p.slug===targetSlug)!;
     return <section className="inv"><div className="page-wrap inv-state"><h1>Choose how to continue.</h1><p>Your existing {revise?'saved interest':'worksheet'} has different project choices. Nothing has been replaced. To include {target.title}, explicitly replace the draft lineup or keep your existing choices and add it manually at the allocation step.</p><div className="inv-actions"><button type="button" className="inv-button" data-testid="button-replace-draft-lineup" onClick={()=>{setA(prev=>({...prev,unallocated:false,lineup:[{project_id:target.id,amount:prev.amount}]}));setScreen(4);setSelectionNeeded(false);}}>Replace draft lineup with {target.title}</button><button type="button" className="inv-button secondary" onClick={()=>{setScreen(4);setSelectionNeeded(false);}}>Keep existing choices</button></div></div></section>;
   }
+  const stepHeadings = single ? singleHeadings : headings;
+  const position = single ? (screen===5 ? 2 : 1) : screen;
   return <section className="inv"><div className="page-wrap">
-    <div className="inv-top"><Link href="/explore" className="inv-kicker" data-testid="link-invest-explore">Movie Show Investing / Explore</Link><span className="inv-kicker" data-testid="text-invest-step">Step {screen} / 5</span></div>
-    <div className="inv-progress" aria-label={`Step ${screen} of 5`}>{headings.map((h,i)=><span key={h} className={i<screen?'active':''} title={h}/>)}</div>
-    <div className="inv-layout"><div className="inv-intro" key={screen}><p className="inv-kicker">Investor worksheet / 0{screen}</p><h1>{headings[screen-1]}<em>.</em></h1><p>{descriptions[screen-1]}</p><div className="inv-note"><p>Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.</p><p>Your interest is non-binding. No money is collected and nothing here is an offer to sell securities.</p></div></div>
+    <div className="inv-top"><Link href="/explore" className="inv-kicker" data-testid="link-invest-explore">Movie Show Investing / Explore</Link><span className="inv-kicker" data-testid="text-invest-step">Step {position} / {stepHeadings.length}</span></div>
+    <div className="inv-progress" aria-label={`Step ${position} of ${stepHeadings.length}`}>{stepHeadings.map((h,i)=><span key={h} className={i<position?'active':''} title={h}/>)}</div>
+    <div className="inv-layout"><div className="inv-intro" key={screen}><p className="inv-kicker">{single ? 'Pledge' : 'Investor worksheet'} / 0{position}</p><h1>{stepHeadings[position-1]}<em>.</em></h1><p>{(single ? singleDescriptions : descriptions)[position-1]}</p><div className="inv-note"><p>Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.</p><p>Your interest is non-binding. No money is collected and nothing here is an offer to sell securities.</p></div></div>
       <div className="inv-panel" inert={finishing} aria-busy={finishing}>
-        {screen===1 && <><p className="inv-label">How much might you be interested in? · USD</p><div className="inv-amount"><span>$</span>{a.amount || '—'}</div><p className="inv-small">A pledge is a non-binding indication of interest only; it does not reserve a project, require payment, or make an investment.</p><p className="inv-small">Returns aren’t guaranteed. You may get back less, or nothing.</p><div className="inv-options">{[100,250,500,1000].map(value=><Option key={value} type="radio" checked={a.amount===value} label={dollars(value)} onChange={()=>change('amount',value)}/>)}</div><div className="inv-field"><label htmlFor="invest-amount">Or enter an amount</label><input id="invest-amount" data-testid="input-invest-amount" className="inv-input" type="number" min="100" step="1" value={a.amount || ''} onChange={e=>change('amount',Number(e.target.value))}/></div><p className="inv-small">Minimum total interest: $100. You can adjust your project choices later.</p>
+        {screen===1 && single && (()=>{const project=available.find(p=>p.id===a.lineup[0]?.project_id);const offer=project?.offer_per_100 ?? null;const goal=offer!==null && offer>=125 && a.amount>0 ? a.amount*offer/100 : null;return <>
+          <p className="inv-kicker" data-testid="text-single-project-kicker">Your pledge to</p>
+          <h2 className="serif" data-testid="text-single-project-title" style={{fontSize:'clamp(30px,4vw,46px)',lineHeight:1.05,margin:'6px 0 14px',overflowWrap:'anywhere'}}>{project?.title ?? 'This project'}</h2>
+          <p data-testid="text-pledge-encouragement">{PLEDGE_ENCOURAGEMENT}</p>
+          <p className="inv-label" style={{marginTop:22}}>How much would you pledge to this project? · USD</p>
+          <div className="inv-amount"><span>$</span>{a.amount || '—'}</div>
+          <div className="inv-options">{[100,250,500,1000].map(value=><Option key={value} type="radio" checked={a.amount===value} label={dollars(value)} onChange={()=>setSingleAmount(value)}/>)}</div>
+          <div className="inv-field"><label htmlFor="invest-amount">Or enter an amount</label><input id="invest-amount" data-testid="input-invest-amount" className="inv-input" type="number" min={PROJECT_MINIMUM} step="1" value={a.amount || ''} onChange={e=>setSingleAmount(Number(e.target.value))}/></div>
+          <p className="inv-small">Minimum {dollars(PROJECT_MINIMUM)} for this project.</p>
+          {goal!==null && <p data-testid="text-single-payback-goal">Payback goal: {goalDollars(goal)} back on your {dollars(a.amount)}, based on the project’s current offer; this figure is illustrative, not guaranteed. Returns aren’t guaranteed. You may get back less, or nothing.</p>}
+          {goal===null && <p className="inv-small">Returns aren’t guaranteed. You may get back less, or nothing.</p>}
+          <p className="inv-small">A pledge is a non-binding indication of interest only; it does not reserve a project, require payment, or make an investment.</p>
+          <p className="inv-kicker">General understanding · not a signature</p>
+          <div className="inv-section"><h2>Interest is not an investment.</h2><p>Your pledge is non-binding. No money is collected, and you are not committing to fund a project.</p></div>
+          <div className="inv-section"><h2>Returns aren’t guaranteed.</h2><p>Films and shows can create exciting possibilities, but budgets, timelines, and audiences can change. If an investment becomes available in the future, it could lose some or all of its value. Any future opportunity would come with separate details to review and a separate decision to make.</p></div>
+          <div className="inv-section"><p>This general acknowledgment is not a signature. On the next screen you review the exact project and amount and sign once.</p><Option label="I understand this is non-binding interest, not an investment or an offer." checked={a.terms_read} onChange={()=>change('terms_read',!a.terms_read)}/></div>
+          <AgeAcknowledgment role="investor" checked={ageStatus.confirmed || ageChecked} disabled={ageStatus.confirmed} savedAt={ageStatus.confirmedAt} onChange={setAgeChecked}/>
+        </>;})()}
+        {screen===1 && !single && <><p className="inv-label">How much might you be interested in? · USD</p><div className="inv-amount"><span>$</span>{a.amount || '—'}</div><p className="inv-small">A pledge is a non-binding indication of interest only; it does not reserve a project, require payment, or make an investment.</p><p className="inv-small">Returns aren’t guaranteed. You may get back less, or nothing.</p><div className="inv-options">{[100,250,500,1000].map(value=><Option key={value} type="radio" checked={a.amount===value} label={dollars(value)} onChange={()=>change('amount',value)}/>)}</div><div className="inv-field"><label htmlFor="invest-amount">Or enter an amount</label><input id="invest-amount" data-testid="input-invest-amount" className="inv-input" type="number" min="100" step="1" value={a.amount || ''} onChange={e=>change('amount',Number(e.target.value))}/></div><p className="inv-small">Minimum total interest: $100. You can adjust your project choices later.</p>
         <div className="inv-section"><h2>Per $100 invested</h2><p className="inv-small">Repayment preferences later are stated as total repayment per $100 including original capital. Project terms, backend splits and platform fees are shown with each project at the lineup step.</p></div><p className="inv-kicker">General understanding · not a signature</p><div className="inv-section"><h2>Interest is not an investment.</h2><p>This worksheet records what you may want to explore. Your pledge is non-binding. No money is collected, and you are not committing to fund a project.</p></div><div className="inv-section"><h2>Returns aren’t guaranteed.</h2><p>Films and shows can create exciting possibilities, but budgets, timelines, and audiences can change. If an investment becomes available in the future, it could lose some or all of its value.</p><p>For now, a pledge only expresses interest—no money changes hands. Any future opportunity would come with separate details to review and a separate decision to make.</p></div><div className="inv-section"><p>This general acknowledgment is not a signature or confirmation of any saved amount or project allocations. Later, you can review the exact saved record and sign it separately.</p><Option label="I understand this is non-binding interest, not an investment or an offer." checked={a.terms_read} onChange={()=>change('terms_read',!a.terms_read)}/></div><AgeAcknowledgment role="investor" checked={ageStatus.confirmed || ageChecked} disabled={ageStatus.confirmed} savedAt={ageStatus.confirmedAt} onChange={setAgeChecked}/></>}
           {screen===2 && <><p className="inv-label">Genres you return to · choose any</p><div className="inv-grid">{genres.map(g=><Option key={g} label={g} checked={a.favorite_genres.includes(g)} onChange={()=>change('favorite_genres',toggle(a.favorite_genres,g))}/>)}</div><div className="inv-section"><p className="inv-label">Where in the process?</p><div className="inv-options">{stages.map(([value,label])=><Option key={value} label={label} checked={a.stages.includes(value)} onChange={()=>change('stages',toggle(a.stages,value))}/>)}</div></div></>}
           {screen===3 && <div className="inv-section" data-testid="section-repayment-preferences">
@@ -525,13 +566,13 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
              </div>
           </>}
         </>}
-        {screen===5 && <><div className="inv-section" data-testid="summary-investor"><p className="inv-kicker">Your choices · edit any time</p><p className="inv-small">Amount {dollars(a.amount)} · {a.unallocated ? 'unallocated' : `${a.lineup.length} project${a.lineup.length===1?'':'s'}`} · genres: {a.favorite_genres.join(', ') || '—'} · stages: {a.stages.join(', ') || '—'}</p><div className="inv-actions" style={{marginTop:0}}><button type="button" className="inv-button secondary" data-testid="button-edit-amount" disabled={saving} onClick={()=>void jump(1)}>Edit amount</button><button type="button" className="inv-button secondary" data-testid="button-edit-interests" disabled={saving} onClick={()=>void jump(2)}>Edit interests</button><button type="button" className="inv-button secondary" data-testid="button-edit-lineup" disabled={saving} onClick={()=>void jump(4)}>Edit lineup</button></div></div>{!ageStatus.confirmed && <AgeAcknowledgment role="investor" checked={ageChecked} onChange={setAgeChecked}/>}<p className="inv-small">Required contact details: name, email, city, and country. Phone, region/state, and postal code are optional.</p><Field id="invest-name" label="Your name" value={a.name} onChange={v=>change('name',v)} autoComplete="name" required/><Field id="invest-email" label="Email address" value={a.email} onChange={v=>change('email',v)} type="email" autoComplete="email" required/><Field id="invest-phone" label="Phone number" value={a.phone||''} onChange={v=>change('phone',v)} type="tel" autoComplete="tel"/>
+        {screen===5 && <><div className="inv-section" data-testid="summary-investor"><p className="inv-kicker">Your choices · edit any time</p>{single ? <p className="inv-small" data-testid="text-single-review-summary">Amount {dollars(a.amount)} · {available.find(p=>p.id===a.lineup[0]?.project_id)?.title ?? 'this project'} only</p> : <p className="inv-small">Amount {dollars(a.amount)} · {a.unallocated ? 'unallocated' : `${a.lineup.length} project${a.lineup.length===1?'':'s'}`} · genres: {a.favorite_genres.join(', ') || '—'} · stages: {a.stages.join(', ') || '—'}</p>}<div className="inv-actions" style={{marginTop:0}}><button type="button" className="inv-button secondary" data-testid="button-edit-amount" disabled={saving} onClick={()=>void jump(1)}>Edit amount</button>{!single && <><button type="button" className="inv-button secondary" data-testid="button-edit-interests" disabled={saving} onClick={()=>void jump(2)}>Edit interests</button><button type="button" className="inv-button secondary" data-testid="button-edit-lineup" disabled={saving} onClick={()=>void jump(4)}>Edit lineup</button></>}</div></div>{!ageStatus.confirmed && <AgeAcknowledgment role="investor" checked={ageChecked} onChange={setAgeChecked}/>}<p className="inv-small">Required contact details: name, email, city, and country. Phone, region/state, and postal code are optional.</p><Field id="invest-name" label="Your name" value={a.name} onChange={v=>change('name',v)} autoComplete="name" required/><Field id="invest-email" label="Email address" value={a.email} onChange={v=>change('email',v)} type="email" autoComplete="email" required/><Field id="invest-phone" label="Phone number" value={a.phone||''} onChange={v=>change('phone',v)} type="tel" autoComplete="tel"/>
            <LocationPicker value={{city:a.city||'',state:a.state||'',country:a.country||'',location_manual:a.location_manual}}
              onChange={location=>{setA(current=>({...current,...location}));setError('');setCanStartFresh(false);}}/>
            <Field id="invest-zip" label="Postal code" value={a.zip||''} onChange={v=>change('zip',v)} autoComplete="postal-code"/>
           <div className="inv-section"><h2>Investor background</h2><p className="inv-label">Are you an accredited investor?</p><div className="inv-options"><Option label="Yes" type="radio" checked={a.accredited} onChange={()=>change('accredited',true)}/><Option label="No or not sure" type="radio" checked={!a.accredited} onChange={()=>change('accredited',false)}/></div></div>
-          <div className="inv-section"><p className="inv-label">What experience do you bring? · choose any</p><div className="inv-options">{['New to investing','Invested in creative projects','Invested in private companies','Work in film or media'].map(value=><Option key={value} label={value} checked={a.experience.includes(value)} onChange={()=>change('experience',toggle(a.experience,value))}/>)}</div></div>
-          <div className="inv-section"><p className="inv-label">What brings you here? · choose any</p><div className="inv-options">{['Support independent filmmakers','Discover stories early','Connect with creators','Learn about future opportunities'].map(value=><Option key={value} label={value} checked={a.motivations.includes(value)} onChange={()=>change('motivations',toggle(a.motivations,value))}/>)}</div></div>
+          {!single && <div className="inv-section"><p className="inv-label">What experience do you bring? · choose any</p><div className="inv-options">{['New to investing','Invested in creative projects','Invested in private companies','Work in film or media'].map(value=><Option key={value} label={value} checked={a.experience.includes(value)} onChange={()=>change('experience',toggle(a.experience,value))}/>)}</div></div>}
+          {!single && <div className="inv-section"><p className="inv-label">What brings you here? · choose any</p><div className="inv-options">{['Support independent filmmakers','Discover stories early','Connect with creators','Learn about future opportunities'].map(value=><Option key={value} label={value} checked={a.motivations.includes(value)} onChange={()=>change('motivations',toggle(a.motivations,value))}/>)}</div></div>}
            <label className="fm-check inv-section inv-contact-opt-in"><input type="checkbox" data-testid="checkbox-invest-chat-opt-in" checked={a.call_opt_in} onChange={e=>change('call_opt_in',e.target.checked)}/><span>I’m open to a quick 15-minute chat about my interests.</span></label>
             <InvestorNotificationPermissionControl/>
             {!a.terms_read && <label className="fm-check inv-section"><input type="checkbox" checked={a.terms_read} onChange={event => change('terms_read', event.target.checked)} data-testid="checkbox-restored-ground-rules"/><span>I understand this is non-binding interest, not an investment or payment. Any future investment requires its own offering documents and eligibility checks; returns are not guaranteed.</span></label>}

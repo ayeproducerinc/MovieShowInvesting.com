@@ -89,7 +89,8 @@ export default function Project() {
   const eligible = data.approved && data.showcase_requested && ['idea', 'production', 'distribution'].includes(data.stage || '');
   const intent = current.data?.intent;
   const previousHere = current.data?.history.some(entry => entry.allocations.some(row => row.project_id === data.id));
-  const target = `/invest?project=${encodeURIComponent(data.slug)}`;
+  // one=1 opens the two-screen, single-project pledge (DECISIONS.md › Investor pledge limits).
+  const target = `/invest?project=${encodeURIComponent(data.slug)}&one=1`;
   const pitchDeckUrl = eligible ? safeUrl(data.pitch_deck_url) : null;
   const published = data.approved && data.showcase_requested;
   const synopsis = data.synopsis?.trim() || '';
@@ -113,7 +114,7 @@ export default function Project() {
         current.isError ? <p role="alert">We couldn’t check your saved interest. <button type="button" className="pj-linkbtn" onClick={() => void current.refetch()}>Try again</button></p> :
         intent?.status === 'saved' ? <div><p>You have saved non-binding interest that is not yet confirmed. No new interest has been recorded for this project.</p><div className="pj-actions"><Link href="/lineup" className="dossier-button pj-primary" data-testid="link-project-continue-interest">Continue saved interest <ArrowUpRight size={16}/></Link><Link href={`${target}&revise=1`} className="dossier-button dossier-button-outline" data-testid="link-project-revise-interest">Revise pending interest for this project <ArrowUpRight size={16}/></Link></div></div> :
         intent?.status === 'confirmed' && previousHere && !dismissed ? <div data-testid="prompt-project-more-interest"><p>You are on the waitlist for this project: your confirmed, non-binding interest is on record. A new amount will be a separate non-binding entry, reviewed and signed again; your earlier interest stays unchanged.</p><div className="pj-actions"><Link href={`${target}&new=1`} className="dossier-button pj-primary" data-testid="link-project-add-more">Add more interest to this project <ArrowUpRight size={16}/></Link><Link href="/lineup" className="dossier-button dossier-button-outline">View my lineup <ArrowUpRight size={16}/></Link><button type="button" className="dossier-button dossier-button-outline" onClick={() => setDismissed(true)} data-testid="button-dismiss-project-interest">Dismiss</button></div></div> :
-        <div className="pj-actions"><Link href={`${target}${intent?.status === 'confirmed' ? '&new=1' : ''}`} className="dossier-button pj-primary" data-testid="link-project-pledge">{intent?.status === 'confirmed' ? 'Pledge more interest & stay on the waitlist' : 'Pledge interest & join the waitlist'} <ArrowUpRight size={18}/></Link></div>}
+        <div className="pj-actions"><Link href={`${target}${intent?.status === 'confirmed' ? '&new=1' : ''}`} className="dossier-button pj-primary" data-testid="link-project-pledge">{intent?.status === 'confirmed' ? 'Pledge more interest & stay on the waitlist' : 'Pledge to this project'} <ArrowUpRight size={18}/></Link></div>}
       <p className="pj-fine" data-testid="text-pledge-support">Non-binding. No investment or payment happens now, and future opportunities and eligibility are not guaranteed.</p>
       <p className="pj-fine"><strong>Returns aren’t guaranteed. You may get back less, or nothing.</strong> If investment opens later, full offering documents will be provided before any decision.</p>
     </div>}
