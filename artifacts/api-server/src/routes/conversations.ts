@@ -31,6 +31,9 @@ type ConversationRow = {
   project_slug: string;
   project_title: string;
   other_party_name: string | null;
+  viewer_role?: ParticipantRole;
+  filmmaker_name?: string;
+  investor_name?: string;
   locked: boolean;
   reported: boolean;
   last_message_at: Date | null;
@@ -171,25 +174,16 @@ router.post("/projects/:slug/conversations", async (req, res): Promise<void> => 
       return;
     }
 
-    const result = await client.query<{
-      id: number;
-      project_id: number;
-      project_slug: string;
-      project_title: string;
-      other_party_name: string | null;
-      locked: boolean;
-      reported: boolean;
-      last_message_at: Date | null;
-      created_at: Date;
-    }>(
+    const result = await client.query<ConversationRow>(
       `insert into conversations (project_id, investor_id, filmmaker_id)
        values ($1, $2, $3)
        on conflict (project_id, investor_id) do update set updated_at = conversations.updated_at
          where conversations.filmmaker_id = excluded.filmmaker_id
        returning id, project_id, $4::text as project_slug, $5::text as project_title,
-         $6::text as other_party_name, locked, reported,
+         $6::text as other_party_name, 'investor'::text as viewer_role,
+         $6::text as filmmaker_name, $7::text as investor_name, locked, reported,
          last_message_at, created_at`,
-      [project.id, investor.id, project.filmmaker_id, project.slug, project.title, project.filmmaker_name ?? "Filmmaker"],
+      [project.id, investor.id, project.filmmaker_id, project.slug, project.title, project.filmmaker_name ?? "Filmmaker", investor.name ?? "Investor"],
     );
     conversation = result.rows[0];
     if (!conversation) {
@@ -224,6 +218,8 @@ router.get("/me/conversations", async (req, res): Promise<void> => {
     `select c.id, c.project_id, p.slug as project_slug, p.title as project_title,
        case when i.${uidColumn} = $1 then coalesce(f.name, 'Filmmaker')
             else coalesce(i.name, 'Investor') end as other_party_name,
+       case when i.${uidColumn} = $1 then 'investor' else 'filmmaker' end as viewer_role,
+       coalesce(f.name, 'Filmmaker') as filmmaker_name, coalesce(i.name, 'Investor') as investor_name,
        c.locked, c.reported,
        c.last_message_at, c.created_at
      from conversations c
@@ -255,6 +251,8 @@ router.get("/conversations/:id", async (req, res): Promise<void> => {
     `select c.id, c.project_id, p.slug as project_slug, p.title as project_title,
        case when i.${uidColumn} = $2 then coalesce(f.name, 'Filmmaker')
             else coalesce(i.name, 'Investor') end as other_party_name,
+       case when i.${uidColumn} = $2 then 'investor' else 'filmmaker' end as viewer_role,
+       coalesce(f.name, 'Filmmaker') as filmmaker_name, coalesce(i.name, 'Investor') as investor_name,
        c.locked, c.reported,
        c.last_message_at, c.created_at
      from conversations c

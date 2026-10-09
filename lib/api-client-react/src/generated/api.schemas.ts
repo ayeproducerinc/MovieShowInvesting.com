@@ -1744,6 +1744,17 @@ export interface MessagingConfig {
   disclosure: string;
 }
 
+/**
+ * The signed-in participant's side of this conversation
+ */
+export type ConversationViewerRole = typeof ConversationViewerRole[keyof typeof ConversationViewerRole];
+
+
+export const ConversationViewerRole = {
+  investor: 'investor',
+  filmmaker: 'filmmaker',
+} as const;
+
 export interface Conversation {
   /** @minimum 1 */
   id: number;
@@ -1752,6 +1763,10 @@ export interface Conversation {
   project_slug: string;
   project_title: string;
   other_party_name: string;
+  /** The signed-in participant's side of this conversation */
+  viewer_role?: ConversationViewerRole;
+  filmmaker_name?: string;
+  investor_name?: string;
   locked: boolean;
   reported: boolean;
   /** @nullable */

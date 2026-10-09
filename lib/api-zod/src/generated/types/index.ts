@@ -59,6 +59,7 @@ export * from './conversationModerationResult';
 export * from './conversationReportInput';
 export * from './conversationReportResult';
 export * from './conversations';
+export * from './conversationViewerRole';
 export * from './conversationView';
 export * from './deleteFilmmakerImageKind';
 export * from './deleteFilmmakerImageParams';

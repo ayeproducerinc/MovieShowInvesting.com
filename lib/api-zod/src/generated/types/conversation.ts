@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ConversationViewerRole } from './conversationViewerRole';
 
 export interface Conversation {
   /** @minimum 1 */
@@ -14,6 +15,10 @@ export interface Conversation {
   project_slug: string;
   project_title: string;
   other_party_name: string;
+  /** The signed-in participant's side of this conversation */
+  viewer_role?: ConversationViewerRole;
+  filmmaker_name?: string;
+  investor_name?: string;
   locked: boolean;
   reported: boolean;
   /** @nullable */
