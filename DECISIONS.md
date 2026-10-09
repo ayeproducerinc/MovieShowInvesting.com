@@ -6,7 +6,7 @@ These product rules are locked for the MVP. Change them only when the owner expl
 
 - Brand: **Movie Show Investing**, a filmmaker–investor matching platform owned by AYe Producer, Inc. The AYeList is named only on the FAQ page.
 - The site collects non-binding pledges and indications of interest. No trades or money movement occur in this MVP.
-- Filmmakers launch first. Investor signup and pledges launch later, after approved projects are available.
+- Investor pledging opens at the same time as filmmaker posting; there is no “opening later” gate for investors. A project page accepts pledges once the filmmaker has submitted the project and it is not hidden, whether or not it is approved. Explore still lists approved projects only, and public pledge counts still show confirmed pledges only, on approved projects only. Pledging must work even when email is not configured; those emails are logged as unconfigured. *(Replaces: “Filmmakers launch first. Investor signup and pledges launch later, after approved projects are available.”)*
 - The project is unlisted by default. “Private” means accessible to people with its link, not access-controlled. Do not describe an unlisted page as confidential or password-protected.
 - A filmmaker can request to showcase a project, but it appears in Explore only after admin approval and only while it is not hidden.
 - Do not add investor payments, banking, escrow, Greenlights, leaderboards, public Q&A, unrestricted direct messages, or tiered rates. The owner approved a separate $49 one-time editorial pitch-review fee, with a free unlisted pitch option; paid review does not guarantee public listing. Investor allocations within one non-binding lineup may be edited. Approved messaging exception: one private, text-only investor–filmmaker conversation per project and investor, accessible only to verified participants and authorized admins, with reporting, admin review/lock controls, and an audit trail. Do not open it to real users until owner-approved messaging privacy wording and moderation controls are in place. Approved outreach exception: Project Updates emails (see “Project updates” below), sent only to consenting confirmed backers after owner approval. No other automatic outreach.
@@ -66,13 +66,25 @@ The owner approved these terms for new proposals. They supersede the historical 
 - Place the required risk disclosure next to investor-facing pledge and payback figures, including in results, emails, project pages, Explore, and lineup views.
 - Securities notice at the top of Explore and every project page: **“Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.”**
 - Footer on every page: **“Pledges are non-binding. No money is collected. This is not an offer to sell securities.”**
-- Every count shown to users must be a real database value. Public pledge counts include confirmed pledges only.
+- Every count shown to users must be a real database value. Public pledge counts include confirmed pledges only, and appear only on approved projects (see the open-pledging rule under Product and scope).
+
+### Backer names
+
+Owner revision, 2026-10-09, of the brief's “Backer names” phase.
+
+- The filmmaker and authorized admins always see each backer's name, email and confirmed pledge amount for that project. There is no checkbox for this. *(Replaces: the brief's opt-in “Also share my email with the filmmaker.” checkbox.)*
+- At the signing step, show: **“The filmmaker will see your name, email and pledge amount.”** *(Replaces: the brief's “The filmmaker will see your name and pledge amount.”)*
+- Public display is opt-in. At the signing step, a checkbox that is off by default: **“Show my name and pledge amount publicly on this project's page and in Explore.”** Only backers who tick it appear publicly by name and amount, and only where public pledge figures are already allowed (confirmed pledges on approved projects). *(Replaces: “Names are never shown publicly.” and the “public backer names” do-not-add item.)*
+- Store which version of this notice the investor saw, and their public-display choice, with each signed entry, the way consent is stored elsewhere (`confirmation_evidence.notice_version`, `investor_notification_events`).
+- A pledge signed before this notice existed shows to the filmmaker as “Backer (name not shared)” with its amount and no email, and never appears publicly.
 - The AYeList is not named on project pages, Explore, or investor/filmmaker flows; it is named only in the FAQ.
 
 ## Investor pledge limits and matching
 
-- Minimum lineup total: $100. Minimum amount per project: $25.
-- A pledge under $150 can contain at most 4 projects; a pledge of $150 or more can contain at most 5.
+- Minimum $100 per project, everywhere. *(Replaces: “Minimum lineup total: $100. Minimum amount per project: $25.”)*
+- Up to 5 projects per pledge. *(Replaces: “A pledge under $150 can contain at most 4 projects; a pledge of $150 or more can contain at most 5.”)*
+- Pledges already signed keep their original amounts; do not rewrite them. Leave the existing database minimum check (`pledges_amount_minimum_check`, amount ≥ 25) alone and enforce $100 for new pledges in the application.
+- Two ways in. From a project page (the link a filmmaker shares), the investor pledges to that one project only, $100 or more. From Explore, the investor can choose several projects, $100 or more each. Both keep the age acknowledgment, sign-in, and the single review-sign-confirm step; no second signature. Before the one-project path is built, its exact steps (the fewest the locked rules allow) are listed for owner approval.
 - One lineup per investor email. Default allocation is an equal split; any remainder goes to the first project.
 - Investor minimum ladder, per $100: $125, $150, $175, $200, $250+, Other, or Not interested for each slate.
 - An offer matches an investor’s selected minimum only when it meets or exceeds that minimum. “Not interested” is never a match.
@@ -96,17 +108,16 @@ The owner approved these terms for new proposals. They supersede the historical 
 
 ## Project updates
 
-Filmmakers look for money last, after the script, cast and budget are done. Project updates keep the people who pledged informed from day one: a filmmaker posts a milestone, the owner approves it, and each consenting confirmed backer gets an email with one button to increase their pledge. The measure the owner needs is how many backers increased, and how many new pledges came in, after each update.
+Filmmakers look for money last, after the script, cast and budget are done. These features let them start on day one: collect pledges early, keep backers informed as the film progresses, and see their own deadline. A filmmaker posts a milestone, the owner approves it, and each consenting confirmed backer gets an email with one button to increase their pledge. The measure the owner needs is how many backers increased, and how many new pledges came in, after each update.
 
 ### Locked rules
 
-1. The backer email has exactly one action button: **“Increase my pledge”**. Do not add “I'm still in”, “step back”, “withdraw”, or any re-confirmation.
-2. Increasing uses the existing repeat-interest flow: a new, separate signed entry. Never edit an earlier signed record. Do not add a second signature to the normal investor journey.
-3. Public pledge counts stay as they are: confirmed pledges only, and only on projects eligible for discovery (approved and not hidden). Unlisted pages keep showing no count.
-4. A milestone never changes a project's stage. Stage still sets the payback goal and is changed only through the existing reviewed path.
-5. The owner approves every update in admin before it appears publicly or is emailed.
-6. At most one update email per project every 14 days. If an email already went out in that window, the approved update still shows on the timeline but no email is sent. Tell the admin which will happen before they approve.
-7. Email only confirmed backers of that project whose latest notification-permission record (`investor_notification_events`) is “allowed”. A missing choice is not consent.
+a. The owner approves every update in admin before it appears publicly or is emailed.
+b. A milestone never changes a project's stage. Stage still sets the payback goal and changes only through the existing reviewed path.
+c. At most one update email per project every 14 days. If one already went out in that window, the approved update shows on the timeline but no email is sent. Tell the admin which will happen before they approve.
+d. Email only confirmed backers of that project whose latest notification-permission record (`investor_notification_events`) is “allowed”. A missing choice is not consent.
+
+*(Replaces: the earlier Project Updates rules 1–7 drafted on 2026-10-09. The email-button and repeat-interest rules now sit under Email content; the public-count rule is under Product and scope and Investor language.)*
 
 ### Milestone list (fixed keys, grouped by stage)
 
@@ -138,16 +149,35 @@ The filmmaker sees their own stage's group plus the “Any stage” group.
 
 ### Email content
 
-- Project title, the milestone, the approved note, the backer's own confirmed pledge amount for that project, and the single button.
+- Project title, the milestone, the approved note, the backer's own confirmed pledge amount for that project, and exactly one button: **“Increase my pledge”**. Do not add “I'm still in”, “step back”, “withdraw”, or any re-confirmation.
 - Next to the pledge amount, verbatim: **“Returns aren't guaranteed. You may get back less, or nothing.”**
 - End with, verbatim: **“Pledges are non-binding. No money is collected. This is not an offer to sell securities.”**
 - Do not call the payback goal a return, earnings, or an expectation. Do not name The AYeList.
-- The button links to the project page and requires normal sign-in; no login tokens in the link. After sign-in it opens the existing repeat-interest flow with that project selected. A later increase records which update it came from.
-- Delivery uses the existing Mailjet helper and email log; rows are claimed before contacting the provider and an uncertain send is never retried automatically.
+- The button links to the project page and requires normal sign-in; no login tokens in the link. After sign-in it opens the existing repeat-interest flow for that project: a new, separate signed entry. Never edit an earlier signed record. A later increase records which update it came from.
+- Delivery uses the existing Mailjet helper and email log; each row is claimed before contacting the provider and an uncertain send is never retried automatically.
 
-### Do not add
+### Timeline and backer view
 
-Reminders or scheduled jobs, “still in” tracking, funding targets or progress bars, stage changes from milestones, a digest email, push or SMS, or anything involving payments.
+- Project page: a “Progress” timeline of approved updates, newest first, ending with the date the project was listed. Filmmaker-posted milestones only; no automatic pledge-count entries. No listing-date column exists today; the listing date is the latest approval entry in `projects.review_history`.
+- Filmmaker project area: totals (backers and amount pledged, number who increased and by how much, new pledges since the last update, date of last update), then the backer list: name, email, amount and date (see Backer names; pre-notice pledges show as “Backer (name not shared)”).
+- Admin: per update, emails sent, increases, and new pledges in the 14 days after it.
+
+## Money date
+
+- In filmmaker intake and Edit pitch, a “Your timeline” section with two optional month-and-year fields: “When do you plan to start filming?” and “When do you need the money by?” Include “Skip for now”, recorded as a skip, separate from a blank.
+- An optional “Development amount” next to the full budget, shown clearly labelled wherever the budget is shown today.
+- In the filmmaker's private project area: money needed by, time left in months, pledged so far (real confirmed total), development amount, and budget. If a date was skipped, prompt to add it. If it has passed, say so and offer to update it. If there is no budget, leave that line out; do not show a zero.
+- The dates and countdown are private to the filmmaker and admin: never on the public page, in Explore, or in any email to backers.
+- Admin shows both dates per project and includes them in the existing CSV export.
+
+## Admin follow-up and research
+
+- Quiet-project list: an admin page of projects with no approved update in 30 days, showing title, filmmaker contact, last update date, and number of backers. A list only; no automatic messages.
+- Research question: after an investor signs, ask one optional question: **“If you could set this money aside today and earn interest until the offering opens, would you?”** Answers: Yes, No, Not sure. Under it show: **“This is a research question. No account is being offered.”** Store the answer and show the counts in admin.
+
+## Do not add (pledge-first features)
+
+A progress checklist or “suggested next” prompt, automatic reminders or scheduled jobs, “still in” tracking, progress bars or percentages, stage changes from milestones, a digest email, push or SMS, public backer names without the backer's opt-in (see Backer names), a public deadline, or any payment, deposit, or bank feature. *(Replaces: the earlier Project Updates “Do not add” list.)*
 
 ## Open decisions — do not guess
 
@@ -156,3 +186,4 @@ Reminders or scheduled jobs, “still in” tracking, funding targets or progres
 - Pass thresholds for the six demand tests.
 - Investor-facing “Returns” motivation and the longer project-page disclaimer in the guides conflict with the banned investor wording. The exact required short risk disclosure above remains the exception; do not silently adopt the conflicting copy or invent replacements.
 - Any later profit-share terms, rate tiers, or payment waterfall beyond the current MVP rules.
+- Privacy page wording for backer names: what the filmmaker and admin see (name, email, pledge amount) and the opt-in public display. Needs owner-approved text before launch.
