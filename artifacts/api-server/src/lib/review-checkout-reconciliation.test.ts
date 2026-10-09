@@ -9,6 +9,7 @@ import { FREE99_PROMOTION_ID, FREE99_COUPON_ID } from "./review-checkout-policy"
 import "./review-checkout-policy.test";
 import "./referral-policy.test";
 import "./pledge-policy.test";
+import "./backer-visibility.test";
 
 process.env.NODE_ENV = "production"; // Test-double provider only; never calls live Stripe.
 process.env.REPLIT_DOMAINS = "checkout-fixture.example";

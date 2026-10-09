@@ -781,6 +781,35 @@ paths:
           description: Firebase email must be verified
         "503":
           description: Firebase verification is unavailable
+  /filmmakers/projects/{project_id}/backers:
+    get:
+      operationId: getFilmmakerProjectBackers
+      tags: [filmmakers]
+      summary: Confirmed backers of an account-owned project (name, email and amount), private to the filmmaker
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Confirmed backers, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerProjectBackers"
+        "400":
+          description: Invalid project ID
+        "401":
+          description: Verified sign-in required
+        "404":
+          description: Project is not available to this account
+        "503":
+          description: Firebase verification is unavailable
   /filmmakers/projects/{project_id}/select:
     post:
       operationId: selectFilmmakerProject
@@ -3176,6 +3205,11 @@ components:
       additionalProperties: false
       required: [id, slug, title, format, genre, stage, logline, synopsis, team_links, money_use, distribution_plan, trailer_url, trailer_thumbnail_url, poster_url, pitch_deck_url, pitch_deck_name, confirmed_pledge_total, approved, showcase_requested, phone_verified, is_owner]
       properties:
+        public_backers:
+          type: array
+          description: Backers who chose public display; only on approved, listed projects
+          items:
+            $ref: "#/components/schemas/PublicBacker"
         public_filmmaker_name: { type: ["string", "null"], description: Explicit public project credit, never the filmmaker's private contact name }
         team_info: { type: ["string", "null"] }
         budget: { type: ["integer", "null"] }
@@ -3206,11 +3240,42 @@ components:
         showcase_requested: { type: boolean }
         phone_verified: { type: boolean }
         is_owner: { type: boolean, description: True when the request has verified provider-qualified account ownership or the original project visitor cookie }
+    PublicBacker:
+      type: object
+      additionalProperties: false
+      required: [name, amount]
+      properties:
+        name: { type: string, description: Name the backer chose to show publicly }
+        amount: { type: integer, minimum: 1, description: Sum of that backer's publicly shown confirmed pledges to this project }
+    FilmmakerBacker:
+      type: object
+      additionalProperties: false
+      required: [name, email, amount, confirmed_at, name_shared]
+      properties:
+        name: { type: ["string", "null"], description: Null for pledges signed before the backer-visibility notice existed }
+        email: { type: ["string", "null"], description: Null for pledges signed before the backer-visibility notice existed }
+        amount: { type: integer, minimum: 1 }
+        confirmed_at: { type: ["string", "null"], format: date-time }
+        name_shared: { type: boolean, description: True when the backer signed after seeing the backer-visibility notice }
+    FilmmakerProjectBackers:
+      type: object
+      additionalProperties: false
+      required: [backers]
+      properties:
+        backers:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilmmakerBacker"
     ExploreProject:
       type: object
       additionalProperties: false
       required: [id, slug, title, logline, format, genre, stage, poster_url, offer_per_100, confirmed_pledge_total, is_owner, pitch_deck_url, pitch_deck_name]
       properties:
+        public_backers:
+          type: array
+          description: Backers who chose public display; only on approved, listed projects
+          items:
+            $ref: "#/components/schemas/PublicBacker"
         budget: { type: ["integer", "null"] }
         proposal:
           anyOf:
@@ -3386,6 +3451,7 @@ components:
         accepted: { type: boolean, const: true }
         amount: { type: integer, minimum: 100, maximum: 2147483647 }
         entry_id: { type: ["integer", "null"], minimum: 1, description: Identifies the exact reviewed entry; null for the original record }
+        public_display: { type: boolean, description: "Backer chose to show their name and pledge amount publicly (off by default)" }
         allocations:
           type: array
           maxItems: 5

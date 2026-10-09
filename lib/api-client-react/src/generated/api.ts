@@ -63,6 +63,7 @@ import type {
   FilmmakerMaterialTextUpdate,
   FilmmakerMediaConfig,
   FilmmakerPhoneVerification,
+  FilmmakerProjectBackers,
   FilmmakerProjectClaim,
   FilmmakerProjectSelection,
   FilmmakerProjects,
@@ -3086,6 +3087,83 @@ export const useLeaveFilmmakerAccount = <TError = ErrorType<void>,
       > => {
       return useMutation(getLeaveFilmmakerAccountMutationOptions(options));
     }
+
+export const getGetFilmmakerProjectBackersUrl = (projectId: number,) => {
+
+
+
+
+  return `/api/filmmakers/projects/${projectId}/backers`
+}
+
+/**
+ * @summary Confirmed backers of an account-owned project (name, email and amount), private to the filmmaker
+ */
+export const getFilmmakerProjectBackers = async (projectId: number, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerProjectBackers> => {
+
+  return customFetch<FilmmakerProjectBackers>(getGetFilmmakerProjectBackersUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFilmmakerProjectBackersQueryKey = (projectId: number,) => {
+    return [
+    `/api/filmmakers/projects/${projectId}/backers`
+    ] as const;
+    }
+
+
+export const getGetFilmmakerProjectBackersQueryOptions = <TData = Awaited<ReturnType<typeof getFilmmakerProjectBackers>>, TError = ErrorType<void>>(projectId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectBackers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFilmmakerProjectBackersQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFilmmakerProjectBackers>>> = ({ signal }) => getFilmmakerProjectBackers(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectBackers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFilmmakerProjectBackersQueryResult = NonNullable<Awaited<ReturnType<typeof getFilmmakerProjectBackers>>>
+export type GetFilmmakerProjectBackersQueryError = ErrorType<void>
+
+
+/**
+ * @summary Confirmed backers of an account-owned project (name, email and amount), private to the filmmaker
+ */
+
+export function useGetFilmmakerProjectBackers<TData = Awaited<ReturnType<typeof getFilmmakerProjectBackers>>, TError = ErrorType<void>>(
+ projectId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectBackers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFilmmakerProjectBackersQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getSelectFilmmakerProjectUrl = (projectId: number,) => {
 

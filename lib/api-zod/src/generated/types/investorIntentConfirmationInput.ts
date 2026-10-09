@@ -30,6 +30,8 @@ export interface InvestorIntentConfirmationInput {
      * @nullable
      */
   entry_id?: number | null;
+  /** Backer chose to show their name and pledge amount publicly (off by default) */
+  public_display?: boolean;
   /** @maxItems 5 */
   allocations: InvestorAllocationInput[];
 }

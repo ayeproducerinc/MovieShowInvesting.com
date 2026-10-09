@@ -1023,7 +1023,19 @@ export interface FilmmakerImageUpload {
   image_url: string;
 }
 
+export interface PublicBacker {
+  /** Name the backer chose to show publicly */
+  name: string;
+  /**
+     * Sum of that backer's publicly shown confirmed pledges to this project
+     * @minimum 1
+     */
+  amount: number;
+}
+
 export interface PublicProject {
+  /** Backers who chose public display; only on approved, listed projects */
+  public_backers?: PublicBacker[];
   /**
      * Explicit public project credit
      * @nullable
@@ -1075,7 +1087,32 @@ export interface PublicProject {
   is_owner: boolean;
 }
 
+export interface FilmmakerBacker {
+  /**
+     * Null for pledges signed before the backer-visibility notice existed
+     * @nullable
+     */
+  name: string | null;
+  /**
+     * Null for pledges signed before the backer-visibility notice existed
+     * @nullable
+     */
+  email: string | null;
+  /** @minimum 1 */
+  amount: number;
+  /** @nullable */
+  confirmed_at: string | null;
+  /** True when the backer signed after seeing the backer-visibility notice */
+  name_shared: boolean;
+}
+
+export interface FilmmakerProjectBackers {
+  backers: FilmmakerBacker[];
+}
+
 export interface ExploreProject {
+  /** Backers who chose public display; only on approved, listed projects */
+  public_backers?: PublicBacker[];
   /** @nullable */
   budget?: number | null;
   proposal?: FilmmakerProposal | null;
@@ -1262,6 +1299,8 @@ export interface InvestorIntentConfirmationInput {
      * @nullable
      */
   entry_id?: number | null;
+  /** Backer chose to show their name and pledge amount publicly (off by default) */
+  public_display?: boolean;
   /** @maxItems 5 */
   allocations: InvestorAllocationInput[];
 }

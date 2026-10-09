@@ -111,6 +111,7 @@ export default function Project() {
     {panel.show && <div className="pj-panel" data-testid="project-interest-action">
       <span className="dossier-kicker">Pledge interest</span>
       {panel.showTotal && <div className="pj-total"><p className="pj-total-num" data-testid="text-confirmed-pledge-total">{money(data.confirmed_pledge_total)}</p><p>Confirmed, non-binding interest. Only signed interest is counted. This is not an investment or payment.</p>{panel.ownerOnlyTotal && <p data-testid="text-owner-only-total">Only you can see this total until your project is approved and listed.</p>}</div>}
+      {!!data.public_backers?.length && <div data-testid="list-public-backers"><p className="pj-fine">Backers who chose to be named</p><ul>{data.public_backers.map(backer => <li key={backer.name} style={{overflowWrap:'anywhere'}}>{backer.name} · {money(backer.amount)}</li>)}</ul></div>}
       {data.is_owner ? <p>You can manage this project, but you can’t pledge interest in your own project.</p> :
         current.isPending || current.isFetching ? <p role="status">Checking your saved interest…</p> :
         current.isError ? <p role="alert">We couldn’t check your saved interest. <button type="button" className="pj-linkbtn" onClick={() => void current.refetch()}>Try again</button></p> :

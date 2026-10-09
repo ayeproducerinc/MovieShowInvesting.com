@@ -872,6 +872,30 @@ export const LeaveFilmmakerAccountResponse = zod.object({
 
 
 /**
+ * @summary Confirmed backers of an account-owned project (name, email and amount), private to the filmmaker
+ */
+
+
+
+export const GetFilmmakerProjectBackersParams = zod.object({
+  "project_id": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const GetFilmmakerProjectBackersResponse = zod.object({
+  "backers": zod.array(zod.object({
+  "name": zod.string().nullable().describe('Null for pledges signed before the backer-visibility notice existed'),
+  "email": zod.string().nullable().describe('Null for pledges signed before the backer-visibility notice existed'),
+  "amount": zod.number().int().min(1),
+  "confirmed_at": zod.coerce.date().nullable(),
+  "name_shared": zod.boolean().describe('True when the backer signed after seeing the backer-visibility notice')
+}))
+})
+
+
+/**
  * @summary Select an account-owned project for the existing visitor-scoped editing routes
  */
 
@@ -1725,6 +1749,7 @@ export const GetPublicProjectParams = zod.object({
   "slug": zod.coerce.string().min(1).max(getPublicProjectPathSlugMax).regex(getPublicProjectPathSlugRegExp)
 })
 
+
 export const getPublicProjectResponseProposalOneOneRepaymentPer100Min = 125;
 export const getPublicProjectResponseProposalOneOneRepaymentPer100Max = 10000;
 
@@ -1744,6 +1769,10 @@ export const getPublicProjectResponseConfirmedPledgeTotalMin = 0;
 
 
 export const GetPublicProjectResponse = zod.object({
+  "public_backers": zod.array(zod.object({
+  "name": zod.string().describe('Name the backer chose to show publicly'),
+  "amount": zod.number().int().min(1).describe('Sum of that backer\'s publicly shown confirmed pledges to this project')
+})).optional().describe('Backers who chose public display; only on approved, listed projects'),
   "public_filmmaker_name": zod.string().nullish().describe('Explicit public project credit'),
   "team_info": zod.string().nullish(),
   "budget": zod.number().int().nullish(),
@@ -1830,6 +1859,7 @@ export const GetExploreQueryParams = zod.object({
   "search": zod.coerce.string().optional()
 })
 
+
 export const getExploreResponseProjectsItemProposalOneOneRepaymentPer100Min = 125;
 export const getExploreResponseProjectsItemProposalOneOneRepaymentPer100Max = 10000;
 
@@ -1852,6 +1882,10 @@ export const getExploreResponseProjectsItemConfirmedPledgeTotalMin = 0;
 
 export const GetExploreResponse = zod.object({
   "projects": zod.array(zod.object({
+  "public_backers": zod.array(zod.object({
+  "name": zod.string().describe('Name the backer chose to show publicly'),
+  "amount": zod.number().int().min(1).describe('Sum of that backer\'s publicly shown confirmed pledges to this project')
+})).optional().describe('Backers who chose public display; only on approved, listed projects'),
   "budget": zod.number().int().nullish(),
   "proposal": zod.union([zod.object({
   "decision": zod.enum(['standard', 'negotiation']),
@@ -1909,6 +1943,7 @@ export const MatchInvestorBody = zod.object({
 })
 })
 
+
 export const matchInvestorResponseProjectsItemProposalOneOneRepaymentPer100Min = 125;
 export const matchInvestorResponseProjectsItemProposalOneOneRepaymentPer100Max = 10000;
 
@@ -1931,6 +1966,10 @@ export const matchInvestorResponseProjectsItemConfirmedPledgeTotalMin = 0;
 
 export const MatchInvestorResponse = zod.object({
   "projects": zod.array(zod.object({
+  "public_backers": zod.array(zod.object({
+  "name": zod.string().describe('Name the backer chose to show publicly'),
+  "amount": zod.number().int().min(1).describe('Sum of that backer\'s publicly shown confirmed pledges to this project')
+})).optional().describe('Backers who chose public display; only on approved, listed projects'),
   "budget": zod.number().int().nullish(),
   "proposal": zod.union([zod.object({
   "decision": zod.enum(['standard', 'negotiation']),
@@ -2144,6 +2183,7 @@ export const ConfirmInvestorIntentBody = zod.object({
   "accepted": zod.literal(true),
   "amount": zod.number().int().min(confirmInvestorIntentBodyAmountMin).max(confirmInvestorIntentBodyAmountMax),
   "entry_id": zod.number().int().min(1).nullish().describe('Identifies the exact reviewed entry; null for the original record'),
+  "public_display": zod.boolean().optional().describe('Backer chose to show their name and pledge amount publicly (off by default)'),
   "allocations": zod.array(zod.object({
   "project_id": zod.number().int().min(1),
   "amount": zod.number().int().min(confirmInvestorIntentBodyAllocationsItemAmountMin).max(confirmInvestorIntentBodyAllocationsItemAmountMax).describe('Whole-dollar allocation of at least $100 per project (new pledges)')

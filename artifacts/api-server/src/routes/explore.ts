@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import { GetExploreQueryParams, GetExploreResponse } from "@workspace/api-zod";
 import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
+import { CONFIRMED_BACKERS_SQL, publicBackers, type BackerRow } from "../lib/backer-visibility";
 
 const router: IRouter = Router();
 
@@ -97,6 +98,9 @@ router.get("/explore", async (req, res): Promise<void> => {
     return b.created_at.getTime() - a.created_at.getTime();
   });
 
+  // Explore lists approved projects only, so opted-in names may show on every card.
+  const backerRows = filtered.length
+    ? (await pool.query<BackerRow>(CONFIRMED_BACKERS_SQL, [filtered.map((project) => project.id)])).rows : [];
   const response = {
     projects: filtered.map((project) => ({
       id: project.id,
@@ -114,6 +118,7 @@ router.get("/explore", async (req, res): Promise<void> => {
       proposal: project.proposal,
       confirmed_pledge_total: Number(project.confirmed_pledge_total),
       is_owner: project.is_owner,
+      public_backers: publicBackers(backerRows.filter((row) => row.project_id === project.id)),
     })),
   };
   res.json(GetExploreResponse.parse(response));

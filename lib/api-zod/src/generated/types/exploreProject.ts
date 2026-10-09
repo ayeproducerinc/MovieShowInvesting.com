@@ -6,8 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FilmmakerProposal } from './filmmakerProposal';
+import type { PublicBacker } from './publicBacker';
 
 export interface ExploreProject {
+  /** Backers who chose public display; only on approved, listed projects */
+  public_backers?: PublicBacker[];
   /** @nullable */
   budget?: number | null;
   proposal?: FilmmakerProposal | null;

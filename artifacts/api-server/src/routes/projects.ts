@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request } from "express";
-import { getConfirmedPledgeTotal, getPublicProjectBySlug } from "@workspace/db";
+import { getConfirmedPledgeTotal, getPublicProjectBySlug, pool } from "@workspace/db";
 import {
   GetProjectShareMetadataParams,
   GetProjectShareMetadataResponse,
@@ -9,6 +9,7 @@ import {
 import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 import { serveFilmmakerPitchDeck } from "./filmmaker-draft-materials";
 import { acceptsPledges } from "../lib/pledge-policy";
+import { CONFIRMED_BACKERS_SQL, publicBackers, type BackerRow } from "../lib/backer-visibility";
 
 const router: IRouter = Router();
 const thumbnailCache = new Map<string, { expiresAt: number; url: string | null }>();
@@ -150,6 +151,8 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
   // Unlisted pages show everything a listed page shows; only Explore, the public
   // total and search indexing depend on listing (DECISIONS.md › Product and scope).
   const pageVisible = acceptsPledges(project);
+  // Opted-in backer names are public only where the public total is shown.
+  const backers = listingEligible ? publicBackers((await pool.query<BackerRow>(CONFIRMED_BACKERS_SQL, [[project.id]])).rows) : [];
   const response = {
     id: project.id,
     budget: pageVisible || isOwner ? project.budget : null,
@@ -157,6 +160,7 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
     slug: project.slug,
     title: project.title,
     public_filmmaker_name: project.publicFilmmakerName?.trim() || null,
+    public_backers: backers,
     format: project.format,
     genre: project.genre,
     stage: project.stage,

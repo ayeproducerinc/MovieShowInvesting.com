@@ -184,6 +184,8 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
   const confirmInterest = useConfirmInvestorIntent();
   const [signature, setSignature] = useState('');
   const [interestAccepted, setInterestAccepted] = useState(false);
+  // Public display of name and amount is opt-in and off by default (DECISIONS.md › Backer names).
+  const [publicDisplay, setPublicDisplay] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const finishingRef = useRef(false);
   const pendingSaved = useRef<{ investor_id:number; entry_id:number|null; reviewKey:string; draftKey:string } | null>(null);
@@ -463,7 +465,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
       }
       if(!active.current) return;
       await confirmInterest.mutateAsync({data:{
-        investor_id:saved.investor_id, signature_name:signature, accepted:true, entry_id:saved.entry_id,
+        investor_id:saved.investor_id, signature_name:signature, accepted:true, entry_id:saved.entry_id, public_display:publicDisplay,
         amount:reviewed.amount, allocations:reviewed.allocations,
       }});
       trackInvestorEvent('inv_confirmed');
@@ -606,6 +608,8 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
               <h2>Review and confirm your interest.</h2>
               <p><strong data-testid="review-interest-total">{dollars(a.amount)}</strong> in non-binding interest.</p>
               {a.unallocated ? <p data-testid="review-interest-unallocated">The full amount is unallocated; you have not selected projects.</p> : <ul>{a.lineup.map(row=><li key={row.project_id} data-testid={`review-allocation-${row.project_id}`}>{available.find(project=>project.id===row.project_id)?.title ?? `Project #${row.project_id}`} — {dollars(row.amount)}</li>)}</ul>}
+              <p data-testid="text-backer-notice"><strong>The filmmaker will see your name, email and pledge amount.</strong></p>
+              <label className="lineup-check"><input type="checkbox" data-testid="checkbox-public-display" checked={publicDisplay} onChange={event=>setPublicDisplay(event.target.checked)}/><span>Show my name and pledge amount publicly on this project's page and in Explore.</span></label>
               <p>This confirmation applies only to the amount and project allocations shown here. You can change your mind; this is not a contract, investment or authorization to charge you.</p>
               <Field id="interest-signature" label={`Signature · type your full name exactly: ${a.name.trim() || 'enter your name above'}`} value={signature} onChange={setSignature} required/>
               <label className="lineup-check"><input type="checkbox" data-testid="checkbox-final-interest-confirmation" checked={interestAccepted} onChange={event=>setInterestAccepted(event.target.checked)}/><span>I confirm this non-binding interest for the amount and project selections shown above. No investment is being made and no money is collected.</span></label>

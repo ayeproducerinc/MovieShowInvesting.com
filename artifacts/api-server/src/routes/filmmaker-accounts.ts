@@ -15,6 +15,7 @@ import {
   findVisitorFlowProgress,
   getFilmmakerCount,
   startOrResumeFilmmakerAccountDraft,
+  pool,
 } from "@workspace/db";
 import {
   ClaimFilmmakerProjectResponse,
@@ -26,8 +27,11 @@ import {
   StartFilmmakerProjectResponse,
   JoinFilmmakerCommunityBody,
   JoinFilmmakerCommunityResponse,
+  GetFilmmakerProjectBackersParams,
+  GetFilmmakerProjectBackersResponse,
 } from "@workspace/api-zod";
 import { authenticateFilmmaker } from "../lib/filmmaker-auth";
+import { CONFIRMED_BACKERS_SQL, filmmakerBackers, type BackerRow } from "../lib/backer-visibility";
 import { syncReferralRewards } from "../lib/referral-reward-sync";
 
 const router: IRouter = Router();
@@ -265,6 +269,26 @@ router.post("/filmmakers/projects/:project_id/select", async (req, res): Promise
   }
   setVisitorCookie(req, res, visitorId);
   res.json(SelectFilmmakerProjectResponse.parse({ project_id: params.data.project_id }));
+});
+
+// Private to the project's filmmaker: name, email and amount for each confirmed pledge
+// (DECISIONS.md › Backer names). Ownership matches the project selection route above.
+router.get("/filmmakers/projects/:project_id/backers", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const params = GetFilmmakerProjectBackersParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid project ID." });
+    return;
+  }
+  const identity = await authenticateFilmmaker(req, res, true);
+  if (!identity) return;
+  const owned = await getFilmmakerAccountProjectVisitor(identity.uid, params.data.project_id, identity.provider);
+  if (!owned) {
+    res.status(404).json({ error: "Project is not available to this filmmaker account." });
+    return;
+  }
+  const { rows } = await pool.query<BackerRow>(CONFIRMED_BACKERS_SQL, [[params.data.project_id]]);
+  res.json(GetFilmmakerProjectBackersResponse.parse({ backers: filmmakerBackers(rows) }));
 });
 
 export default router;

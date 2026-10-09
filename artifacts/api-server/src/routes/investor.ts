@@ -15,6 +15,7 @@ import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 import { deliverInterestAlertEmail } from "../lib/interest-alert-email";
 import { requireAccountAgeConfirmation } from "../lib/age-confirmation";
 import { acceptsPledges, allocationLimitError } from "../lib/pledge-policy";
+import { backerEvidence } from "../lib/backer-visibility";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -839,6 +840,8 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
       age_confirmation: ageResult.rows[0] ? { confirmed_at: ageResult.rows[0].confirmed_at, self_declaration: true } : null,
       project_terms_at_confirmation: termResult.rows,
       verified_account_email: identity.email,
+      // Backer-visibility notice shown at signing, and the public-display choice (off by default).
+      ...backerEvidence(submitted.public_display === true),
     });
     await client.query(
       `update ${active ? "interest_entries" : "investors"} set confirmation_evidence = $1::jsonb where id = $2 and confirmed_at is null`,
