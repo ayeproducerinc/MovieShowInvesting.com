@@ -410,6 +410,13 @@ textarea.fm-input { min-height:116px; resize:vertical; }
 @media(max-width:850px) { .dossier-grid { grid-template-columns:1fr; gap:10px; } .dossier-sticky { position:static; } .dossier-side { order:-1; } }
 @media(max-width:600px) { .dossier-hero { padding:65px 0; } .dossier-title { font-size:clamp(60px,17vw,95px); } .dossier-grid { padding-top:45px; } .dossier-actions > * { flex:1; } }
 @media(prefers-reduced-motion:reduce) { .dossier-button { transition:none; } }
+/* Submission result page only: keep the project details and status above the fold. */
+.dossier--result .dossier-head { padding:14px 0; }
+.dossier--result .dossier-hero { padding:clamp(22px,3vw,38px) 0 clamp(20px,2.5vw,30px); }
+.dossier--result .dossier-title { font-size:clamp(44px,5.5vw,76px); margin:10px 0 12px; }
+.dossier--result .dossier-grid { padding:clamp(24px,3vw,40px) 0 72px; gap:clamp(32px,5vw,72px); }
+.dossier--result .dossier-dark .dossier-value { font-size:clamp(36px,4vw,52px); margin:12px 0; }
+@media(max-width:600px) { .dossier--result .dossier-hero { padding:22px 0 18px; } .dossier--result .dossier-title { font-size:clamp(40px,11vw,56px); } .dossier--result .dossier-grid { padding-top:24px; } }
 .dossier-media-grid { display:grid; gap:15px; grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:30px; }
 .dossier-media-tile { min-width:0; border:1px solid var(--d-line); background:#faf7f0; padding:clamp(18px,3vw,27px); }
 .dossier-media-tile:first-child { grid-column:1/-1; }
