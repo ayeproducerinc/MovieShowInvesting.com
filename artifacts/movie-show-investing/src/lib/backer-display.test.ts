@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { backerLabel, pledgeSummary, publicBackersLine } from './backer-display.js';
+import { backerLabel, backersErrorText, pledgeSummary, publicBackersLine } from './backer-display.js';
+
+test('a backer list that is not available to the account offers no pointless retry', () => {
+  assert.equal(backersErrorText(404).canRetry, false);
+  assert.equal(backersErrorText(500).canRetry, true);
+  assert.equal(backersErrorText(undefined).canRetry, true);
+});
 
 test('the filmmaker sees the total and how many people pledged', () => {
   const fmt = (n: number) => `$${n}`;

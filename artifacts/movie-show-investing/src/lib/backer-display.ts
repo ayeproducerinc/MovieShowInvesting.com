@@ -3,6 +3,12 @@ export function backerLabel(backer: { name: string | null; name_shared: boolean 
   return backer.name_shared && backer.name ? backer.name : 'Backer (name not shared)';
 }
 
+/** Load-failure wording for the private backer list; retry only when it can help. */
+export function backersErrorText(status: number | undefined): { text: string; canRetry: boolean } {
+  if (status === 404) return { text: 'Backers for this project aren’t available to this account.', canRetry: false };
+  return { text: 'Your backers couldn’t load right now. Their pledges are still saved.', canRetry: true };
+}
+
 /** "$850 from 2 backers" for the filmmaker's private views. */
 export function pledgeSummary(totals: { confirmed_pledge_total: number; backer_count: number }, format: (n: number) => string): string {
   if (!totals.backer_count) return 'No pledges yet';

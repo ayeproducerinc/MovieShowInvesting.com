@@ -1,5 +1,5 @@
 import { getGetFilmmakerProjectBackersQueryKey, useGetFilmmakerProjectBackers } from '@workspace/api-client-react';
-import { backerLabel, pledgeSummary } from '@/lib/backer-display';
+import { backerLabel, backersErrorText, pledgeSummary } from '@/lib/backer-display';
 
 const dollars = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 const day = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
@@ -29,7 +29,10 @@ export function FilmmakerBackers({ projectId, identityId }: { projectId: number;
   return <section className="dossier-section" data-testid="section-filmmaker-backers">
     <span className="dossier-kicker">Your backers · private to you</span>
     {backers.isPending ? <p role="status">Loading your backers…</p>
-      : backers.isError ? <p role="alert">We couldn’t load your backers. <button type="button" className="underline" onClick={() => void backers.refetch()}>Try again</button></p>
+      : backers.isError ? (() => {
+        const failure = backersErrorText(backers.error?.status);
+        return <p role="alert" data-testid="error-filmmaker-backers">{failure.text}{failure.canRetry && <> <button type="button" className="underline" onClick={() => void backers.refetch()}>Try again</button></>}</p>;
+      })()
       : !backers.data.backers.length ? <p data-testid="text-no-backers">No confirmed pledges yet. Share your project link so people can pledge.</p>
       : <>
         <p data-testid="text-backers-total"><strong>{pledgeSummary(backers.data, dollars)}</strong></p>
