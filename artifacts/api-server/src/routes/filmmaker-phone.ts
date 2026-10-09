@@ -10,9 +10,7 @@ router.post("/filmmakers/phone-verification", async (req, res): Promise<void> =>
   if (!identity) return;
   if (!identity.phoneNumber) {
     res.status(403).json({
-      error: identity.provider === "replit"
-        ? "Phone verification is currently available only for Firebase accounts."
-        : "A phone number linked to this Firebase account is required.",
+      error: "A phone number linked to this Firebase account is required.",
     });
     return;
   }

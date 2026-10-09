@@ -13,7 +13,6 @@ import { trackInvestorEvent } from '@/lib/analytics';
 import { LocationPicker } from '@/components/location-picker';
 import { cap, selectAutoBuildProjects, split } from '@/lib/investor-lineup';
 import { investorReviewKey, minimaForSelectedStages } from '@/lib/investor-review';
-import { useAuth } from '@workspace/replit-auth-web';
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import '../investor.css';
@@ -83,13 +82,12 @@ function GuestDraftConflictState() {
 }
 
 export function InvestorDone() {
-  const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
   const firebaseReady = useFirebaseSessionReady();
   const queryClient = useQueryClient();
-  const signedIn = Boolean(replitAuth.user || firebaseUser);
-  const ready = !replitAuth.isLoading && firebaseReady;
-  const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
+  const signedIn = Boolean(firebaseUser);
+  const ready = firebaseReady;
+  const identityId = firebaseUser?.uid ?? 'visitor';
   const current = useGetCurrentInvestorIntent({ query: { queryKey: [...getGetCurrentInvestorIntentQueryKey(), identityId], enabled: ready, refetchOnMount: 'always' } });
   const latestHistoryEntry = current.data?.history.reduce<(typeof current.data.history)[number] | null>((latest, entry) =>
     !latest || Date.parse(entry.confirmed_at) > Date.parse(latest.confirmed_at) ||
@@ -128,21 +126,20 @@ function InvestorSignInGate({ firebaseReady, queryClient, projectSlug }: { fireb
 }
 
 export default function Investor() {
-  const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
   const firebaseReady = useFirebaseSessionReady();
   const queryClient = useQueryClient();
-  const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
-  const expectedOwner = replitAuth.user ? `replit:${replitAuth.user.id}` : firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
+  const identityId = firebaseUser?.uid ?? 'visitor';
+  const expectedOwner = firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
   const search = window.location.search;
-  if (replitAuth.isLoading || !firebaseReady) return <section className="inv"><div className="page-wrap inv-state" role="status" aria-label="Checking sign-in"><div className="inv-skeleton" style={{height:95}}/><div className="inv-skeleton"/></div></section>;
-  if (!replitAuth.user && !firebaseUser) {
+  if (!firebaseReady) return <section className="inv"><div className="page-wrap inv-state" role="status" aria-label="Checking sign-in"><div className="inv-skeleton" style={{height:95}}/><div className="inv-skeleton"/></div></section>;
+  if (!firebaseUser) {
     return <InvestorSignInGate firebaseReady={firebaseReady} queryClient={queryClient} projectSlug={new URLSearchParams(search).get('project')} />;
   }
-  return <InvestorWorksheet key={`${expectedOwner}:${search}`} identityId={identityId} expectedOwner={expectedOwner} signedInEmail={replitAuth.user?.email ?? firebaseUser?.email ?? null} authLoading={replitAuth.isLoading || !firebaseReady} />;
+  return <InvestorWorksheet key={`${expectedOwner}:${search}`} identityId={identityId} expectedOwner={expectedOwner} signedInEmail={firebaseUser?.email ?? null} />;
 }
 
-function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoading }: { identityId: string; expectedOwner: string; signedInEmail:string|null; authLoading: boolean }) {
+function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { identityId: string; expectedOwner: string; signedInEmail:string|null }) {
   const params = new URLSearchParams(window.location.search);
   const targetSlug = params.get('project');
   const newEntry = params.get('new') === '1';
@@ -150,11 +147,10 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoadi
   const [,navigate] = useLocation();
   const queryClient = useQueryClient();
   const visitor = useGetPriceGroup();
-  const progress = useGetFlowProgress('investor',{query:{queryKey:[...getGetFlowProgressQueryKey('investor'),identityId],enabled:!authLoading && visitor.isSuccess,retry:(count,error)=>error.status!==404 && count<2}});
-  const current = useGetCurrentInvestorIntent({query:{queryKey:[...getGetCurrentInvestorIntentQueryKey(),identityId],enabled:!authLoading && visitor.isSuccess,retry:(count,error)=>error.status!==404 && count<2}});
+  const progress = useGetFlowProgress('investor',{query:{queryKey:[...getGetFlowProgressQueryKey('investor'),identityId],enabled:visitor.isSuccess,retry:(count,error)=>error.status!==404 && count<2}});
+  const current = useGetCurrentInvestorIntent({query:{queryKey:[...getGetCurrentInvestorIntentQueryKey(),identityId],enabled:visitor.isSuccess,retry:(count,error)=>error.status!==404 && count<2}});
   const explore = useGetExplore(undefined, {query:{
     queryKey:[...getGetExploreQueryKey(),expectedOwner],
-    enabled:!authLoading,
     refetchOnMount:'always',
     refetchOnWindowFocus:true,
   }});
@@ -470,7 +466,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail, authLoadi
   if (targetSlug && explore.isSuccess && !available.some(p=>p.slug===targetSlug)) return <section className="inv"><div className="page-wrap inv-state" role="alert"><h1>{ownedProjects.some(p=>p.slug===targetSlug) ? 'This is your project.' : 'This project is not available for new interest.'}</h1><p>{ownedProjects.some(p=>p.slug===targetSlug) ? 'You can manage it, but you can’t pledge interest in your own project.' : 'No saved or signed interest was changed.'}</p><Link href={ownedProjects.some(p=>p.slug===targetSlug) ? '/me/projects' : '/explore'} className="inv-button">{ownedProjects.some(p=>p.slug===targetSlug) ? 'Manage project' : 'Explore available projects'}</Link></div></section>;
   if(progress.isError && progress.error?.status===409) return <section className="inv"><GuestDraftConflictState/></section>;
   if(visitor.isError || progress.isError && progress.error?.status!==404 || current.isError && current.error?.status!==404 || explore.isError) return <section className="inv"><ErrorState retry={()=>{void visitor.refetch();void progress.refetch();void current.refetch();void explore.refetch();}}/></section>;
-  if(authLoading || visitor.isPending || progress.isLoading || current.isLoading || explore.isLoading || !ready && !progress.isError && !visitor.isError) return <section className="inv"><div className="page-wrap inv-state" aria-label="Loading investor worksheet"><p className="inv-kicker">Opening your worksheet</p><div className="inv-skeleton" style={{height:85}}/><div className="inv-skeleton" style={{height:150}}/></div></section>;
+  if(visitor.isPending || progress.isLoading || current.isLoading || explore.isLoading || !ready && !progress.isError && !visitor.isError) return <section className="inv"><div className="page-wrap inv-state" aria-label="Loading investor worksheet"><p className="inv-kicker">Opening your worksheet</p><div className="inv-skeleton" style={{height:85}}/><div className="inv-skeleton" style={{height:150}}/></div></section>;
   if (newEntry && (identityId==='visitor' || !current.data?.history.length) || revise && current.data?.intent?.status!=='saved') return <section className="inv"><div className="page-wrap inv-state"><h1>This worksheet cannot be started here.</h1><p>Review your saved interest first. A separate entry requires previously confirmed account interest.</p><Link href="/lineup" className="inv-button">View my lineup</Link></div></section>;
   if (selectionNeeded) {
     const target=available.find(p=>p.slug===targetSlug)!;

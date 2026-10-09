@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useAuth } from '@workspace/replit-auth-web';
 import { useFirebaseUser } from '@/components/firebase-bootstrap';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetAgeConfirmationQueryKey, useConfirmAge, useGetAgeConfirmation } from '@workspace/api-client-react';
@@ -16,11 +15,10 @@ export const kycParagraphs = (role: AgeRole): [string, string] => [
   'We are not collecting your date of birth or ID during this onboarding. Completing onboarding does not guarantee that an offering will open or that you will be eligible to participate.',
 ];
 
-/** Provider-qualified identity (replit:id / firebase:uid); raw ids can collide across providers. */
+/** Provider-qualified identity (firebase:uid); raw ids can collide across providers. */
 export function useAgeIdentityKey() {
-  const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
-  return replitAuth.user ? `replit:${replitAuth.user.id}` : firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
+  return firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
 }
 
 /** Account-scoped age status. The key always includes the provider-qualified identity so accounts never share an acknowledgment. */

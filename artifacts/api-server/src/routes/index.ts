@@ -20,13 +20,11 @@ import investorReviewRouter from "./investor-review";
 import interestAlertsRouter from "./interest-alerts";
 import conversationsRouter from "./conversations";
 import adminConversationsRouter from "./admin-conversations";
-import replitAuthRouter from "./replit-auth";
 import referralsRouter from "./referrals";
 
 const router: IRouter = Router();
 router.use(draftResetRouter);
 
-router.use(replitAuthRouter);
 router.use(referralsRouter);
 router.use(healthRouter);
 router.use(ageConfirmationRouter);

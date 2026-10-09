@@ -3,7 +3,6 @@ import type { QueryClient } from '@tanstack/react-query';
 import type { Auth, User } from 'firebase/auth';
 import { SiGoogle } from 'react-icons/si';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
-import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-web';
 import { signInWithGoogle } from '@/lib/google-sign-in';
 import { clearPrivateAuthQueries } from '@/lib/homepage-community';
 import { canPrepareRegisteredFilmmakerHandoff, clearFilmmakerAuthHandoff, prepareRegisteredFilmmakerHandoff, subscribeFilmmakerAuthPreparation } from '@/lib/filmmaker-auth-handoff';
@@ -88,10 +87,8 @@ export function GoogleSignInButton({
         throw new Error('Your latest worksheet changes could not be saved before account linking. You are signed in, but the original browser draft has not been linked. Return to the worksheet and retry.');
       }
       setFirebaseSignedIn(Boolean(result.user));
-      if (!isReplitAuthActive() && !isReplitAuthLoading()) {
-        setAuthTokenGetter(() => auth.currentUser?.getIdToken() ?? null);
-        onSignedIn?.(result.user);
-      }
+      setAuthTokenGetter(() => auth.currentUser?.getIdToken() ?? null);
+      onSignedIn?.(result.user);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Google sign-in could not be completed. Please try again.';
       setFeedback(message);

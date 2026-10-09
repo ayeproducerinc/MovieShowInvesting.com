@@ -14,17 +14,19 @@ test("development referral lifecycle and denial regressions", async t => {
   const visitors: string[] = [];
   const projects: number[] = [];
   const filmmakers: number[] = [];
+  // Firebase actors; account creation times are stubbed instead of calling Firebase Admin.
+  const createdAt=new Map<string,Date>();
+  const enroll=(actor:FilmmakerIdentity,token:unknown)=>enrollReferralMember(actor,token,async uid=>createdAt.get(uid));
   async function account(email?: string, old = false) {
-    const uid=randomUUID();
-    const actor:FilmmakerIdentity={uid,provider:"replit",email:email ?? `ref-test-${uid}@example.invalid`,phoneNumber:null};
-    await pool.query(`INSERT INTO replit_auth_users(id,issuer,subject,email,created_at) VALUES($1::uuid,'referral-regression',$1::text,$2,$3)`,
-      [uid,actor.email,new Date(Date.now()-(old ? 86400000 : 0))]);
+    const uid=`ref-test-${randomUUID()}`;
+    const actor:FilmmakerIdentity={uid,provider:"firebase",email:email ?? `${uid}@example.invalid`,phoneNumber:null};
+    createdAt.set(uid,new Date(Date.now()-(old ? 86400000 : 0)));
     users.push(actor); return actor;
   }
   async function paidProject(actor:FilmmakerIdentity, listed=false) {
     const visitor=randomUUID(); visitors.push(visitor);
     await pool.query("INSERT INTO visitors(visitor_id) VALUES($1)",[visitor]);
-    const f=(await pool.query("INSERT INTO filmmakers(replit_uid,email,visitor_id) VALUES($1,$2,$3) RETURNING id",
+    const f=(await pool.query("INSERT INTO filmmakers(firebase_uid,email,visitor_id) VALUES($1,$2,$3) RETURNING id",
       [actor.uid,actor.email,visitor])).rows[0].id; filmmakers.push(f);
     const p=(await pool.query(`INSERT INTO projects(filmmaker_id,title,slug,review_paid_at,showcase_requested,approved,hidden)
       VALUES($1,'Referral regression',$2,now(),true,$3,false) RETURNING id`,[f,`ref-test-${randomUUID()}`,listed])).rows[0].id;
@@ -37,10 +39,10 @@ test("development referral lifecycle and denial regressions", async t => {
   const payout={reference:`ref-regression-${randomUUID()}`,paid_on:new Date().toISOString().slice(0,10),confirmed_sent:true};
   try {
     const owner=await account(undefined,true);
-    const ownerId=await enrollReferralMember(owner,null);
+    const ownerId=await enroll(owner,null);
     const ownerCode=(await memberReferrals(ownerId)).code;
     const otherOwner=await account(undefined,true);
-    const otherId=await enrollReferralMember(otherOwner,null);
+    const otherId=await enroll(otherOwner,null);
     const otherCode=(await memberReferrals(otherId)).code;
     await t.test("invalid/missing codes reject; first link persists; manual code replaces before signup",async()=>{
       await assert.rejects(captureReferral("INVALID",null,false));
@@ -55,27 +57,27 @@ test("development referral lifecycle and denial regressions", async t => {
     });
     const receipt=await captureReferral(ownerCode,null,false);
     const referred=await account();
-    const referredId=await enrollReferralMember(referred,receipt.token);
+    const referredId=await enroll(referred,receipt.token);
     await t.test("new signup is attributed once; signup alone earns nothing",async()=>{
       assert.equal((await memberReferrals(referredId)).referred_by,true);
       const summary=await memberReferrals(ownerId);
       assert.equal(summary.signup_count,1); assert.equal(summary.eligible_cents,0); assert.equal(summary.pending_count,1);
-      assert.equal(await enrollReferralMember(referred,receipt.token),referredId);
+      assert.equal(await enroll(referred,receipt.token),referredId);
       assert.equal((await memberReferrals(ownerId)).signup_count,1);
       await assert.rejects(captureReferral(otherCode,receipt.token,true));
     });
     await t.test("existing accounts, expired receipts, repeated cookies and duplicate emails do not earn attribution",async()=>{
       const oldReceipt=await captureReferral(ownerCode,null,false);
       const old=await account(undefined,true);
-      assert.equal((await memberReferrals(await enrollReferralMember(old,oldReceipt.token))).referred_by,false);
+      assert.equal((await memberReferrals(await enroll(old,oldReceipt.token))).referred_by,false);
       const expired=await captureReferral(ownerCode,null,false);
       await pool.query("UPDATE referral_receipts SET expires_at=now()-interval '1 second' WHERE token_hash=encode(sha256($1::bytea),'hex')",[expired.token]);
       const fresh=await account();
-      assert.equal((await memberReferrals(await enrollReferralMember(fresh,expired.token))).referred_by,false);
+      assert.equal((await memberReferrals(await enroll(fresh,expired.token))).referred_by,false);
       const repeated=await account();
-      assert.equal((await memberReferrals(await enrollReferralMember(repeated,receipt.token))).referred_by,false);
+      assert.equal((await memberReferrals(await enroll(repeated,receipt.token))).referred_by,false);
       const duplicate=await account(referred.email);
-      await assert.rejects(enrollReferralMember(duplicate,null),/another sign-in method/);
+      await assert.rejects(enroll(duplicate,null),/another sign-in method/);
       assert.equal((await memberReferrals(ownerId)).signup_count,1);
     });
     const project=await paidProject(referred);
@@ -132,7 +134,7 @@ test("development referral lifecycle and denial regressions", async t => {
       await pool.query(`UPDATE pitch_review_checkouts SET paid_at=(
         SELECT captured_at+interval '1 millisecond' FROM referral_receipts
         WHERE token_hash=encode(sha256($1::bytea),'hex')) WHERE project_id=$2`,[guestReceipt.token,guestProject]);
-      await enrollReferralMember(guest,guestReceipt.token);
+      await enroll(guest,guestReceipt.token);
       const guestReward=(await pool.query(`SELECT r.project_id,c.paid_at,m.account_created_at
         FROM referral_rewards r JOIN referral_members m ON m.id=r.referred_id
         JOIN pitch_review_checkouts c ON c.session_id=r.session_id WHERE r.referred_id=$1`,
@@ -151,7 +153,6 @@ test("development referral lifecycle and denial regressions", async t => {
     await pool.query("DELETE FROM projects WHERE id=ANY($1::int[])",[projects]);
     await pool.query("DELETE FROM filmmakers WHERE id=ANY($1::int[])",[filmmakers]);
     await pool.query("DELETE FROM visitors WHERE visitor_id=ANY($1::text[])",[visitors]);
-    await pool.query("DELETE FROM replit_auth_users WHERE id=ANY($1::uuid[])",[users.map(u=>u.uid)]);
     await pool.end();
   }
 });

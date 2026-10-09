@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { useAuth } from '@workspace/replit-auth-web';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import {
   canReplayPage,
@@ -29,13 +28,10 @@ export function ReplayConsent() {
   const [location] = useLocation();
   const [choice, setChoice] = useState<Choice>(savedChoice);
   const [open, setOpen] = useState(() => savedChoice() === null && canReplayPage(window.location.pathname));
-  const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
   const firebaseReady = useFirebaseSessionReady();
-  const authReady = !replitAuth.isLoading && firebaseReady;
-  const account = replitAuth.user
-    ? `replit:${replitAuth.user.id}`
-    : firebaseUser ? `firebase:${firebaseUser.uid}` : null;
+  const authReady = firebaseReady;
+  const account = firebaseUser ? `firebase:${firebaseUser.uid}` : null;
   const [readyAccount, setReadyAccount] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {

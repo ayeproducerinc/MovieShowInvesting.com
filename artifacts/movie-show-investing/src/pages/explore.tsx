@@ -3,7 +3,6 @@ import { ArrowRight, RotateCcw } from 'lucide-react';
 import { Link } from 'wouter';
 import { getGetExploreQueryKey, useGetExplore } from '@workspace/api-client-react';
 import type { ExploreProject, GetExploreStage } from '@workspace/api-client-react';
-import { useAuth } from '@workspace/replit-auth-web';
 import { InvestorProjectCard } from '@/components/investor-project-card';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import '../investor.css';
@@ -15,11 +14,10 @@ const securitiesNotice = "Project profiles are not investment offers. Expressing
 type ExploreProjectWithPitchDeck = ExploreProject & { pitch_deck_url?: string | null; pitch_deck_name?: string | null };
 
 export default function Explore() {
-  const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
   const firebaseReady = useFirebaseSessionReady();
-  const identityKey = replitAuth.user ? `replit:${replitAuth.user.id}` : firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
-  const authReady = !replitAuth.isLoading && firebaseReady;
+  const identityKey = firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
+  const authReady = firebaseReady;
   const [stage,setStage] = useState<GetExploreStage | ''>('');
   const [genre,setGenre] = useState('');
   const [search,setSearch] = useState('');

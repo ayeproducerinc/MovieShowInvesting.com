@@ -14,7 +14,6 @@ import { pitchDetailsFingerprint } from '@/lib/pitch-details-state';
 import { legacyDeal, money, type Stage } from './filmmaker-calculator';
 import { AgeGateForCurrentUser } from '@/components/age-acknowledgment';
 import { ProposalSummary } from '@/components/proposal-summary';
-import { useAuth } from '@workspace/replit-auth-web';
 
 const clean = (value: string) => value.trim() || null;
 function validLinks(value: string) {
@@ -315,20 +314,19 @@ function ShowcaseForm({ result, onSaved, reviewStatus, reviewStatusState, checko
 }
 
 export default function FilmmakerDone() {
-  const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
-  const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
-  return <FilmmakerDoneContent key={identityId} identityId={identityId} authLoading={replitAuth.isLoading} ssoSignedIn={Boolean(replitAuth.user)} />;
+  const identityId = firebaseUser?.uid ?? 'visitor';
+  return <FilmmakerDoneContent key={identityId} identityId={identityId} />;
 }
 
-function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identityId: string; authLoading: boolean; ssoSignedIn: boolean }) {
+function FilmmakerDoneContent({ identityId }: { identityId: string }) {
   const [, navigate] = useLocation();
   const search = useSearch();
   const reviewTriggerRef = useRef<HTMLButtonElement>(null);
   const authReady = useFirebaseSessionReady();
   const user = useFirebaseUser();
   const [guestVisible] = useState(guestConfirmationVisible);
-  const result = useGetFilmmakerResult({ query: { queryKey: [...getGetFilmmakerResultQueryKey(), identityId], enabled: authReady && !authLoading, refetchOnMount: 'always', retry: (count, error) => error.status !== 404 && count < 2 } });
+  const result = useGetFilmmakerResult({ query: { queryKey: [...getGetFilmmakerResultQueryKey(), identityId], enabled: authReady, refetchOnMount: 'always', retry: (count, error) => error.status !== 404 && count < 2 } });
   const checkoutConfig = useGetPitchReviewCheckoutConfig({ query: { queryKey: ['/api/filmmakers/review-checkout/config'], retry: false, staleTime: 0, refetchOnMount: 'always' } });
   const checkoutEnabled = checkoutConfig.isSuccess && checkoutConfig.data.mode === 'live' && checkoutConfig.data.enabled;
   const checkoutUnavailableText = checkoutConfig.isLoading
@@ -344,7 +342,7 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
     wasEditingMaterials.current = editMaterials;
   }, [editMaterials, result.refetch]);
   useEffect(() => {
-    if (editMaterials || !data?.completed || !authReady || authLoading
+    if (editMaterials || !data?.completed || !authReady
       || new URLSearchParams(search).get('details') !== 'materials') return;
     const frame = window.requestAnimationFrame(() => {
       const details = document.querySelector<HTMLDetailsElement>('[data-testid="details-edit-pitch"]');
@@ -354,14 +352,14 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
       details.scrollIntoView({ block: 'start' });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [search, editMaterials, data?.completed, data?.project_id, authReady, authLoading]);
+  }, [search, editMaterials, data?.completed, data?.project_id, authReady]);
   const checkoutProof = data?.checkout_proof || getPitchReviewProof(data?.project_id ?? null);
   const reviewStatus = useGetPitchReviewCheckoutStatus({
     request: { headers: data?.project_id ? {
       'X-MSI-Project-Id': String(data.project_id),
       ...(checkoutProof ? { 'X-MSI-Checkout-Proof': checkoutProof } : {}),
     } : {} },
-    query: { queryKey: ['/api/filmmakers/review-checkout/status', identityId, data?.project_id], enabled: authReady && !authLoading && !!data?.project_id, refetchOnMount: 'always', refetchInterval: 20_000, retry: false },
+    query: { queryKey: ['/api/filmmakers/review-checkout/status', identityId, data?.project_id], enabled: authReady && !!data?.project_id, refetchOnMount: 'always', refetchInterval: 20_000, retry: false },
   });
   const checkoutReturn = new URLSearchParams(search).get('review_checkout');
   useEffect(() => {
@@ -428,17 +426,17 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
     return () => window.removeEventListener('pageshow', onPageShow);
   }, [user, navigate]);
   useEffect(() => {
-    if (!authReady || user || ssoSignedIn) return;
+    if (!authReady || user) return;
     if ((data?.completed && !guestVisible) || result.error?.status === 401) navigate('/me/projects');
-  }, [authReady, user, ssoSignedIn, data?.completed, guestVisible, result.error, navigate]);
+  }, [authReady, user, data?.completed, guestVisible, result.error, navigate]);
   useEffect(() => {
     if (data?.completed) sessionStorage.removeItem('filmmaker-submitted-no-project');
   }, [data?.completed]);
-  if (authLoading || !authReady || result.isLoading || (!user && !ssoSignedIn && data?.completed && !guestVisible)) return <section className="dossier"><div className="page-wrap dossier-hero" aria-label="Loading your saved submission"><p className="dossier-kicker">Retrieving your submission</p><div className="dossier-skeleton" style={{ width: 'min(90%, 660px)', height: 95 }} /><div className="dossier-skeleton" style={{ width: 'min(60%, 420px)' }} /></div></section>;
+  if (!authReady || result.isLoading || (!user && data?.completed && !guestVisible)) return <section className="dossier"><div className="page-wrap dossier-hero" aria-label="Loading your saved submission"><p className="dossier-kicker">Retrieving your submission</p><div className="dossier-skeleton" style={{ width: 'min(90%, 660px)', height: 95 }} /><div className="dossier-skeleton" style={{ width: 'min(60%, 420px)' }} /></div></section>;
   if (result.isError && result.error?.status === 404 && identityId !== 'visitor') return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Select your project</p><h1 className="dossier-title">Your project is <em>still saved.</em></h1><p className="dossier-lead" role="alert">There is no submitted project selected for this visit. Open My projects and select the project you want to edit before submitting it for paid review.</p><Link href="/me/projects?action=manage" onClick={() => setFilmmakerAction('manage')} data-testid="link-reselect-result-project" className="dossier-button" style={{ marginTop: 30 }}>Open My projects <ArrowRight size={17}/></Link></div></section>;
   if (result.isError && result.error?.status !== 404) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Connection interrupted</p><h1 className="dossier-title">Your story is <em>still here.</em></h1><p className="dossier-lead" role="alert">We couldn’t retrieve your saved submission right now. Please try again.</p><button type="button" className="dossier-button" data-testid="button-retry-result" style={{ marginTop: 30 }} onClick={() => void refreshResult()}><RotateCcw size={16}/> Try again</button></div></section>;
    if (!data?.completed) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Not submitted</p><h1 className="dossier-title">The beginning<br/><em>comes first.</em></h1><p className="dossier-lead">No final submission is attached to this visit. If you saved a draft, open the worksheet to continue it; otherwise, start your answers. Saving a draft does not submit it.</p><Link href="/start/filmmaker" data-testid="link-return-to-worksheet" className="dossier-button" style={{ marginTop: 32 }}>Open the worksheet <ArrowRight size={17}/></Link></div></section>;
-   if (data.no_project_yet) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker"><Check size={15} style={{ display: 'inline', marginRight: 9 }}/> Answers received / No project yet</p><h1 className="dossier-title" data-testid="text-confirmation">There’s room<br/><em>for what’s next.</em></h1><p className="dossier-lead">We received your contact details and your interest in participating in the future. No project or deal terms were submitted.</p><div className="dossier-notice" style={{ maxWidth: 680, marginTop: 42 }}>We’re still building this experience. There’s no investment available or money collected here today. If there’s a relevant next step, we’ll reach out using the information you shared.</div>{!user && !ssoSignedIn && <p className="dossier-status">Your answers are saved. Sign in to manage future projects across devices.</p>}<div className="dossier-actions" style={{ marginTop: 38 }}><Link href="/me/projects?action=start" onClick={() => setFilmmakerAction('start')} data-testid="link-start-another-project" className="dossier-button">Start a project <ArrowRight size={17}/></Link><Link href="/me/projects?action=manage" onClick={() => setFilmmakerAction('manage')} className="dossier-button dossier-button-outline">Manage projects <ArrowRight size={17}/></Link></div></div></section>;
+   if (data.no_project_yet) return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker"><Check size={15} style={{ display: 'inline', marginRight: 9 }}/> Answers received / No project yet</p><h1 className="dossier-title" data-testid="text-confirmation">There’s room<br/><em>for what’s next.</em></h1><p className="dossier-lead">We received your contact details and your interest in participating in the future. No project or deal terms were submitted.</p><div className="dossier-notice" style={{ maxWidth: 680, marginTop: 42 }}>We’re still building this experience. There’s no investment available or money collected here today. If there’s a relevant next step, we’ll reach out using the information you shared.</div>{!user && <p className="dossier-status">Your answers are saved. Sign in to manage future projects across devices.</p>}<div className="dossier-actions" style={{ marginTop: 38 }}><Link href="/me/projects?action=start" onClick={() => setFilmmakerAction('start')} data-testid="link-start-another-project" className="dossier-button">Start a project <ArrowRight size={17}/></Link><Link href="/me/projects?action=manage" onClick={() => setFilmmakerAction('manage')} className="dossier-button dossier-button-outline">Manage projects <ArrowRight size={17}/></Link></div></div></section>;
     if (editMaterials) return <section className="dossier"><div className="page-wrap">
       <div className="dossier-head"><Link href="/" className="dossier-kicker">Movie Show Investing / Filmmakers</Link><span className="dossier-kicker">Project materials / {data.title || 'Your project'}</span></div>
       {data.project_id && data.project_slug
@@ -494,7 +492,7 @@ function FilmmakerDoneContent({ identityId, authLoading, ssoSignedIn }: { identi
                 <Link href="/me/projects?action=manage" onClick={() => setFilmmakerAction('manage')} data-testid="link-manage-projects" className="dossier-button">Manage projects <ArrowRight size={17}/></Link>
                 <Link href="/me/projects?action=start" onClick={() => setFilmmakerAction('start')} data-testid="link-start-another-project" className="dossier-button dossier-button-outline">Start another project <ArrowRight size={17}/></Link>
               </div>
-              {!user && !ssoSignedIn && <p className="dossier-status">Your final submission is received. Sign in to manage it later or on another device. Either action above will guide you through sign-in.</p>}
+              {!user && <p className="dossier-status">Your final submission is received. Sign in to manage it later or on another device. Either action above will guide you through sign-in.</p>}
             </div>
           </aside>
     </div>

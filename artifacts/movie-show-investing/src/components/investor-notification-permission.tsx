@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@workspace/replit-auth-web';
 import {
   getGetInvestorNotificationPermissionQueryKey,
   useGetInvestorNotificationPermission, useSetInvestorNotificationPermission,
@@ -9,14 +8,13 @@ import { useFirebaseUser, useFirebaseSessionReady } from './firebase-bootstrap';
 
 /** Separate notification permission; never changes a signed interest entry. */
 export function InvestorNotificationPermissionControl() {
-  const auth = useAuth();
   const firebase = useFirebaseUser();
   const firebaseReady = useFirebaseSessionReady();
-  const owner = auth.user ? `replit:${auth.user.id}` : firebase ? `firebase:${firebase.uid}` : null;
+  const owner = firebase ? `firebase:${firebase.uid}` : null;
   const cache = useQueryClient();
   const [error, setError] = useState('');
   const queryKey = [...getGetInvestorNotificationPermissionQueryKey(), owner];
-  const permission = useGetInvestorNotificationPermission({ query: { queryKey, enabled: Boolean(owner) && firebaseReady && !auth.isLoading, retry: false } });
+  const permission = useGetInvestorNotificationPermission({ query: { queryKey, enabled: Boolean(owner) && firebaseReady, retry: false } });
   const update = useSetInvestorNotificationPermission();
   async function save(allowed: boolean) {
     if (!owner) return;

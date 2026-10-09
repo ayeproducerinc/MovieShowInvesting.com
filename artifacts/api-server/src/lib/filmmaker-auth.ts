@@ -4,6 +4,8 @@ import { FirebaseConfigurationError, verifyFirebaseIdToken } from "./firebase-ad
 
 export type FilmmakerIdentity = {
   uid: string;
+  // Sign-in is Firebase only. "replit" remains in the type solely so guards on
+  // legacy rows (replit_uid columns, kept in the schema) still type-check.
   provider: "firebase" | "replit";
   email: string;
   phoneNumber: string | null;
@@ -47,16 +49,8 @@ export async function authenticateFilmmaker(
       return null;
     }
   }
-  if (req.isAuthenticated?.() && req.user) {
-    const { id, email } = req.user;
-    if (!id || !email?.trim()) {
-      res.status(403).json({ error: "A verified Replit account email is required." });
-      return null;
-    }
-    return { uid: id, provider: "replit", email: email.trim().toLowerCase(), phoneNumber: null };
-  }
   if (required) {
-    res.status(401).json({ error: "A verified Firebase or Replit account is required." });
+    res.status(401).json({ error: "A verified Google sign-in is required." });
   }
   return null;
 }

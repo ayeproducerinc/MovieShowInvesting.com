@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut, type Auth, type User } from 'firebase/auth';
 import { getGetFirebaseConfigQueryKey, setAuthTokenGetter, useGetFirebaseConfig } from '@workspace/api-client-react';
-import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-web';
 
 const APP_NAME = 'movie-show-investing';
 
@@ -37,7 +36,7 @@ export function useFilmmakerAuth() {
   useEffect(() => {
     if (!auth) return;
     return onAuthStateChanged(auth, next => {
-      setAuthTokenGetter(next && !isReplitAuthActive() && !isReplitAuthLoading() ? () => auth.currentUser?.getIdToken() ?? null : null);
+      setAuthTokenGetter(next ? () => auth.currentUser?.getIdToken() ?? null : null);
       setUser(next);
       setReady(true);
     }, () => {

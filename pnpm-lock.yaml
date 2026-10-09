@@ -520,9 +520,6 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
-      '@workspace/replit-auth-web':
-        specifier: workspace:*
-        version: link:../../lib/replit-auth-web
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -641,19 +638,6 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
-
-  lib/replit-auth-web:
-    dependencies:
-      '@tanstack/react-query':
-        specifier: 'catalog:'
-        version: 5.102.8(react@19.1.0)
-      '@workspace/api-client-react':
-        specifier: workspace:*
-        version: link:../api-client-react
-    devDependencies:
-      '@types/react':
-        specifier: 'catalog:'
-        version: 19.3.0
 
   scripts:
     devDependencies:

@@ -1,12 +1,6 @@
 import type { Request, Response } from "express";
-import { pool } from "@workspace/db";
 import { resolveProtectedIdentity, type FilmmakerIdentity } from "./filmmaker-auth";
 import { getFirebaseUidForEmail } from "./firebase-admin";
-import { ISSUER_URL } from "./replit-auth";
-
-function normalizedEmail(value: string): string {
-  return value.trim().toLowerCase();
-}
 
 export async function authorizeAdminIdentity(
   req: Request,
@@ -25,45 +19,23 @@ export async function authorizeAdminIdentity(
     return null;
   }
 
-  if (identity.provider === "firebase") {
-    let canonicalUid: string;
-    try {
-      canonicalUid = await getFirebaseUidForEmail(adminEmail);
-    } catch {
-      req.log.error("Firebase admin identity lookup unavailable");
-      res.status(503).json({ error: "Admin access could not be verified right now." });
-      return null;
-    }
-    if (identity.uid !== canonicalUid) {
-      res.status(403).json({ error: "This account is not an administrator." });
-      return null;
-    }
+  // Admin access is Google (Firebase) only: the email must also map to the
+  // canonical Firebase account for ADMIN_EMAIL.
+  if (identity.provider !== "firebase") {
+    res.status(403).json({ error: "This account is not an administrator." });
+    return null;
   }
-
-  if (identity.provider === "replit") {
-    const adminReplitSubject = process.env.ADMIN_REPLIT_SUB?.trim();
-    if (!adminReplitSubject) {
-      res.status(503).json({ error: "Replit admin access is not configured. Set ADMIN_REPLIT_SUB on the server." });
-      return null;
-    }
-
-    const result = await pool.query<{ issuer: string; subject: string; email: string }>(
-      `select issuer, subject, email
-       from replit_auth_users
-       where id::text = $1
-       limit 1`,
-      [identity.uid],
-    );
-    const replitUser = result.rows[0];
-    if (
-      !replitUser ||
-      replitUser.issuer !== ISSUER_URL ||
-      replitUser.subject !== adminReplitSubject ||
-      normalizedEmail(replitUser.email) !== adminEmail
-    ) {
-      res.status(403).json({ error: "This account is not an administrator." });
-      return null;
-    }
+  let canonicalUid: string;
+  try {
+    canonicalUid = await getFirebaseUidForEmail(adminEmail);
+  } catch {
+    req.log.error("Firebase admin identity lookup unavailable");
+    res.status(503).json({ error: "Admin access could not be verified right now." });
+    return null;
+  }
+  if (identity.uid !== canonicalUid) {
+    res.status(403).json({ error: "This account is not an administrator." });
+    return null;
   }
 
   return identity;

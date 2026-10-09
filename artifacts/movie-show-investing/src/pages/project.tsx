@@ -3,7 +3,6 @@ import { ArrowLeft, ArrowUpRight, RotateCcw, Share2 } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import { getGetCurrentInvestorIntentQueryKey, getGetPublicProjectQueryKey, useGetCurrentInvestorIntent, useGetPublicProject } from '@workspace/api-client-react';
 import type { PublicProject } from '@workspace/api-client-react';
-import { useAuth } from '@workspace/replit-auth-web';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { ProjectShare } from '@/components/project-share';
 import { ProjectContactDialog } from '@/components/project-contact-dialog';
@@ -26,11 +25,10 @@ function SecuritiesNotice() {
 export default function Project() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug || '';
-  const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
   const firebaseReady = useFirebaseSessionReady();
-  const authReady = !replitAuth.isLoading && firebaseReady;
-  const identityId = replitAuth.user ? `replit:${replitAuth.user.id}` : firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
+  const authReady = firebaseReady;
+  const identityId = firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
   const project = useGetPublicProject(slug, { query: {
     enabled: !!slug && authReady,
     queryKey: [...getGetPublicProjectQueryKey(slug), identityId],

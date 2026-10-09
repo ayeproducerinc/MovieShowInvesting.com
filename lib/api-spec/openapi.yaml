@@ -30,8 +30,6 @@ tags:
     description: International city and region suggestions
   - name: admin
     description: Firebase-protected administration
-  - name: auth
-    description: Browser sign-in and session status
 paths:
   /filmmakers/drafts/reset:
     get:
@@ -211,56 +209,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AgeConfirmation"
-  /auth/user:
-    get:
-      operationId: getCurrentAuthUser
-      tags: [auth]
-      summary: Get the current browser session user
-      responses:
-        "200":
-          description: Current session user, or null when signed out
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthUserEnvelope"
-  /login:
-    get:
-      operationId: beginBrowserLogin
-      tags: [auth]
-      summary: Redirect legacy login links to the Google sign-in screen
-      parameters:
-        - name: returnTo
-          in: query
-          required: false
-          schema: { type: string }
-      responses:
-        "302": { description: Redirect to the filmmaker Google sign-in screen }
-  /callback:
-    get:
-      operationId: handleBrowserLoginCallback
-      tags: [auth]
-      summary: Reject deprecated browser OIDC callbacks
-      responses:
-        "410": { description: Replit OIDC callbacks are no longer accepted }
-  /logout:
-    post:
-      operationId: logoutBrowserSession
-      tags: [auth]
-      summary: End the browser session using a same-origin request
-      parameters:
-        - name: returnTo
-          in: query
-          required: false
-          description: Optional local path returned for post-logout navigation.
-          schema: { type: string, maxLength: 2048 }
-      responses:
-        "200":
-          description: Local session destroyed; returnTo is a validated same-origin path
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LogoutSessionEnvelope"
-        "403": { description: Same-origin Origin header required for cookie-authenticated logout }
   /question-config:
     get:
       operationId: getQuestionConfig
@@ -2503,32 +2451,6 @@ components:
         authority_checked: { type: boolean }
         questions_resolved: { type: boolean }
         updated_at: { type: ["string", "null"] }
-    AuthUser:
-      type: object
-      additionalProperties: false
-      required: [id, email, firstName, lastName, profileImageUrl]
-      properties:
-        id: { type: string, format: uuid }
-        email: { type: string, format: email }
-        firstName: { type: ["string", "null"] }
-        lastName: { type: ["string", "null"] }
-        profileImageUrl: { type: ["string", "null"], format: uri }
-    AuthUserEnvelope:
-      type: object
-      additionalProperties: false
-      required: [user]
-      properties:
-        user:
-          oneOf:
-            - $ref: "#/components/schemas/AuthUser"
-            - type: "null"
-    LogoutSessionEnvelope:
-      type: object
-      additionalProperties: false
-      required: [success, returnTo]
-      properties:
-        success: { type: boolean, const: true }
-        returnTo: { type: string, minLength: 1, maxLength: 2048 }
     QuestionConfig:
       type: object
       additionalProperties: false

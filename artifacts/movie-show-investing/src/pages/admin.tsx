@@ -17,8 +17,6 @@ import { AdminInvestors } from '@/components/admin-investors';
 import { PitchProvenance, ReviewNotesForm } from '@/components/admin-pitch-extras';
 import { ReadableValue } from '@/components/admin-readable';
 import { AdminConversations } from '@/components/admin-conversations';
-import { useAuth } from '@workspace/replit-auth-web';
-import { isReplitAuthActive, isReplitAuthLoading } from '@workspace/replit-auth-web';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { customFetch } from '../../../../lib/api-client-react/src/custom-fetch';
 
@@ -492,7 +490,6 @@ function Dashboard({ userId, email, onSignOut }: { userId: string; email: string
 
 export default function Admin() {
   const queryClient = useQueryClient();
-  const replitAuth = useAuth();
   const { data: config, isPending: configPending, isError: configError, refetch: retryConfig } = useGetFirebaseConfig({
     query: { queryKey: getGetFirebaseConfigQueryKey(), retry: false, staleTime: 300_000 },
   });
@@ -529,7 +526,7 @@ export default function Admin() {
         if (previousUid.current !== null || next) queryClient.clear();
         previousUid.current = next?.uid ?? null;
       }
-      setAuthTokenGetter(next && !isReplitAuthActive() && !isReplitAuthLoading() ? () => auth.currentUser?.getIdToken() ?? null : null);
+      setAuthTokenGetter(next ? () => auth.currentUser?.getIdToken() ?? null : null);
       setUser(next);
       setAuthReady(true);
     }, () => {
@@ -539,33 +536,14 @@ export default function Admin() {
     });
   }, [auth, queryClient]);
 
-  useEffect(() => {
-    if (!replitAuth.user) return;
-    setAuthTokenGetter(null);
-    queryClient.clear();
-  }, [replitAuth.user?.id, queryClient]);
-
-  useEffect(() => {
-    if (replitAuth.isLoading) {
-      setAuthTokenGetter(null);
-    } else if (!replitAuth.user && auth?.currentUser) {
-      setAuthTokenGetter(() => auth.currentUser?.getIdToken() ?? null);
-    }
-  }, [auth, replitAuth.isLoading, replitAuth.user?.id]);
-
-  const identityId = replitAuth.user?.id ?? user?.uid;
-  const identityEmail = replitAuth.user?.email ?? user?.email ?? '';
-  const identityReady = !replitAuth.isLoading && (Boolean(replitAuth.user) || (Boolean(user) && authReady));
+  const identityId = user?.uid;
+  const identityEmail = user?.email ?? '';
+  const identityReady = Boolean(user) && authReady;
   const me = useGetAdminMe({
     query: { queryKey: [...getGetAdminMeQueryKey(), identityId], enabled: !!identityId && identityReady, retry: false, staleTime: 30_000, refetchOnWindowFocus: true },
   });
 
   async function leave() {
-    if (replitAuth.user) {
-      queryClient.clear();
-      replitAuth.logout('/admin');
-      return;
-    }
     if (auth) {
       try {
         await leaveFilmmakerAccount();
@@ -583,16 +561,15 @@ export default function Admin() {
     }
   }
 
-  if (replitAuth.isLoading) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
-  if (!replitAuth.user && !user && configPending) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
-  if (!replitAuth.user && !user && (configError || (config && (!config.apiKey || !config.authDomain || !config.projectId || !config.appId)))) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
+  if (!user && configPending) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
+  if (!user && (configError || (config && (!config.apiKey || !config.authDomain || !config.projectId || !config.appId)))) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>
     <Notice icon={<ShieldAlert size={20} />} title="Sign-in is not configured" action="Check again" onAction={() => void retryConfig()}>
       The administration room needs the site's Firebase web configuration before Google sign-in can work. Public pages remain available.
     </Notice>
     {feedback && <p className="admin-feedback" role="alert">{feedback}</p>}
     <GoogleSignInButton auth={auth} queryClient={queryClient} className="admin-button" testId="button-admin-google-sign-in" />
   </div></div></Frame>;
-  if (!replitAuth.user && !user && (!auth || !authReady)) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>{feedback ? <Notice icon={<ShieldAlert size={20} />} title="Sign-in unavailable">{feedback}</Notice> : <Skeleton />}<GoogleSignInButton auth={auth} queryClient={queryClient} disabled={replitAuth.isLoading} className="admin-button" testId="button-admin-google-sign-in" label="Sign in" /></div></div></Frame>;
+  if (!user && (!auth || !authReady)) return <Frame><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>{feedback ? <Notice icon={<ShieldAlert size={20} />} title="Sign-in unavailable">{feedback}</Notice> : <Skeleton />}<GoogleSignInButton auth={auth} queryClient={queryClient} className="admin-button" testId="button-admin-google-sign-in" label="Sign in" /></div></div></Frame>;
   if (identityReady && identityId) {
     if (me.isPending) return <Frame email={identityEmail || undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}><Skeleton /></div></div></Frame>;
     if (me.isError) return <Frame email={identityEmail || undefined} onSignOut={leave}><div className="admin-auth-panel" style={{ minHeight: 'calc(100dvh - 76px)' }}><div style={{ width: 'min(100%, 520px)' }}>

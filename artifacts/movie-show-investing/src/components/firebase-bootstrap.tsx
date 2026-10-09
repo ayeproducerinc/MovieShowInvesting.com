@@ -7,7 +7,6 @@ import {
   setAuthTokenGetter,
   useGetFirebaseConfig,
 } from '@workspace/api-client-react';
-import { isReplitAuthActive, isReplitAuthLoading, useAuth } from '@workspace/replit-auth-web';
 import { clearPrivateAuthQueries } from '@/lib/homepage-community';
 
 const APP_NAME = 'movie-show-investing';
@@ -48,7 +47,6 @@ export function getInitializedAuth(): Auth | null {
 
 export function FirebaseBootstrap() {
   const queryClient = useQueryClient();
-  const replitAuth = useAuth();
   const { data: config, error, isError } = useGetFirebaseConfig({
     query: {
       queryKey: getGetFirebaseConfigQueryKey(),
@@ -79,7 +77,7 @@ export function FirebaseBootstrap() {
           if (previousUid !== null || user) clearPrivateAuthQueries(queryClient);
           previousUid = user?.uid ?? null;
         }
-        setAuthTokenGetter(user && !isReplitAuthActive() && !isReplitAuthLoading() ? () => initializedAuth?.currentUser?.getIdToken() ?? null : null);
+        setAuthTokenGetter(user ? () => initializedAuth?.currentUser?.getIdToken() ?? null : null);
         currentUser = user;
         listeners.forEach(listener => listener());
         setSessionReady(true);
@@ -97,24 +95,11 @@ export function FirebaseBootstrap() {
   }, [config, queryClient]);
 
   useEffect(() => {
-    if (replitAuth.isLoading) {
-      setAuthTokenGetter(null);
-      return;
-    }
-    if (replitAuth.user) {
-      setAuthTokenGetter(null);
-      queryClient.clear();
-    } else {
-      setAuthTokenGetter(currentUser ? () => initializedAuth?.currentUser?.getIdToken() ?? null : null);
-    }
-  }, [replitAuth.isLoading, replitAuth.user?.id, queryClient]);
-
-  useEffect(() => {
     if (isError) setSessionReady(true);
     if (!isError || reportedConfigError || !import.meta.env.DEV) return;
     reportedConfigError = true;
     if (error?.status === 503) {
-      console.warn('[Movie Show Investing] Firebase Auth is not configured yet: /api/config returned 503. Supply the Firebase web configuration in Replit Secrets. Public pages remain available.');
+      console.warn('[Movie Show Investing] Firebase Auth is not configured yet: /api/config returned 503. Supply the Firebase web configuration in the server environment. Public pages remain available.');
     } else {
       console.warn('[Movie Show Investing] Firebase Auth configuration could not be loaded from /api/config. Public pages remain available.', error);
     }

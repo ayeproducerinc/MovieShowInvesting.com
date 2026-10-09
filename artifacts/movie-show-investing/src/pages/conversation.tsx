@@ -108,10 +108,9 @@ export default function Conversation() {
   const messagingAvailable = config.data?.available === true && config.data.disclosure === APPROVED_MESSAGING_NOTICE;
   const provider = auth.provider;
   const scopeKey = auth.identityKey;
-  const list = useGetMyConversations({ query: { queryKey: [...getGetMyConversationsQueryKey(), provider, identityId], enabled: !auth.authLoading && messagingAvailable && !!identityId && !!provider && (provider === 'replit' || auth.ready), retry: false, refetchInterval: id ? 20000 : false } });
+  const list = useGetMyConversations({ query: { queryKey: [...getGetMyConversationsQueryKey(), provider, identityId], enabled: messagingAvailable && !!identityId && !!provider && auth.ready, retry: false, refetchInterval: id ? 20000 : false } });
   useEffect(() => { document.title = 'Correspondence | Movie Show Investing'; const meta = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]') ?? document.createElement('meta'); const old = meta.content; meta.name = 'robots'; meta.content = 'noindex, nofollow'; if (!meta.parentNode) document.head.append(meta); return () => { if (old) meta.content = old; else meta.remove(); }; }, []);
   const unavailable = config.isError || !messagingAvailable;
-  if (auth.authLoading) return <main className="correspondence"><div className="corr-state" role="status" aria-label="Checking sign-in"><div className="corr-skeleton" style={{ width: '30%' }}/><div className="corr-skeleton" style={{ width: '75%', height: 90 }}/><div className="corr-skeleton" style={{ width: '54%' }}/></div></main>;
   return <main className="correspondence">
     <header className="corr-top"><Link href="/" className="corr-kicker" data-testid="link-correspondence-home">Movie Show Investing / Correspondence</Link><span className="corr-kicker">Private project conversations</span></header>
     {config.isPending || auth.configPending ? <div className="corr-state" role="status" aria-label="Loading messaging"><div className="corr-skeleton" style={{ width: '30%' }}/><div className="corr-skeleton" style={{ width: '75%', height: 90 }}/><div className="corr-skeleton" style={{ width: '54%' }}/></div>

@@ -6,7 +6,7 @@ import {
 } from "@workspace/api-zod";
 import { authenticateFilmmaker } from "../lib/filmmaker-auth";
 import { authorizeAdminIdentity } from "../lib/admin-auth";
-import { getTrustedOrigin } from "../lib/replit-auth";
+import { getTrustedOrigin } from "../lib/trusted-origin";
 import {
   captureReferral, enrollReferralMember, memberReferrals, referralLedger, referralIdentityId,
   refreshReferralReward, recordReferralPayout, ReferralError,

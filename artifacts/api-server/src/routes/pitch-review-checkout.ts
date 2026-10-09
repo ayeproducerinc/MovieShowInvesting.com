@@ -41,7 +41,7 @@ async function currentPitch(req: Parameters<typeof authorizeFilmmakerVisitor>[0]
       .limit(1);
     visitorId = owner?.visitorId ?? null;
   }
-  if (!visitorId && projectId && (req.get("authorization") || req.isAuthenticated?.())) {
+  if (!visitorId && projectId && req.get("authorization")) {
     const identity = await authenticateFilmmaker(req, res, false);
     if (!identity) return null;
     visitorId = await getFilmmakerAccountProjectVisitor(identity.uid, projectId, identity.provider);

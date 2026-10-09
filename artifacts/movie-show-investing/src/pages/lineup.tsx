@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { ArrowRight, RotateCcw } from 'lucide-react';
 import { Link } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@workspace/replit-auth-web';
 import { getGetCurrentInvestorIntentQueryKey, getGetExploreQueryKey, useClaimInvestorIntent, useGetCurrentInvestorIntent, useGetExplore } from '@workspace/api-client-react';
 import type { InvestorInterestHistoryItem } from '@workspace/api-client-react';
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
@@ -63,12 +62,11 @@ function SignedHistoryEntry({ entry, index }: { entry: InvestorInterestHistoryIt
 
 export default function Lineup() {
   const queryClient = useQueryClient();
-  const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
   const firebaseReady = useFirebaseSessionReady();
-  const signedIn = Boolean(replitAuth.user || firebaseUser);
-  const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
-  const ready = !replitAuth.isLoading && firebaseReady;
+  const signedIn = Boolean(firebaseUser);
+  const identityId = firebaseUser?.uid ?? 'visitor';
+  const ready = firebaseReady;
   const claim = useClaimInvestorIntent();
   const [claimError, setClaimError] = useState('');
   const current = useGetCurrentInvestorIntent({

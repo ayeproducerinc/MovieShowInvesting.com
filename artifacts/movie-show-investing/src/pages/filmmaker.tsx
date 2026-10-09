@@ -10,7 +10,6 @@ import type { FilmmakerProposalInput, FilmmakerSubmissionInput } from '@workspac
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { DraftPitchMaterials, UnsavedMaterialError, UNSAVED_MATERIAL_MESSAGE, type DraftPitchMaterialsHandle } from '@/components/draft-pitch-materials';
-import { useAuth } from '@workspace/replit-auth-web';
 import {
   clearFilmmakerAuthHandoff,
   isFilmmakerDraftLinked,
@@ -126,35 +125,34 @@ function OptionalSpecifics({ a, change }: { a:Answers; change:<K extends keyof A
 }
 
 export default function Filmmaker() {
-  const replitAuth = useAuth();
   const firebaseUser = useFirebaseUser();
-  const identityId = replitAuth.user?.id ?? firebaseUser?.uid ?? 'visitor';
-  const identityKey = replitAuth.user ? `replit:${replitAuth.user.id}` : firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
-  const signedInEmail = replitAuth.user?.email ?? firebaseUser?.email ?? null;
-  return <FilmmakerWorksheet key={identityKey} identityId={identityId} identityKey={identityKey} signedInEmail={signedInEmail} authLoading={replitAuth.isLoading} />;
+  const identityId = firebaseUser?.uid ?? 'visitor';
+  const identityKey = firebaseUser ? `firebase:${firebaseUser.uid}` : 'visitor';
+  const signedInEmail = firebaseUser?.email ?? null;
+  return <FilmmakerWorksheet key={identityKey} identityId={identityId} identityKey={identityKey} signedInEmail={signedInEmail} />;
 }
 
-function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoading }: { identityId: string; identityKey: string; signedInEmail: string | null; authLoading: boolean }) {
+function FilmmakerWorksheet({ identityId, identityKey, signedInEmail }: { identityId: string; identityKey: string; signedInEmail: string | null }) {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const fromPricing = new URLSearchParams(window.location.search).get('new') === '1';
   const authReady = useFirebaseSessionReady();
-  const completedResult = useGetFilmmakerResult({ query:{ queryKey:[...getGetFilmmakerResultQueryKey(),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
+  const completedResult = useGetFilmmakerResult({ query:{ queryKey:[...getGetFilmmakerResultQueryKey(),identityId], enabled:authReady, retry:(count,error)=>error.status !== 404 && count < 2 } });
   const completedDestination = () => fromPricing ? '/me/projects?action=start&new=1' : '/start/filmmaker/done';
   const [handoffError, setHandoffError] = useState('');
   const [pendingHandoff, setPendingHandoff] = useState<FilmmakerAuthHandoff | null>(readFilmmakerAuthHandoff);
   useEffect(() => { if (completedResult.data?.completed && !pendingHandoff) navigate(completedDestination()); }, [completedResult.data?.completed, navigate, pendingHandoff]);
-  const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:[...getGetFlowProgressQueryKey('filmmaker'),identityId], enabled:authReady && !authLoading, retry:(count,error)=>error.status !== 404 && count < 2 } });
+  const progress = useGetFlowProgress('filmmaker', { query:{ queryKey:[...getGetFlowProgressQueryKey('filmmaker'),identityId], enabled:authReady, retry:(count,error)=>error.status !== 404 && count < 2 } });
   const progressDraftIdRef = useRef<number | null>(null);
   const worksheetDraftId = progressDraftIdRef.current ?? progress.data?.draft_id;
   const contextChanged = Boolean(progressDraftIdRef.current && progress.data?.draft_id && progressDraftIdRef.current !== progress.data.draft_id);
   const submissionConfig = useGetFilmmakerSubmissionConfig({ query:{ queryKey:getGetFilmmakerSubmissionConfigQueryKey(), retry:false, refetchOnWindowFocus:true } });
   useEffect(() => {
-    if (identityId !== 'visitor' && authReady && !authLoading && !pendingHandoff && !handoffError
+    if (identityId !== 'visitor' && authReady && !pendingHandoff && !handoffError
       && completedResult.error?.status === 404 && progress.error?.status === 404) {
       navigate(fromPricing ? '/me/projects?action=start&new=1' : '/me/projects');
     }
-  }, [identityId, authReady, authLoading, pendingHandoff, handoffError, completedResult.error, progress.error, navigate, fromPricing]);
+  }, [identityId, authReady, pendingHandoff, handoffError, completedResult.error, progress.error, navigate, fromPricing]);
   const group = useGetPriceGroup();
   const draftHeaders: Record<string, string> = worksheetDraftId ? { 'X-MSI-Draft-Id': String(worksheetDraftId) } : {};
   const submit = useSubmitFilmmaker({ request: { headers: draftHeaders } });
@@ -241,7 +239,7 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoadin
     }
   }, [identityId, progress.isError, progress.error]);
   useEffect(() => {
-    if (!pendingHandoff || identityId === 'visitor' || authLoading || !authReady) return;
+    if (!pendingHandoff || identityId === 'visitor' || !authReady) return;
     let active = true;
     const connectPreparedDraft = async () => {
       if (!pendingHandoff.prepared) {
@@ -301,7 +299,7 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoadin
     };
     void connectPreparedDraft();
     return () => { active = false; };
-  }, [pendingHandoff, identityId, identityKey, authLoading, authReady, progress.data?.draft_id, progress.error, progress.isLoading, claim]);
+  }, [pendingHandoff, identityId, identityKey, authReady, progress.data?.draft_id, progress.error, progress.isLoading, claim]);
 
   function change<K extends keyof Answers>(key:K, value:Answers[K]) {
     setA(current => ({ ...current, [key]:value }));
@@ -443,14 +441,14 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoadin
     }
   }
   useEffect(() => {
-    if (!hydrated || authLoading || existingDraft || resetting) return;
+    if (!hydrated || existingDraft || resetting) return;
     const snapshot = JSON.stringify({ screen, answers:a });
     if (snapshot === lastSaved.current) return;
     editTimer.current = window.setTimeout(() => { editTimer.current = null; void persist(screen, a).catch(() => undefined); }, 800);
     return () => { if (editTimer.current !== null) window.clearTimeout(editTimer.current); editTimer.current = null; };
     // Deliberately schedule only when answers/screen change; mutation objects are unstable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a, screen, hydrated, authLoading, existingDraft, resetting]);
+  }, [a, screen, hydrated, existingDraft, resetting]);
   const startOverButton = <FilmmakerStartOver
     draftId={worksheetDraftId}
     disabled={saving || materialsBusy || connectingDraft || submit.isPending || Boolean(pendingHandoff)}
@@ -667,7 +665,7 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoadin
       <div className="fm-field"><label htmlFor="custom-budget" className="fm-label">Your estimated budget · USD</label><input id="custom-budget" data-testid="input-custom-budget" className="fm-input" inputMode="numeric" value={a.budget ? a.budget.toLocaleString('en-US') : ''} onChange={e=>{ const raw=e.target.value.replace(/,/g,''); if (/^\d*$/.test(raw)) updateBudget(raw ? Number(raw) : 0); }} aria-invalid={!budgetValid} />{!budgetValid && <p className="fm-error" role="alert">Enter a positive whole-dollar amount.</p>}</div>}
   </div>;
 
-  if (authLoading || completedResult.isLoading || progress.isLoading || group.isLoading || completedResult.data?.completed || !hydrated && !progress.isError) return <section className="fm"><div className="page-wrap" style={{padding:'70px 0 140px'}} aria-label="Loading saved answers"><p className="fm-kicker">Opening your worksheet</p><div className="fm-skeleton" style={{maxWidth:440,height:75}}/><div className="fm-skeleton" style={{maxWidth:310}}/><div className="fm-skeleton" style={{maxWidth:600,height:190}}/></div></section>;
+  if (completedResult.isLoading || progress.isLoading || group.isLoading || completedResult.data?.completed || !hydrated && !progress.isError) return <section className="fm"><div className="page-wrap" style={{padding:'70px 0 140px'}} aria-label="Loading saved answers"><p className="fm-kicker">Opening your worksheet</p><div className="fm-skeleton" style={{maxWidth:440,height:75}}/><div className="fm-skeleton" style={{maxWidth:310}}/><div className="fm-skeleton" style={{maxWidth:600,height:190}}/></div></section>;
   if (completedResult.isError && completedResult.error?.status !== 404 || progress.isError && progress.error?.status !== 404 || group.isError || !group.data) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Connection interrupted</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>We can’t open your worksheet yet.</h1><p className="fm-small">Your previous answers and pricing group need to load before you continue. Please try again.</p><button type="button" data-testid="button-retry-loading" className="fm-primary" style={{marginTop:30}} onClick={()=>{ void completedResult.refetch(); void progress.refetch(); void group.refetch(); }}><RotateCcw size={17}/> Try again</button>{startOverButton}</div></section>;
     if (identityId !== 'visitor' && progress.error?.status === 404 && handoffError) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Draft not connected</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>Your original draft is still safe.</h1><p className="fm-error" role="alert">{handoffError}</p><Link href="/me/projects" data-testid="link-filmmaker-handoff-recovery" className="fm-primary" style={{marginTop:30}}>Open My projects <ArrowRight size={17}/></Link></div></section>;
     if (identityId !== 'visitor' && progress.error?.status === 404) return <section className="fm"><div className="page-wrap" style={{padding:'100px 0 150px'}}><p className="fm-kicker">Choose a project</p><h1 className="serif" style={{fontSize:'clamp(50px,7vw,85px)',margin:'20px 0'}}>Your draft isn’t selected.</h1><p className="fm-small">Open My projects to resume a saved draft or start another project. No project was changed.</p><Link href={fromPricing ? '/me/projects?action=start&new=1' : '/me/projects'} data-testid="link-select-filmmaker-draft" className="fm-primary" style={{marginTop:30}}>My projects <ArrowRight size={17}/></Link></div></section>;

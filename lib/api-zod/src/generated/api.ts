@@ -245,57 +245,6 @@ export const ConfirmAgeResponse = zod.object({
 
 
 /**
- * @summary Get the current browser session user
- */
-export const GetCurrentAuthUserResponse = zod.object({
-  "user": zod.union([zod.object({
-  "id": zod.string().uuid(),
-  "email": zod.string().email(),
-  "firstName": zod.string().nullable(),
-  "lastName": zod.string().nullable(),
-  "profileImageUrl": zod.string().url().nullable()
-}),zod.null()])
-})
-
-
-/**
- * @summary Redirect legacy login links to the Google sign-in screen
- */
-export const BeginBrowserLoginQueryParams = zod.object({
-  "returnTo": zod.coerce.string().optional()
-})
-
-export const BeginBrowserLoginResponse = zod.void()
-
-
-/**
- * @summary Reject deprecated browser OIDC callbacks
- */
-export const HandleBrowserLoginCallbackResponse = zod.void()
-
-
-/**
- * @summary End the browser session using a same-origin request
- */
-export const logoutBrowserSessionQueryReturnToMax = 2048;
-
-
-
-export const LogoutBrowserSessionQueryParams = zod.object({
-  "returnTo": zod.coerce.string().max(logoutBrowserSessionQueryReturnToMax).optional().describe('Optional local path returned for post-logout navigation.')
-})
-
-export const logoutBrowserSessionResponseReturnToMax = 2048;
-
-
-
-export const LogoutBrowserSessionResponse = zod.object({
-  "success": zod.literal(true),
-  "returnTo": zod.string().min(1).max(logoutBrowserSessionResponseReturnToMax)
-})
-
-
-/**
  * @summary Public question form availability
  */
 export const GetQuestionConfigResponse = zod.object({

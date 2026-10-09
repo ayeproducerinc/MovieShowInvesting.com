@@ -48,11 +48,18 @@ export async function captureReferral(codeInput: string, existingToken: unknown,
   } finally { client.release(); }
 }
 
-export async function enrollReferralMember(identity: FilmmakerIdentity, receiptToken: unknown): Promise<string> {
+type AccountCreatedAtResolver = (uid: string) => Promise<Date | string | null | undefined>;
+
+export async function enrollReferralMember(
+  identity: FilmmakerIdentity,
+  receiptToken: unknown,
+  // Injectable so integration tests need not call Firebase Admin.
+  resolveCreatedAt: AccountCreatedAtResolver = getFirebaseAccountCreatedAt,
+): Promise<string> {
   const id = referralIdentityId(identity);
   if ((await pool.query("SELECT id FROM referral_members WHERE id=$1", [id])).rowCount) return id;
-  const accountCreatedAt = identity.provider === "firebase" ? await getFirebaseAccountCreatedAt(identity.uid)
-    : (await pool.query("SELECT created_at FROM replit_auth_users WHERE id::text=$1", [identity.uid])).rows[0]?.created_at;
+  // Sign-in is Google (Firebase) only; its creation time proves a new signup.
+  const accountCreatedAt = identity.provider === "firebase" ? await resolveCreatedAt(identity.uid) : null;
   if (!accountCreatedAt || !Number.isFinite(new Date(accountCreatedAt).getTime())) {
     throw new ReferralError("The account's signup date could not be verified.", 503);
   }
@@ -74,7 +81,7 @@ export async function enrollReferralMember(identity: FilmmakerIdentity, receiptT
     const attributable = source && canAttributeReferral({
       memberId: id, referrerId: source.referrer_id, accountCreatedAt: new Date(accountCreatedAt),
       capturedAt: source.captured_at, expiresAt: source.expires_at, consumedBy: source.consumed_by,
-      accountTimestampPrecisionMs: identity.provider === "firebase" ? 1000 : 1,
+      accountTimestampPrecisionMs: 1000,
     });
     await client.query(`INSERT INTO referral_members(id,provider,uid,email,code,account_created_at,referred_by,attribution_at)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,

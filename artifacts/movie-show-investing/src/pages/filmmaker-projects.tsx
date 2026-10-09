@@ -21,7 +21,6 @@ import { FilmmakerConversationsDesk } from '@/components/filmmaker-conversations
 import { FilmmakerInterestAlerts } from '@/components/filmmaker-interest-alerts';
 import { useFilmmakerAuth } from '@/hooks/use-filmmaker-auth';
 import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } from '@/lib/filmmaker-intent';
-import { useAuth } from '@workspace/replit-auth-web';
 import { FilmmakerStartOver } from '@/components/filmmaker-start-over';
 
 function accountError(error: unknown): string {
@@ -48,8 +47,6 @@ export default function FilmmakerProjects() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const auth = useFilmmakerAuth();
-  const replitAuth = useAuth();
-  const ssoUser = replitAuth.user;
   const [actionError, setActionError] = useState('');
   const [claimError, setClaimError] = useState('');
   const [claiming, setClaiming] = useState(false);
@@ -57,14 +54,14 @@ export default function FilmmakerProjects() {
   const [initialAction] = useState(pendingFilmmakerAction);
   const claimedUid = useRef<string | null>(null);
   const uid = auth.user?.uid;
-  const identityId = ssoUser?.id ?? uid;
-  const identityProvider = ssoUser ? 'replit' : uid ? 'firebase' : null;
+  const identityId = uid;
+  const identityProvider = uid ? 'firebase' : null;
   const user = auth.user;
 
   const projects = useGetFilmmakerProjects({
     query: {
       queryKey: [...getGetFilmmakerProjectsQueryKey(), identityId],
-      enabled: !!identityId && !replitAuth.isLoading && (Boolean(ssoUser) || auth.ready),
+      enabled: !!identityId && auth.ready,
       retry: (count, error) => error.status !== 401 && error.status !== 403 && count < 2,
       refetchOnMount: 'always',
     },
@@ -83,11 +80,11 @@ export default function FilmmakerProjects() {
   }, []);
 
   const linkCurrentVisit = useCallback(async () => {
-    if (!identityId || replitAuth.isLoading) return;
+    if (!identityId) return;
     setClaiming(true);
     setClaimError('');
     try {
-      if (user && !ssoUser) {
+      if (user) {
         try {
           await synchronizeFilmmakerPhone(user);
         } catch (error) {
@@ -108,7 +105,7 @@ export default function FilmmakerProjects() {
         await claimFilmmakerProject({
           headers: draftId ? { 'X-MSI-Draft-Id': String(draftId) } : {},
         });
-        if (user && !ssoUser) await synchronizeFilmmakerPhone(user);
+        if (user) await synchronizeFilmmakerPhone(user);
         await queryClient.invalidateQueries({ queryKey: getGetFilmmakerProjectsQueryKey() });
         const requestedStart = hasPendingStartAction()
           || new URLSearchParams(window.location.search).get('action') === 'start';
@@ -129,13 +126,13 @@ export default function FilmmakerProjects() {
     } finally {
       setClaiming(false);
     }
-  }, [queryClient, identityId, user, ssoUser, replitAuth.isLoading, initialAction, navigate, start]);
+  }, [queryClient, identityId, user, initialAction, navigate, start]);
 
   useEffect(() => {
-    if (!identityId || replitAuth.isLoading || (!ssoUser && !auth.ready) || claimedUid.current === identityId) return;
+    if (!identityId || !auth.ready || claimedUid.current === identityId) return;
     claimedUid.current = identityId;
     void linkCurrentVisit();
-  }, [identityId, ssoUser, replitAuth.isLoading, auth.ready, linkCurrentVisit]);
+  }, [identityId, auth.ready, linkCurrentVisit]);
 
   function clearVisitorQueries() {
     queryClient.removeQueries({ queryKey: getGetFilmmakerResultQueryKey() });
@@ -159,10 +156,10 @@ export default function FilmmakerProjects() {
     }
   }
 
-    if (replitAuth.isLoading || (!ssoUser && (auth.configPending || (!auth.configError && !auth.ready)))) {
+    if (auth.configPending || (!auth.configError && !auth.ready)) {
     return <section className="dossier"><div className="page-wrap dossier-hero" role="status"><p className="dossier-kicker">Your filmmaker desk</p><h1 className="dossier-title">Finding your<br/><em>projects.</em></h1></div></section>;
   }
-  if (!ssoUser && auth.configError && !auth.user) {
+  if (auth.configError && !auth.user) {
     return <section className="dossier"><div className="page-wrap dossier-hero"><p className="dossier-kicker">Account sign-in unavailable</p><h1 className="dossier-title">We can’t open<br/><em>your desk yet.</em></h1><p className="dossier-lead" role="alert">{auth.authError || 'Google sign-in isn’t configured right now. Your existing submission has not changed. Please try again later.'}</p>{actionError && <p className="dossier-status" role="alert">{actionError}</p>}<button type="button" className="dossier-button dossier-button-outline" style={{ marginTop: 16 }} onClick={() => void auth.retryConfig()}>Check again <RotateCcw size={17}/></button></div></section>;
   }
   if (!identityId) {
@@ -188,18 +185,18 @@ export default function FilmmakerProjects() {
     {(claimError || actionError || projects.data?.has_resumable_draft) && <div className="page-wrap"><FilmmakerStartOver disabled={acting || claiming}/></div>}
     {actionError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{actionError} {actionError.includes('Keep this original browser draft') && <Link href="/start/filmmaker">Open this browser’s worksheet</Link>}</div>}
     <ProjectHubView
-      email={ssoUser?.email ?? auth.user?.email ?? ''}
+      email={auth.user?.email ?? ''}
       initiallyOpen={initialAction === 'manage'}
       projects={items}
       draftAvailable={projects.data?.has_resumable_draft ?? false}
       loading={projects.isPending || claiming}
       busy={acting || claiming}
       error={projects.isError ? accountError(projects.error) : null}
-      phoneVerificationSlot={auth.user && !ssoUser ? <FilmmakerPhoneVerification user={auth.user} verified={projects.data?.phone_verified ?? false} /> : ssoUser ? <p className="dossier-notice">Phone verification is available after signing in with Google.</p> : null}
+      phoneVerificationSlot={auth.user ? <FilmmakerPhoneVerification user={auth.user} verified={projects.data?.phone_verified ?? false} /> : null}
       onStart={() => void perform(() => start.mutateAsync(), '/start/filmmaker')}
       onResume={() => void perform(() => resume.mutateAsync(), '/start/filmmaker')}
       onOpen={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}
-      onRetry={() => { void projects.refetch(); if (!ssoUser) void linkCurrentVisit(); }}
+      onRetry={() => { void projects.refetch(); void linkCurrentVisit(); }}
     />
     {!projects.isPending && !projects.isError && !claiming && identityId && <FilmmakerInterestAlerts key={identityId} uid={identityId} busy={acting} onOpenProject={id => void perform(() => select.mutateAsync({ projectId: id }), '/start/filmmaker/done')}/>}
     {!projects.isPending && !projects.isError && !claiming && <FilmmakerQuestionsDesk projects={projects.data?.projects ?? []}/>}

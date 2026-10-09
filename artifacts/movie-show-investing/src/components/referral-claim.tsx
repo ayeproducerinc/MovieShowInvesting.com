@@ -1,16 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClaimReferral } from '@workspace/api-client-react';
-import { useAuth } from '@workspace/replit-auth-web';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { claimForIdentity, useReferralCaptureStatus, retryReferralCapture } from '@/lib/referral-attribution';
 
 export function useReferralIdentity(): string | null {
-  const replit = useAuth();
   const user = useFirebaseUser();
   const ready = useFirebaseSessionReady();
-  if (replit.isLoading) return null;
-  if (replit.user) return `r:${replit.user.id}`;
   return ready && user ? `f:${user.uid}` : null;
 }
 
