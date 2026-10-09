@@ -26,6 +26,9 @@ The showcase 402 gate treats a verified FREE99 waiver like a paid fee (`showcase
 - The account and price check is cached for 5 minutes (failures for 30 seconds).
 - `GET /api/filmmakers/review-checkout/config` and `/status` are limited to 60 requests per IP per 5 minutes (`lib/rate-limit.ts`). The status page normally polls about 15 times per 5 minutes.
 
+## 5. Guest status check failed after the 24-hour proof expired — fixed
+`routes/pitch-review-checkout.ts` used a 4-group visitor-ID pattern (8-4-4-12) that never matched a real ID (8-4-4-4-12), so the guest cookie fallback in `/status` was dead. A signed-out guest with the page open more than 24 hours got "status unavailable" until they reloaded. It now uses the same pattern as every other route; ownership is still enforced by `authorizeFilmmakerVisitor`.
+
 ## Before relying on it in production
 - On Replit: run `node scripts/test-review-checkouts.mjs`.
 - In the sandbox, confirm Stripe accepts the `created[gte]`/`created[lte]` filter on the Checkout session list. If it doesn't, old reservations simply stay blocked as before, which is safe.
@@ -35,4 +38,3 @@ The showcase 402 gate treats a verified FREE99 waiver like a paid fee (`showcase
 - Live versus test mode depends only on `NODE_ENV` (`pitch-review-payments.ts`).
 - There is no Stripe webhook, so refunds and disputes after fulfilment aren't detected.
 - Check the FREE99 `max_redemptions` setting in the Stripe dashboard.
-- `routes/pitch-review-checkout.ts` `UUID` pattern has only 4 groups (8-4-4-12), so the guest visitor-cookie fallback never matches a real visitor ID. Guests rely on the checkout proof instead. Fixing it would re-enable that fallback; decide before changing it.

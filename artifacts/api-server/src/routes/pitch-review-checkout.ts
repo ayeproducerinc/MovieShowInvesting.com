@@ -13,7 +13,7 @@ import { requireAccountAgeConfirmation } from "../lib/age-confirmation";
 import { perIpLimit } from "../lib/rate-limit";
 
 const router: IRouter = Router();
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // The done page polls status every 20s (~15 per 5 minutes); these leave ample headroom.
 const configLimit = perIpLimit({ limit: 60, windowMs: 300_000, message: "Too many checkout checks. Please try again in a few minutes." });
 const statusLimit = perIpLimit({ limit: 60, windowMs: 300_000, message: "Too many checkout status checks. Please try again in a few minutes." });
