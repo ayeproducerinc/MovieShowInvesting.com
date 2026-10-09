@@ -47,3 +47,16 @@ CREATE TABLE IF NOT EXISTS project_update_emails (
 -- A backer can never get the same update twice.
 CREATE UNIQUE INDEX IF NOT EXISTS project_update_emails_update_investor_unique
   ON project_update_emails (update_id, investor_id);
+
+-- Update-email preference: on by default for confirmed backers; each change is
+-- recorded (append-only) and the latest one wins. Added 2026-10-09.
+CREATE TABLE IF NOT EXISTS project_update_email_events (
+  id serial PRIMARY KEY,
+  investor_id integer NOT NULL REFERENCES investors(id) ON DELETE CASCADE,
+  allowed boolean NOT NULL,
+  source text NOT NULL,
+  recorded_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT project_update_email_events_source_check CHECK (source IN ('email_link', 'lineup'))
+);
+CREATE INDEX IF NOT EXISTS project_update_email_events_investor_idx
+  ON project_update_email_events (investor_id, recorded_at);

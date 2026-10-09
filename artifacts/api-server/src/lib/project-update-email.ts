@@ -3,6 +3,7 @@ import { recordTransactionalEmailStatus, sendTransactionalEmailDetailed } from "
 import { logger } from "./logger";
 import { CONSENTING_BACKERS_SQL, emailDecision, milestoneLabel, TEAM_ROLES } from "./project-updates";
 import { buildUpdateEmail, EMAIL_TYPE, increaseUrl } from "./project-update-email-content";
+import { optOutUrl } from "./update-email-preference";
 
 /** Any connected client (pool or transaction client) that can run queries. */
 type DbClient = Pick<typeof pool, "query">;
@@ -32,7 +33,7 @@ export async function queueUpdateEmails(client: DbClient, updateId: number, proj
 type ClaimedRow = {
   id: number; email: string | null; project_title: string | null; project_slug: string | null;
   milestone_key: string; custom_label: string | null; role: string | null; person_name: string | null;
-  name_consent: boolean; note: string | null; update_id: number; pledge_amount: number;
+  name_consent: boolean; note: string | null; update_id: number; investor_id: number; pledge_amount: number;
 };
 
 /** After commit. Claims each row before contacting the provider; never retries an uncertain send. */
@@ -43,7 +44,7 @@ export async function deliverUpdateEmails(emailIds: number[]): Promise<void> {
        update project_update_emails set email_status = 'sending'
        where id = any($1::int[]) and email_status = 'pending'
        returning id, update_id, investor_id)
-     select c.id, c.update_id, i.email, p.title as project_title, p.slug as project_slug,
+     select c.id, c.update_id, c.investor_id, i.email, p.title as project_title, p.slug as project_slug,
        u.milestone_key, u.custom_label, u.role, u.person_name, u.name_consent, u.note,
        coalesce((select sum(pl.amount) from pledges pl
          where pl.investor_id = c.investor_id and pl.project_id = u.project_id and pl.confirmed = true), 0)::int as pledge_amount
@@ -56,10 +57,12 @@ export async function deliverUpdateEmails(emailIds: number[]): Promise<void> {
   for (const row of rows) {
     const email = row.email?.trim() ?? "";
     const buttonUrl = row.project_slug ? increaseUrl(process.env.PUBLIC_APP_URL, row.project_slug, row.update_id) : null;
+    // Every email carries a one-click way to turn update emails off; never send without it.
+    const turnOffUrl = optOutUrl(process.env.PUBLIC_APP_URL, row.investor_id, process.env.SESSION_SECRET);
     let status: "sent" | "failed" | "unconfigured" = "unconfigured";
     let uncertain = false;
     try {
-      if (email && buttonUrl) {
+      if (email && buttonUrl && turnOffUrl) {
         const content = buildUpdateEmail({
           projectTitle: row.project_title || "A project you backed",
           milestone: milestoneLabel(row.milestone_key, row.custom_label),
@@ -68,12 +71,13 @@ export async function deliverUpdateEmails(emailIds: number[]): Promise<void> {
           note: row.note,
           pledgeAmount: row.pledge_amount,
           buttonUrl,
+          turnOffUrl,
         });
         const outcome = await sendTransactionalEmailDetailed({ to: email, type: EMAIL_TYPE, ...content });
         status = outcome.status;
         uncertain = outcome.uncertain;
       } else if (email) {
-        // No public app URL for the button: log as unconfigured rather than send a broken email.
+        // No public app URL or secret for the links: log as unconfigured rather than send a broken email.
         await recordTransactionalEmailStatus(email, EMAIL_TYPE, "unconfigured");
       }
     } catch {

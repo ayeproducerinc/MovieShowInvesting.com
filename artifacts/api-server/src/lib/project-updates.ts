@@ -152,18 +152,16 @@ export function filmmakerUpdateView(row: UpdateRow) {
 }
 
 /**
- * Rule d: confirmed backers of the project whose latest notification-permission
- * record is "allowed". A missing record is not consent.
+ * Rule d (revised 2026-10-09): update emails are on by default for every confirmed
+ * backer of the project, unless their latest update-email preference is "off".
  */
 export const CONSENTING_BACKERS_SQL = `
-  select distinct i.id as investor_id
+  select distinct pl.investor_id
   from pledges pl
-  join investors i on i.id = pl.investor_id
-  join lateral (
-    select ev.allowed from investor_notification_events ev
-    where (ev.provider = 'firebase' and ev.uid = i.firebase_uid)
-       or (ev.provider = 'replit' and ev.uid = i.replit_uid)
+  left join lateral (
+    select ev.allowed from project_update_email_events ev
+    where ev.investor_id = pl.investor_id
     order by ev.recorded_at desc, ev.id desc
     limit 1
   ) latest on true
-  where pl.project_id = $1 and pl.confirmed = true and latest.allowed = true`;
+  where pl.project_id = $1 and pl.confirmed = true and coalesce(latest.allowed, true)`;

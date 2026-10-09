@@ -8,6 +8,7 @@ import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { InvestorResultCard } from '@/components/investor-result-card';
 import { InvestorNotificationPermissionControl } from '@/components/investor-notification-permission';
+import { UpdateEmailsToggle } from '@/components/update-emails-toggle';
 import '../investor.css';
 import '../lineup.css';
 
@@ -123,6 +124,7 @@ export default function Lineup() {
         {confirmed ? null : signedIn ? <div className="lineup-confirm-callout"><div><p className="inv-kicker">Finish your worksheet</p><h2>Review and submit once.</h2><p>Your interest is saved but unsigned. Finish the worksheet and confirm once in its final review, before Submit. No extra confirmation screen follows.</p></div><div className="inv-actions"><Link href="/invest?revise=1" className="inv-button" data-testid="link-lineup-confirm">Finish & submit interest <ArrowRight size={16}/></Link><Link href={`/invest?revise=1${intent.allocations[0]?.project_slug ? `&project=${encodeURIComponent(intent.allocations[0].project_slug)}` : ''}`} className="inv-button secondary" data-testid="link-lineup-revise">Revise saved interest</Link></div></div> : <div className="lineup-confirm-callout"><div><p className="inv-kicker">Next step / Sign in</p><h2>Sign in to finish.</h2><p>This guest interest is saved, but confirmation needs an account. After signing in, explicitly claim it from this original browser if it is not linked.</p></div><GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-lineup-confirm-sign-in" label="Sign in to continue" /></div>}
        {confirmed && latestConfirmedEntry && <InvestorResultCard entry={latestConfirmedEntry}/>}
        <InvestorNotificationPermissionControl/>
+       {signedIn && <UpdateEmailsToggle identityId={identityId}/>}
       <details open={!confirmed} data-testid="details-lineup-projects" className="lineup-fold"><summary style={{cursor:'pointer',fontWeight:600}}>{confirmed ? 'Project links and current figures' : 'Project choices'}</summary><div className="lineup-section-head"><div><p className="inv-kicker">Project choices</p><h2>{intent.unallocated ? 'Not allocated yet.' : 'Where your interest goes.'}</h2></div><span>{intent.allocations.length} {intent.allocations.length === 1 ? 'project' : 'projects'}</span></div>
       {intent.unallocated ? <div className="lineup-unallocated" data-testid="lineup-unallocated"><strong>{dollars(intent.amount)} unallocated</strong><p>You {confirmed ? 'confirmed' : 'saved'} interest without choosing a project. No project allocation has been recorded.</p></div> :
       intent.allocations.length ? <>

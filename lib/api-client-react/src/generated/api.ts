@@ -105,6 +105,8 @@ import type {
   InvestorMatches,
   InvestorNotificationInput,
   InvestorNotificationPermission,
+  InvestorUpdateEmails,
+  InvestorUpdateEmailsInput,
   LocationSearchPayload,
   MessagingConfig,
   PriceGroup,
@@ -130,6 +132,7 @@ import type {
   SearchLocationsParams,
   SiteStats,
   StartPitchReviewCheckout200,
+  TurnOffUpdateEmailsParams,
   UploadFilmmakerDraftImageParams,
   UploadFilmmakerImageParams,
   UploadFilmmakerProjectImageParams,
@@ -3646,6 +3649,255 @@ export function useGetPublicProjectUpdates<TData = Awaited<ReturnType<typeof get
 
 
 
+
+export const getTurnOffUpdateEmailsUrl = (params: TurnOffUpdateEmailsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/update-emails/off?${stringifiedParams}` : `/api/update-emails/off`
+}
+
+/**
+ * @summary One-click link from an update email; turns project update emails off for that backer only
+ */
+export const turnOffUpdateEmails = async (params: TurnOffUpdateEmailsParams, options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getTurnOffUpdateEmailsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getTurnOffUpdateEmailsQueryKey = (params?: TurnOffUpdateEmailsParams,) => {
+    return [
+    `/api/update-emails/off`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getTurnOffUpdateEmailsQueryOptions = <TData = Awaited<ReturnType<typeof turnOffUpdateEmails>>, TError = ErrorType<void>>(params: TurnOffUpdateEmailsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof turnOffUpdateEmails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getTurnOffUpdateEmailsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof turnOffUpdateEmails>>> = ({ signal }) => turnOffUpdateEmails(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof turnOffUpdateEmails>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type TurnOffUpdateEmailsQueryResult = NonNullable<Awaited<ReturnType<typeof turnOffUpdateEmails>>>
+export type TurnOffUpdateEmailsQueryError = ErrorType<void>
+
+
+/**
+ * @summary One-click link from an update email; turns project update emails off for that backer only
+ */
+
+export function useTurnOffUpdateEmails<TData = Awaited<ReturnType<typeof turnOffUpdateEmails>>, TError = ErrorType<void>>(
+ params: TurnOffUpdateEmailsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof turnOffUpdateEmails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getTurnOffUpdateEmailsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetInvestorUpdateEmailsUrl = () => {
+
+
+
+
+  return `/api/investor/update-emails`
+}
+
+/**
+ * @summary Whether project update emails are on for the signed-in backer (on by default)
+ */
+export const getInvestorUpdateEmails = async ( options?: Parameters<typeof customFetch>[1]): Promise<InvestorUpdateEmails> => {
+
+  return customFetch<InvestorUpdateEmails>(getGetInvestorUpdateEmailsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInvestorUpdateEmailsQueryKey = () => {
+    return [
+    `/api/investor/update-emails`
+    ] as const;
+    }
+
+
+export const getGetInvestorUpdateEmailsQueryOptions = <TData = Awaited<ReturnType<typeof getInvestorUpdateEmails>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvestorUpdateEmails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInvestorUpdateEmailsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInvestorUpdateEmails>>> = ({ signal }) => getInvestorUpdateEmails({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInvestorUpdateEmails>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInvestorUpdateEmailsQueryResult = NonNullable<Awaited<ReturnType<typeof getInvestorUpdateEmails>>>
+export type GetInvestorUpdateEmailsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Whether project update emails are on for the signed-in backer (on by default)
+ */
+
+export function useGetInvestorUpdateEmails<TData = Awaited<ReturnType<typeof getInvestorUpdateEmails>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvestorUpdateEmails>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInvestorUpdateEmailsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetInvestorUpdateEmailsUrl = () => {
+
+
+
+
+  return `/api/investor/update-emails`
+}
+
+/**
+ * @summary Turn project update emails on or off for the signed-in backer
+ */
+export const setInvestorUpdateEmails = async (investorUpdateEmailsInput: InvestorUpdateEmailsInput, options?: Parameters<typeof customFetch>[1]): Promise<InvestorUpdateEmails> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InvestorUpdateEmails>(getSetInvestorUpdateEmailsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(investorUpdateEmailsInput)
+  }
+);}
+
+
+
+
+
+export const getSetInvestorUpdateEmailsMutationKey = () => ['setInvestorUpdateEmails'] as const;
+
+export const getSetInvestorUpdateEmailsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setInvestorUpdateEmails>>, TError,SetInvestorUpdateEmailsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setInvestorUpdateEmails>>, TError,SetInvestorUpdateEmailsMutationVariables, TContext> => {
+
+const mutationKey = getSetInvestorUpdateEmailsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setInvestorUpdateEmails>>, SetInvestorUpdateEmailsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  setInvestorUpdateEmails(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetInvestorUpdateEmailsMutationResult = NonNullable<Awaited<ReturnType<typeof setInvestorUpdateEmails>>>
+    export type SetInvestorUpdateEmailsMutationBody = BodyType<InvestorUpdateEmailsInput>
+    export type SetInvestorUpdateEmailsMutationError = ErrorType<void>
+    export type SetInvestorUpdateEmailsMutationVariables = {data: BodyType<InvestorUpdateEmailsInput>}
+
+    /**
+ * @summary Turn project update emails on or off for the signed-in backer
+ */
+export const useSetInvestorUpdateEmails = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setInvestorUpdateEmails>>, TError,SetInvestorUpdateEmailsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setInvestorUpdateEmails>>,
+        TError,
+        SetInvestorUpdateEmailsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetInvestorUpdateEmailsMutationOptions(options));
+    }
 
 export const getSelectFilmmakerProjectUrl = (projectId: number,) => {
 

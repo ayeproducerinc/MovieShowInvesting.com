@@ -7,8 +7,11 @@ import {
   GetFilmmakerProjectUpdatesParams, GetFilmmakerProjectUpdatesResponse,
   GetPublicProjectUpdatesParams, GetPublicProjectUpdatesResponse,
   RejectAdminProjectUpdateParams, RejectAdminProjectUpdateResponse,
+  GetInvestorUpdateEmailsResponse, SetInvestorUpdateEmailsBody, SetInvestorUpdateEmailsResponse,
+  TurnOffUpdateEmailsQueryParams,
 } from "@workspace/api-zod";
-import { authenticateFilmmaker } from "../lib/filmmaker-auth";
+import { authenticateFilmmaker, resolveProtectedIdentity } from "../lib/filmmaker-auth";
+import { LATEST_PREFERENCE_SQL, verifyOptOutToken } from "../lib/update-email-preference";
 import { authorizeAdminIdentity } from "../lib/admin-auth";
 import { perIpLimit } from "../lib/rate-limit";
 import { acceptsPledges } from "../lib/pledge-policy";
@@ -189,6 +192,60 @@ router.get("/projects/:slug/updates", async (req, res): Promise<void> => {
     updates: rows.map(publicUpdateView),
     listed_at: listedAt?.toISOString() ?? null,
   }));
+});
+
+// Update emails are on by default for backers and can be turned off (rule d, revised).
+const optOutLimit = perIpLimit({ limit: 60, windowMs: 300_000, message: "Too many requests. Please try again in a few minutes." });
+const page = (title: string, body: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${title}</title></head><body style="font-family:system-ui,sans-serif;background:#f6f2ea;color:#202936;max-width:560px;margin:60px auto;padding:0 16px;line-height:1.6"><h1 style="font-size:28px">${title}</h1><p>${body}</p></body></html>`;
+
+router.get("/update-emails/off", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "no-store");
+  if (!optOutLimit(req, res)) return;
+  const query = TurnOffUpdateEmailsQueryParams.safeParse(req.query);
+  const secret = process.env.SESSION_SECRET;
+  if (!query.success || !secret || !verifyOptOutToken(query.data.i, query.data.t, secret)) {
+    res.status(400).type("html").send(page("This link isn’t valid", "Open the most recent update email and use its link, or turn update emails off from My lineup after signing in."));
+    return;
+  }
+  await pool.query(
+    "insert into project_update_email_events (investor_id, allowed, source) values ($1, false, 'email_link')",
+    [query.data.i],
+  );
+  res.type("html").send(page("Update emails are off", "You won’t get project update emails anymore. Your pledges are unchanged. You can turn update emails back on from My lineup."));
+});
+
+async function investorIdFor(provider: "firebase" | "replit", uid: string): Promise<number | null> {
+  const column = provider === "firebase" ? "firebase_uid" : "replit_uid";
+  const { rows } = await pool.query<{ id: number }>(`select id from investors where ${column} = $1 limit 1`, [uid]);
+  return rows[0]?.id ?? null;
+}
+
+async function preferenceView(investorId: number | null) {
+  if (!investorId) return { enabled: true, has_investor_record: false };
+  const { rows } = await pool.query<{ allowed: boolean }>(LATEST_PREFERENCE_SQL, [investorId]);
+  return { enabled: rows[0]?.allowed ?? true, has_investor_record: true };
+}
+
+router.get("/investor/update-emails", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const identity = await resolveProtectedIdentity(req, res, true);
+  if (!identity) return;
+  res.json(GetInvestorUpdateEmailsResponse.parse(await preferenceView(await investorIdFor(identity.provider, identity.uid))));
+});
+
+router.put("/investor/update-emails", async (req, res): Promise<void> => {
+  res.set("Cache-Control", "private, no-store");
+  const identity = await resolveProtectedIdentity(req, res, true);
+  if (!identity) return;
+  const body = SetInvestorUpdateEmailsBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Choose on or off." }); return; }
+  const investorId = await investorIdFor(identity.provider, identity.uid);
+  if (!investorId) { res.status(404).json({ error: "There’s no pledge on this account yet." }); return; }
+  await pool.query(
+    "insert into project_update_email_events (investor_id, allowed, source) values ($1, $2, 'lineup')",
+    [investorId, body.data.enabled],
+  );
+  res.json(SetInvestorUpdateEmailsResponse.parse(await preferenceView(investorId)));
 });
 
 export default router;

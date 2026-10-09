@@ -54,3 +54,16 @@ export const insertProjectUpdateSchema = createInsertSchema(projectUpdatesTable)
 export type InsertProjectUpdate = z.infer<typeof insertProjectUpdateSchema>;
 export type ProjectUpdate = typeof projectUpdatesTable.$inferSelect;
 export type ProjectUpdateEmail = typeof projectUpdateEmailsTable.$inferSelect;
+
+/** Update-email preference events: on by default; latest wins; "off" stops emails. */
+export const projectUpdateEmailEventsTable = pgTable("project_update_email_events", {
+  id: serial("id").primaryKey(),
+  investorId: integer("investor_id").notNull().references(() => investorsTable.id, { onDelete: "cascade" }),
+  allowed: boolean("allowed").notNull(),
+  source: text("source").notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("project_update_email_events_investor_idx").on(table.investorId, table.recordedAt),
+  check("project_update_email_events_source_check", sql`${table.source} in ('email_link', 'lineup')`),
+]);
+export type ProjectUpdateEmailEvent = typeof projectUpdateEmailEventsTable.$inferSelect;

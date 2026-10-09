@@ -20,20 +20,23 @@ export type UpdateEmailContent = {
   note: string | null;
   pledgeAmount: number;
   buttonUrl: string;
+  /** One-click link that only turns update emails off. */
+  turnOffUrl: string;
 };
 
 export function buildUpdateEmail(content: UpdateEmailContent) {
   const who = [content.role, content.personName].filter(Boolean).join(": ");
   const headline = `${content.milestone}${who ? ` (${who})` : ""}`;
   const pledge = `Your confirmed non-binding pledge to this project: ${dollars(content.pledgeAmount)}. ${RISK_LINE}`;
-  const settings = "You're getting this because you allowed update emails for projects you've backed. You can turn them off on My lineup.";
+  const settings = "You're getting this because you backed this project. Update emails are on for backers; you can turn them off anytime.";
+  const turnOff = "Turn off update emails";
   const subject = `${content.projectTitle}: ${headline}`;
   const text = [
     `${content.projectTitle} has a new update: ${headline}.`,
     content.note ?? "",
     pledge,
     `${BUTTON_LABEL}: ${content.buttonUrl}`,
-    settings,
+    `${settings} ${turnOff}: ${content.turnOffUrl}`,
     FOOTER_LINE,
   ].filter(Boolean).join("\n\n");
   const html = [
@@ -41,7 +44,7 @@ export function buildUpdateEmail(content: UpdateEmailContent) {
     content.note ? `<p>${escape(content.note).replace(/\n/g, "<br>")}</p>` : "",
     `<p>${escape(pledge)}</p>`,
     `<p><a href="${escape(content.buttonUrl)}" style="display:inline-block;padding:12px 20px;background:#7a3f4c;color:#ffffff;text-decoration:none;font-weight:700">${BUTTON_LABEL}</a></p>`,
-    `<p style="color:#6d6b66;font-size:13px">${escape(settings)}</p>`,
+    `<p style="color:#6d6b66;font-size:13px">${escape(settings)} <a href="${escape(content.turnOffUrl)}" style="color:#6d6b66">${turnOff}</a>.</p>`,
     `<p style="color:#6d6b66;font-size:13px">${escape(FOOTER_LINE)}</p>`,
   ].filter(Boolean).join("");
   return { subject, text, html };

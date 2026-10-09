@@ -985,6 +985,71 @@ paths:
                 $ref: "#/components/schemas/PublicProjectUpdates"
         "404":
           description: Project not found
+  /update-emails/off:
+    get:
+      operationId: turnOffUpdateEmails
+      tags: [investor]
+      summary: One-click link from an update email; turns project update emails off for that backer only
+      parameters:
+        - name: i
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: t
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Update emails turned off
+          content:
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: The link is not valid
+  /investor/update-emails:
+    get:
+      operationId: getInvestorUpdateEmails
+      tags: [investor]
+      summary: Whether project update emails are on for the signed-in backer (on by default)
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Current preference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestorUpdateEmails"
+        "401":
+          description: Verified sign-in required
+    put:
+      operationId: setInvestorUpdateEmails
+      tags: [investor]
+      summary: Turn project update emails on or off for the signed-in backer
+      security:
+        - firebaseBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestorUpdateEmailsInput"
+      responses:
+        "200":
+          description: Preference saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestorUpdateEmails"
+        "401":
+          description: Verified sign-in required
+        "404":
+          description: No investor record for this account
   /filmmakers/projects/{project_id}/select:
     post:
       operationId: selectFilmmakerProject
@@ -3557,6 +3622,19 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AdminProjectUpdate"
+    InvestorUpdateEmails:
+      type: object
+      additionalProperties: false
+      required: [enabled, has_investor_record]
+      properties:
+        enabled: { type: boolean, description: "On by default; false only after the backer turned update emails off" }
+        has_investor_record: { type: boolean }
+    InvestorUpdateEmailsInput:
+      type: object
+      additionalProperties: false
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
     ExploreProject:
       type: object
       additionalProperties: false

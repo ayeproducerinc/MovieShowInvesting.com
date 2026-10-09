@@ -1304,6 +1304,16 @@ export interface AdminProjectUpdates {
   updates: AdminProjectUpdate[];
 }
 
+export interface InvestorUpdateEmails {
+  /** On by default; false only after the backer turned update emails off */
+  enabled: boolean;
+  has_investor_record: boolean;
+}
+
+export interface InvestorUpdateEmailsInput {
+  enabled: boolean;
+}
+
 export interface ExploreProject {
   /** Backers who chose public display; only on approved, listed projects */
   public_backers?: PublicBacker[];
@@ -1954,6 +1964,14 @@ export const GetAdminProjectUpdatesStatus = {
   approved: 'approved',
   rejected: 'rejected',
 } as const;
+
+export type TurnOffUpdateEmailsParams = {
+/**
+ * @minimum 1
+ */
+i: number;
+t: string;
+};
 
 export type UploadFilmmakerDraftImageParams = {
 kind: UploadFilmmakerDraftImageKind;

@@ -611,6 +611,7 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
               <p><strong data-testid="review-interest-total">{dollars(a.amount)}</strong> in non-binding interest.</p>
               {a.unallocated ? <p data-testid="review-interest-unallocated">The full amount is unallocated; you have not selected projects.</p> : <ul>{a.lineup.map(row=><li key={row.project_id} data-testid={`review-allocation-${row.project_id}`}>{available.find(project=>project.id===row.project_id)?.title ?? `Project #${row.project_id}`} — {dollars(row.amount)}</li>)}</ul>}
               <p data-testid="text-backer-notice"><strong>The filmmaker will see your name, email and pledge amount.</strong></p>
+              <p data-testid="text-update-emails-notice">You’ll get an email when a project you back posts an update. You can turn these off anytime.</p>
               <label className="lineup-check"><input type="checkbox" data-testid="checkbox-public-display" checked={publicDisplay} onChange={event=>setPublicDisplay(event.target.checked)}/><span>Show my name and pledge amount publicly on this project's page and in Explore.</span></label>
               <p>This confirmation applies only to the amount and project allocations shown here. You can change your mind; this is not a contract, investment or authorization to charge you.</p>
               <Field id="interest-signature" label={`Signature · type your full name exactly: ${a.name.trim() || 'enter your name above'}`} value={signature} onChange={setSignature} required/>

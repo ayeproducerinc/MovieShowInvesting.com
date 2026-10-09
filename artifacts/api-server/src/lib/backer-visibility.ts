@@ -33,9 +33,15 @@ function sawNotice(row: BackerRow): boolean {
   return row.evidence?.backer_notice_version === BACKER_NOTICE_VERSION;
 }
 
+/** Shown at signing: update emails are on by default for backers (rule d, revised 2026-10-09). */
+export const UPDATE_EMAILS_NOTICE = "You'll get an email when a project you back posts an update. You can turn these off anytime.";
+
 /** Evidence fields recorded with a new signature. */
 export function backerEvidence(publicDisplay: boolean) {
-  return { backer_notice_version: BACKER_NOTICE_VERSION, backer_notice: BACKER_NOTICE, public_display: publicDisplay };
+  return {
+    backer_notice_version: BACKER_NOTICE_VERSION, backer_notice: BACKER_NOTICE, public_display: publicDisplay,
+    update_emails_notice: UPDATE_EMAILS_NOTICE,
+  };
 }
 
 /** The filmmaker's private list: one row per signed pledge, newest first. */

@@ -1135,6 +1135,42 @@ export const GetPublicProjectUpdatesResponse = zod.object({
 
 
 /**
+ * @summary One-click link from an update email; turns project update emails off for that backer only
+ */
+
+
+
+export const TurnOffUpdateEmailsQueryParams = zod.object({
+  "i": zod.coerce.number().int().min(1),
+  "t": zod.coerce.string()
+})
+
+export const TurnOffUpdateEmailsResponse = zod.unknown()
+
+
+/**
+ * @summary Whether project update emails are on for the signed-in backer (on by default)
+ */
+export const GetInvestorUpdateEmailsResponse = zod.object({
+  "enabled": zod.boolean().describe('On by default; false only after the backer turned update emails off'),
+  "has_investor_record": zod.boolean()
+})
+
+
+/**
+ * @summary Turn project update emails on or off for the signed-in backer
+ */
+export const SetInvestorUpdateEmailsBody = zod.object({
+  "enabled": zod.boolean()
+})
+
+export const SetInvestorUpdateEmailsResponse = zod.object({
+  "enabled": zod.boolean().describe('On by default; false only after the backer turned update emails off'),
+  "has_investor_record": zod.boolean()
+})
+
+
+/**
  * @summary Select an account-owned project for the existing visitor-scoped editing routes
  */
 

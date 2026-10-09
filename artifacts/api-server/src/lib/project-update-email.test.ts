@@ -5,7 +5,14 @@ import { buildUpdateEmail, increaseUrl, BUTTON_LABEL, FOOTER_LINE, RISK_LINE } f
 const content = {
   projectTitle: "Night Shift", milestone: "Team member joined", role: "Director", personName: "Ava Lee",
   note: "We found our director.", pledgeAmount: 250, buttonUrl: "https://example.com/project/night-shift?increase=7",
+  turnOffUrl: "https://example.com/api/update-emails/off?i=3&t=abc",
 };
+
+test("every email has a one-click way to turn update emails off", () => {
+  const email = buildUpdateEmail(content);
+  assert.ok(email.text.includes("Turn off update emails: https://example.com/api/update-emails/off?i=3&t=abc"));
+  assert.ok(email.html.includes('href="https://example.com/api/update-emails/off?i=3&amp;t=abc"'));
+});
 
 test("the email carries the project, milestone, approved note and the backer's own pledge with the risk line beside it", () => {
   const email = buildUpdateEmail(content);
@@ -17,7 +24,9 @@ test("the email carries the project, milestone, approved note and the backer's o
 
 test("there is exactly one button, Increase my pledge", () => {
   const email = buildUpdateEmail(content);
-  assert.equal((email.html.match(/<a /g) ?? []).length, 1);
+  // One button-styled link; the only other link is the plain "Turn off update emails".
+  assert.equal((email.html.match(/<a [^>]*background:/g) ?? []).length, 1);
+  assert.equal((email.html.match(/<a /g) ?? []).length, 2);
   assert.ok(email.html.includes(`>${BUTTON_LABEL}</a>`));
   for (const banned of [/still in/i, /step back/i, /withdraw/i, /re-?confirm/i]) {
     assert.doesNotMatch(email.text, banned);
