@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getGetMyReferralsQueryKey, useCaptureReferral, useGetMyReferrals } from '@workspace/api-client-react';
 import { getInitializedAuth, useFirebaseSessionReady } from '@/components/firebase-bootstrap';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
+import { filmmakerInviteUrl } from '@/components/project-share';
 import { useReferralIdentity } from '@/components/referral-claim';
 import { REFERRAL_CODE_PATTERN, useReferralClaim, referralCaptureSaved } from '@/lib/referral-attribution';
 import '../referrals.css';
@@ -58,7 +59,7 @@ function Member({ identity }: { identity: string }) {
   const [copyFailed, setCopyFailed] = useState(false);
   const q = useGetMyReferrals({ query: { queryKey: [...getGetMyReferralsQueryKey(), identity], enabled: claim.identity === identity && claim.status === 'done', retry: false, staleTime: 30_000, refetchOnWindowFocus: true } });
   const d = q.data;
-  const link = d ? `${window.location.origin}${import.meta.env.BASE_URL}?ref=${encodeURIComponent(d.code)}` : '';
+  const link = d ? filmmakerInviteUrl(d.code) : '';
   async function copy() {
     setCopyFailed(false);
     try { await navigator.clipboard.writeText(link); setCopied(true); window.setTimeout(() => setCopied(false), 2000); } catch { setCopied(false); setCopyFailed(true); }
