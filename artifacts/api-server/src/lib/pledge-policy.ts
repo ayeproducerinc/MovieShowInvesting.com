@@ -19,7 +19,7 @@ const PLEDGE_STAGES = ["idea", "production", "distribution"];
  * pledges while it is not hidden, whether or not it is approved. A projects row
  * exists only after final submission; drafts live in flow_progress.
  */
-export function acceptsPledges(project: { hidden: boolean; stage: string | null }): boolean {
+export function acceptsPledges(project: { hidden?: boolean | null; stage: string | null }): boolean {
   return !project.hidden && PLEDGE_STAGES.includes(project.stage ?? "");
 }
 

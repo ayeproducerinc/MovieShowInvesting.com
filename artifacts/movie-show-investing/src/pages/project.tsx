@@ -87,21 +87,20 @@ export default function Project() {
   const trailerEmbed = bunnyEmbed || youtubeEmbed;
   const filmmakerName = data.public_filmmaker_name?.trim() || null;
   const labels = [data.format, data.genre, data.stage].filter(Boolean).join(' / ');
-  const eligible = data.approved && data.showcase_requested && ['idea', 'production', 'distribution'].includes(data.stage || '');
   const panel = pledgePanel(data);
   const intent = current.data?.intent;
   const previousHere = current.data?.history.some(entry => entry.allocations.some(row => row.project_id === data.id));
   // one=1 opens the two-screen, single-project pledge (DECISIONS.md › Investor pledge limits).
   const target = `/invest?project=${encodeURIComponent(data.slug)}&one=1`;
-  const pitchDeckUrl = eligible ? safeUrl(data.pitch_deck_url) : null;
+  const pitchDeckUrl = panel.show ? safeUrl(data.pitch_deck_url) : null;
   const published = data.approved && data.showcase_requested;
   const synopsis = data.synopsis?.trim() || '';
   const longStory = synopsis.length > 700;
   const storyText = longStory && !storyOpen ? `${synopsis.slice(0, 640).trimEnd()}…` : synopsis;
-  const terms = eligible && (data.proposal || data.budget);
+  const terms = panel.show && (data.proposal || data.budget);
   return <section className="dossier pj"><div className="pj-wrap">
     <SecuritiesNotice/>
-    <div className="pj-nav"><Link href="/explore" className="pj-back" data-testid="link-project-back"><ArrowLeft size={15}/> Back to Explore</Link>{eligible && !data.is_owner && <a href="#section-project-share" className="pj-share" data-testid="link-project-share-anchor"><Share2 size={14}/> Share</a>}</div>
+    <div className="pj-nav"><Link href="/explore" className="pj-back" data-testid="link-project-back"><ArrowLeft size={15}/> Back to Explore</Link>{panel.show && !data.is_owner && <a href="#section-project-share" className="pj-share" data-testid="link-project-share-anchor"><Share2 size={14}/> Share</a>}</div>
     <header className="pj-head"><p className="dossier-kicker">{labels || 'Independent project'} / Prelaunch</p><h1 className="pj-title" data-testid="text-project-title">{data.title}</h1>{data.logline && <p className="pj-logline" data-testid="text-project-logline">{data.logline}</p>}<div className="pj-by" data-testid="row-project-filmmaker">{filmmakerName ? <p className="pj-by-name" data-testid="text-project-filmmaker">Filmmaker: <strong>{filmmakerName}</strong></p> : <p className="pj-by-name pj-by-missing" data-testid="text-project-filmmaker-missing">Filmmaker: public name not provided</p>}{data.is_owner ? <Link href="/messages" className="dossier-button dossier-button-outline pj-contact-btn" data-testid="link-project-messages">View messages <ArrowUpRight size={16}/></Link> : <ProjectContactDialog key={`${data.slug}:${identityId}`} resetKey={`${data.slug}:${identityId}`} slug={data.slug} title={data.title} filmmakerName={filmmakerName}/>}</div>{data.is_owner && <p className="dossier-status" data-testid="badge-owned-project">Your project · This is how visitors see its public page.</p>}{data.is_owner && <div style={{ marginTop: 14 }}><Link href="/me/projects" className="dossier-button" data-testid="link-project-manage">Manage project <ArrowUpRight size={16}/></Link></div>}</header>
     <div className="pj-media">
       {trailerEmbed ? <><div className="dossier-video"><iframe key={trailerEmbed} src={trailerEmbed} title={`${data.title} trailer`} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" allow="accelerometer; gyroscope; encrypted-media; picture-in-picture; fullscreen" allowFullScreen data-testid="iframe-project-trailer" /></div><p className="dossier-status">Player not working? <a href={youtubeEmbed ? trailer! : bunnyEmbed!} target="_blank" rel="noopener noreferrer" data-testid="link-project-trailer">{youtubeEmbed ? 'Open on YouTube' : 'Open the trailer in a new tab'} <ArrowUpRight size={14} style={{ display: 'inline' }}/></a></p></>
@@ -131,9 +130,9 @@ export default function Project() {
       {data.distribution_plan && <><span className="dossier-kicker">Distribution</span><p>{data.distribution_plan}</p></>}
       {data.money_use && <><span className="dossier-kicker">Planned use of funds</span><p>{data.money_use}</p></>}
     </details>}
-    {pitchDeckUrl && <section className="dossier-section pj-sec"><a href={pitchDeckUrl} target="_blank" rel="noopener noreferrer" className="dossier-button dossier-button-outline" data-testid="link-project-pitch-deck">View pitch deck <ArrowUpRight size={16}/></a><p className="dossier-status">{data.pitch_deck_name || 'Pitch deck'} · Publicly viewable while this project remains eligible for Explore.</p></section>}
+    {pitchDeckUrl && <section className="dossier-section pj-sec"><a href={pitchDeckUrl} target="_blank" rel="noopener noreferrer" className="dossier-button dossier-button-outline" data-testid="link-project-pitch-deck">View pitch deck <ArrowUpRight size={16}/></a><p className="dossier-status">{data.pitch_deck_name || 'Pitch deck'} · Viewable by anyone with this page’s link while the project is available.</p></section>}
     {terms && <section className="dossier-section pj-sec" data-testid="section-project-proposal"><span className="dossier-kicker">The filmmaker’s proposed terms</span><h2>Budget and repayment.</h2>{data.budget != null && <p>Project budget: <strong>{money(data.budget)}</strong></p>}<div className="dossier-notice" role="note">These are the filmmaker’s proposed terms, not an offer. They are illustrative, revenue-dependent and not guaranteed.</div><details className="pj-terms"><summary>View full proposed terms</summary><ProposalSummary proposal={data.proposal} budget={data.budget} stage={data.stage} testId="project-proposal"/></details></section>}
-    {eligible && !data.is_owner && <div id="section-project-share"><ProjectShare audience="recipient" slug={data.slug} title={data.title} genre={data.genre} logline={data.logline} approved={data.approved} showcaseRequested={data.showcase_requested}/></div>}
+    {panel.show && !data.is_owner && <div id="section-project-share"><ProjectShare audience="recipient" slug={data.slug} title={data.title} genre={data.genre} logline={data.logline} approved={data.approved} showcaseRequested={data.showcase_requested}/></div>}
     <p className="dossier-status pj-disc">Project information is supplied by the filmmaker and may change. No money is collected on this page, and it does not offer securities. Returns aren’t guaranteed. You may get back less, or nothing.</p>
   </div></section>;
 }

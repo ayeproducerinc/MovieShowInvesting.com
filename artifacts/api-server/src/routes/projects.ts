@@ -8,6 +8,7 @@ import {
 } from "@workspace/api-zod";
 import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 import { serveFilmmakerPitchDeck } from "./filmmaker-draft-materials";
+import { acceptsPledges } from "../lib/pledge-policy";
 
 const router: IRouter = Router();
 const thumbnailCache = new Map<string, { expiresAt: number; url: string | null }>();
@@ -146,10 +147,13 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
   );
   const listingEligible = project.approved && project.showcaseRequested
     && ["idea", "production", "distribution"].includes(project.stage ?? "");
+  // Unlisted pages show everything a listed page shows; only Explore, the public
+  // total and search indexing depend on listing (DECISIONS.md › Product and scope).
+  const pageVisible = acceptsPledges(project);
   const response = {
     id: project.id,
-    budget: listingEligible || isOwner ? project.budget : null,
-    proposal: listingEligible || isOwner ? project.proposal : null,
+    budget: pageVisible || isOwner ? project.budget : null,
+    proposal: pageVisible || isOwner ? project.proposal : null,
     slug: project.slug,
     title: project.title,
     public_filmmaker_name: project.publicFilmmakerName?.trim() || null,
@@ -164,13 +168,13 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
       : [],
     money_use: project.moneyUse,
     distribution_plan: project.distributionPlan,
-    trailer_url: listingEligible ? safeWebUrl(project.trailerUrl) : null,
-    trailer_thumbnail_url: listingEligible ? await trailerThumbnail(project.trailerUrl) : null,
-    poster_url: listingEligible ? safeWebUrl(project.posterUrl) : null,
-    pitch_deck_url: listingEligible && project.pitchDeckStoragePath
+    trailer_url: pageVisible ? safeWebUrl(project.trailerUrl) : null,
+    trailer_thumbnail_url: pageVisible ? await trailerThumbnail(project.trailerUrl) : null,
+    poster_url: pageVisible ? safeWebUrl(project.posterUrl) : null,
+    pitch_deck_url: pageVisible && project.pitchDeckStoragePath
       ? `/api/projects/${encodeURIComponent(project.slug)}/pitch-deck`
       : null,
-    pitch_deck_name: listingEligible && project.pitchDeckStoragePath ? project.pitchDeckName : null,
+    pitch_deck_name: pageVisible && project.pitchDeckStoragePath ? project.pitchDeckName : null,
     // Before approval only the project's own filmmaker sees its confirmed total.
     confirmed_pledge_total: listingEligible ? project.confirmedPledgeTotal
       : isOwner ? await getConfirmedPledgeTotal(project.id) : 0,
@@ -201,7 +205,7 @@ router.get("/projects/:slug/share", async (req, res): Promise<void> => {
   const browserUrl = `${origin}/project/${encodeURIComponent(project.slug)}`;
   const eligible = project.approved && project.showcaseRequested
     && ["idea", "production", "distribution"].includes(project.stage ?? "");
-  const image = (eligible ? safeWebUrl(project.shareImageUrl) ?? safeWebUrl(project.posterUrl) : null)
+  const image = (acceptsPledges(project) ? safeWebUrl(project.shareImageUrl) ?? safeWebUrl(project.posterUrl) : null)
     ?? `${origin}${DEFAULT_SHARE_IMAGE}`;
   const description = (project.synopsis ?? project.logline ?? "Discover this independent film project.")
     .replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 300);
@@ -221,9 +225,8 @@ router.get("/projects/:slug/pitch-deck", async (req, res): Promise<void> => {
     return;
   }
   const project = await getPublicProjectBySlug(params.data.slug);
-  if (!project || !project.approved || !project.showcaseRequested
-    || !["idea", "production", "distribution"].includes(project.stage ?? "")
-    || !project.pitchDeckStoragePath) {
+  // Any visible project page (submitted, not hidden) offers its deck, listed or not.
+  if (!project || !acceptsPledges(project) || !project.pitchDeckStoragePath) {
     res.status(404).type("text/plain").send("Pitch deck is not publicly available.");
     return;
   }

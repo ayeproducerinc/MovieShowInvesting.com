@@ -561,7 +561,7 @@ export const DraftPitchMaterials = forwardRef<DraftPitchMaterialsHandle, DraftPi
     <h2>To create a stronger pitch, add any pitch trailers, a synopsis, a pitch deck, posters, or other pitch images you have.</h2>
     <p>These are optional. Your materials are saved to this {projectId ? 'project' : 'draft'} and can be changed or removed later. Editing approved listing materials may return the project to review.</p>
     <p className="dossier-status">Unchecking a box only hides its controls; it never deletes saved material. Clear synopsis text to remove it, or use a file’s explicit Remove action.</p>
-    <div className="dossier-notice" role="note" data-testid="text-pitch-deck-disclosure"><strong>Pitch deck visibility:</strong> If your pitch is approved for listing, its pitch deck will be publicly viewable from Explore. Do not include confidential or personal information. Public downloads cannot be recalled, even if you later remove the deck.</div>
+    <div className="dossier-notice" role="note" data-testid="text-pitch-deck-disclosure"><strong>Pitch deck visibility:</strong> Once your pitch is submitted, its pitch deck is viewable by anyone with your project page link, and from Explore if the pitch is approved for listing. Do not include confidential or personal information. Public downloads cannot be recalled, even if you later remove the deck.</div>
 
     {mediaConfig.isError && <div className="dossier-notice" role="status">Media upload requirements are temporarily unavailable. You can still save synopsis and trailer links. <button type="button" className="underline" data-testid="button-retry-material-config" onClick={() => void mediaConfig.refetch()}><RotateCcw size={14} style={{ display: 'inline' }}/> Check again</button></div>}
 
@@ -600,7 +600,7 @@ export const DraftPitchMaterials = forwardRef<DraftPitchMaterialsHandle, DraftPi
         <span>Do you have a pitch deck?</span>
       </label>
       {expanded.pitchDeck && <div style={{ marginTop: 15 }}>
-        <p className="dossier-status">One PDF · up to 20 MB. This deck may be publicly viewable from Explore if the pitch is approved for listing. Please keep confidential or personal information out of it.</p>
+        <p className="dossier-status">One PDF · up to 20 MB. Once submitted, this deck is viewable by anyone with your project page link, and from Explore if approved for listing. Please keep confidential or personal information out of it.</p>
         {fileControl('pitch-deck', 'Pitch deck (PDF)', 'application/pdf,.pdf', snapshot.pitch_deck_url, snapshot.pitch_deck_name)}
       </div>}
     </div>

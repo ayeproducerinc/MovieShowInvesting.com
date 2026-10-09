@@ -172,8 +172,8 @@ function InvestorWorksheet({ identityId, expectedOwner, signedInEmail }: { ident
     id:publicTarget.data.id, slug:publicTarget.data.slug, title:publicTarget.data.title, logline:publicTarget.data.logline ?? null,
     format:publicTarget.data.format ?? null, genre:publicTarget.data.genre ?? null, stage:publicTarget.data.stage ?? null,
     poster_url:null, pitch_deck_url:null, pitch_deck_name:null,
-    // An unapproved project's offer is not public, so no payback goal is shown.
-    offer_per_100:null, confirmed_pledge_total:0, is_owner:publicTarget.data.is_owner,
+    // Older projects without structured terms have no offer here, so no payback goal is shown.
+    offer_per_100:publicTarget.data.proposal?.repayment_per100 ?? null, confirmed_pledge_total:0, is_owner:publicTarget.data.is_owner,
   } : null;
   const waitingForPageTarget = loadPageTarget && publicTarget.isPending;
   const projectList = explore.data ? [...explore.data.projects, ...(pageTarget ? [pageTarget] : [])] : undefined;
