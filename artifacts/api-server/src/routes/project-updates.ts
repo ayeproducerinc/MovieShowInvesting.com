@@ -20,6 +20,8 @@ import {
   nextStatus, publicUpdateView, validateUpdateInput, type UpdateRow,
 } from "../lib/project-updates";
 import { deliverUpdateEmails, queueUpdateEmails } from "../lib/project-update-email";
+import { CONFIRMED_BACKERS_SQL, type BackerRow } from "../lib/backer-visibility";
+import { updateImpact } from "../lib/update-metrics";
 import { logger } from "../lib/logger";
 
 // Project updates (DECISIONS.md › Project updates). Approval queues one email per
@@ -99,6 +101,21 @@ const ADMIN_SELECT = `select ${UPDATE_COLUMNS}, u.project_id, u.reviewed_by,
   join projects p on p.id = u.project_id
   join filmmakers f on f.id = u.filmmaker_id`;
 
+// Per update: emails queued and sent, increases from its button, and first-time
+// pledges in the 14 days after approval (zero while pending or rejected).
+async function impactOf(row: AdminRow) {
+  const { rows: [emails] } = await pool.query<{ queued: number; sent: number }>(
+    "select count(*)::int as queued, count(*) filter (where email_status = 'sent')::int as sent from project_update_emails where update_id = $1",
+    [row.id],
+  );
+  const pledges = row.status === "approved"
+    ? (await pool.query<BackerRow>(CONFIRMED_BACKERS_SQL, [[row.project_id]])).rows : [];
+  return {
+    emails_queued: emails?.queued ?? 0, emails_sent: emails?.sent ?? 0,
+    ...updateImpact(pledges, { id: row.id, approvedAt: row.status === "approved" ? row.reviewed_at : null }),
+  };
+}
+
 async function adminView(row: AdminRow, now: Date) {
   return {
     id: row.id, project_id: row.project_id, project_title: row.project_title, project_slug: row.project_slug,
@@ -111,6 +128,7 @@ async function adminView(row: AdminRow, now: Date) {
     // Rule c: tell the admin before approval whether an email would go out.
     email_decision: emailDecision(row.last_queued_at, now),
     backers_to_email: await backersToEmail(row.project_id),
+    ...await impactOf(row),
   };
 }
 

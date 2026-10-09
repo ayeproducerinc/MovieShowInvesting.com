@@ -11,7 +11,7 @@ test("totals add every confirmed pledge and count each person once", () => {
 
 const row = (over: Partial<BackerRow>): BackerRow => ({
   project_id: 1, investor_id: 1, amount: 100, name: "Jane Doe", email: "jane@example.com",
-  confirmed_at: new Date("2026-10-01T00:00:00Z"), evidence: backerEvidence(false), ...over,
+  confirmed_at: new Date("2026-10-01T00:00:00Z"), evidence: backerEvidence(false), source_update_id: null, ...over,
 });
 
 test("the filmmaker sees name, email and amount for pledges signed with the notice", () => {

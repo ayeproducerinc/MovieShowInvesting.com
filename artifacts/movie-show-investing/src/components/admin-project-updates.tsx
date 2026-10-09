@@ -3,9 +3,28 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetAdminProjectUpdatesQueryKey, useApproveAdminProjectUpdate, useGetAdminProjectUpdates, useRejectAdminProjectUpdate,
 } from '@workspace/api-client-react';
-import { adminEmailNotice } from '@/lib/project-update-display';
+import { adminEmailNotice, updateImpactLines } from '@/lib/project-update-display';
 
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+const dollars = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+
+/** Per approved update: emails sent, increases from it, and new pledges in the 14 days after. */
+function ApprovedUpdateResults({ userId }: { userId: string }) {
+  const params = { status: 'approved' as const };
+  const approved = useGetAdminProjectUpdates(params, { query: {
+    queryKey: [...getGetAdminProjectUpdatesQueryKey(params), userId], retry: false, refetchOnWindowFocus: true,
+  } });
+  if (!approved.isSuccess || !approved.data.updates.length) return null;
+  return <section data-testid="section-admin-update-results" style={{ marginTop: 28 }}>
+    <h3 style={{ margin: '0 0 8px' }}>Results by update</h3>
+    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
+      {approved.data.updates.map(update => <li key={update.id} data-testid={`card-update-results-${update.id}`} style={{ background: 'var(--admin-panel)', border: '1px solid var(--admin-line)', padding: 16 }}>
+        <p style={{ margin: 0 }}><strong>{update.label}</strong> · {update.project_title || 'Untitled project'}{update.reviewed_at && ` · approved ${day(update.reviewed_at)}`}</p>
+        <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>{updateImpactLines(update, dollars).map(line => <li key={line}>{line}</li>)}</ul>
+      </li>)}
+    </ul>
+  </section>;
+}
 
 /** Pending project updates for owner review (DECISIONS.md › Project updates, rule a and c). */
 export function AdminProjectUpdates({ userId }: { userId: string }) {
@@ -51,5 +70,6 @@ export function AdminProjectUpdates({ userId }: { userId: string }) {
           </div>
         </li>)}
       </ul>}
+    <ApprovedUpdateResults userId={userId} />
   </section>;
 }

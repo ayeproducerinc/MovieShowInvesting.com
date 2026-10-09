@@ -1,5 +1,5 @@
 import { getGetFilmmakerProjectBackersQueryKey, useGetFilmmakerProjectBackers } from '@workspace/api-client-react';
-import { backerLabel, backersErrorText, pledgeSummary } from '@/lib/backer-display';
+import { backerLabel, backersErrorText, pledgeSummary, progressLines } from '@/lib/backer-display';
 
 const dollars = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 const day = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
@@ -36,6 +36,9 @@ export function FilmmakerBackers({ projectId, identityId }: { projectId: number;
       : !backers.data.backers.length ? <p data-testid="text-no-backers">No confirmed pledges yet. Share your project link so people can pledge.</p>
       : <>
         <p data-testid="text-backers-total"><strong>{pledgeSummary(backers.data, dollars)}</strong></p>
+        <ul className="dossier-links" data-testid="list-backer-progress" style={{ marginBottom: 18 }}>
+          {progressLines(backers.data, dollars, day).map(line => <li key={line}>{line}</li>)}
+        </ul>
         <ul className="dossier-links" data-testid="list-filmmaker-backers">{backers.data.backers.map((backer, index) =>
           <li key={`${backer.confirmed_at}-${index}`} style={{ overflowWrap: 'anywhere' }}>
             <strong>{backerLabel(backer)}</strong> · {dollars(backer.amount)}{backer.confirmed_at && ` · ${day(backer.confirmed_at)}`}

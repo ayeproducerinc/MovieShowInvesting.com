@@ -1118,6 +1118,28 @@ export interface FilmmakerBacker {
 
 export interface FilmmakerProjectBackers {
   /**
+     * Backers who pledged again after their first pledge
+     * @minimum 0
+     */
+  increase_count: number;
+  /**
+     * Sum of those later pledges
+     * @minimum 0
+     */
+  increase_amount: number;
+  /**
+     * Backers whose first pledge came after the last approved update
+     * @minimum 0
+     */
+  new_since_last_update_count: number;
+  /** @minimum 0 */
+  new_since_last_update_amount: number;
+  /**
+     * Latest approved update
+     * @nullable
+     */
+  last_update_at: string | null;
+  /**
      * Sum of confirmed pledges to this project; private to its filmmaker
      * @minimum 0
      */
@@ -1268,6 +1290,24 @@ export const AdminProjectUpdateEmailDecision = {
 } as const;
 
 export interface AdminProjectUpdate {
+  /** @minimum 0 */
+  emails_queued: number;
+  /** @minimum 0 */
+  emails_sent: number;
+  /**
+     * Backers whose new pledge came from this update's email button
+     * @minimum 0
+     */
+  increase_count: number;
+  /** @minimum 0 */
+  increase_amount: number;
+  /**
+     * Backers whose first pledge came within 14 days after approval
+     * @minimum 0
+     */
+  new_pledge_count_14d: number;
+  /** @minimum 0 */
+  new_pledge_amount_14d: number;
   /** @minimum 1 */
   id: number;
   /** @minimum 1 */

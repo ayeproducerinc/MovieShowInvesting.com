@@ -32,6 +32,7 @@ import {
 } from "@workspace/api-zod";
 import { authenticateFilmmaker } from "../lib/filmmaker-auth";
 import { CONFIRMED_BACKERS_SQL, backerTotals, filmmakerBackers, type BackerRow } from "../lib/backer-visibility";
+import { projectProgress } from "../lib/update-metrics";
 import { syncReferralRewards } from "../lib/referral-reward-sync";
 
 const router: IRouter = Router();
@@ -295,7 +296,15 @@ router.get("/filmmakers/projects/:project_id/backers", async (req, res): Promise
     return;
   }
   const { rows } = await pool.query<BackerRow>(CONFIRMED_BACKERS_SQL, [[params.data.project_id]]);
-  res.json(GetFilmmakerProjectBackersResponse.parse({ backers: filmmakerBackers(rows), ...backerTotals(rows) }));
+  const { rows: [latest] } = await pool.query<{ last: Date | null }>(
+    "select max(reviewed_at) as last from project_updates where project_id = $1 and status = 'approved'",
+    [params.data.project_id],
+  );
+  const lastUpdateAt = latest?.last ?? null;
+  res.json(GetFilmmakerProjectBackersResponse.parse({
+    backers: filmmakerBackers(rows), ...backerTotals(rows),
+    ...projectProgress(rows, lastUpdateAt), last_update_at: lastUpdateAt?.toISOString() ?? null,
+  }));
 });
 
 export default router;

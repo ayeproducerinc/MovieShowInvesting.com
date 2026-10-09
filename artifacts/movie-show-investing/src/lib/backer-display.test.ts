@@ -1,6 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { backerLabel, backersErrorText, pledgeSummary, publicBackersLine } from './backer-display.js';
+import { backerLabel, backersErrorText, pledgeSummary, progressLines, publicBackersLine } from './backer-display.js';
+
+test('the filmmaker sees increases, new pledges since the last update, and its date', () => {
+  const fmt = (n: number) => `$${n}`;
+  const date = (iso: string) => iso.slice(0, 10);
+  assert.deepEqual(progressLines({
+    increase_count: 2, increase_amount: 350, new_since_last_update_count: 1, new_since_last_update_amount: 100,
+    last_update_at: '2026-10-01T00:00:00.000Z',
+  }, fmt, date), [
+    'Increased: 2 backers pledged again, adding $350.',
+    'New since your last update (2026-10-01): 1 backer, $100.',
+  ]);
+  assert.deepEqual(progressLines({
+    increase_count: 0, increase_amount: 0, new_since_last_update_count: 0, new_since_last_update_amount: 0, last_update_at: null,
+  }, fmt, date), [
+    'Increased: no one has pledged again yet.',
+    'Last update: none approved yet. Post one to keep backers informed.',
+  ]);
+});
 
 test('a backer list that is not available to the account offers no pointless retry', () => {
   assert.equal(backersErrorText(404).canRetry, false);

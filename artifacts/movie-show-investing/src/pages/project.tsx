@@ -11,6 +11,7 @@ import { ProposalSummary } from '@/components/proposal-summary';
 import { youtubeEmbedUrl } from '@/lib/youtube-embed';
 import { bunnyEmbedUrl } from '@/lib/bunny-embed';
 import { pledgePanel } from '@/lib/pledge-panel';
+import { ProjectTimeline } from '@/components/project-timeline';
 import './project.css';
 
 const securitiesNotice = "Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.";
@@ -130,6 +131,7 @@ export default function Project() {
       <p className="pj-fine"><strong>Returns aren’t guaranteed. You may get back less, or nothing.</strong> If investment opens later, full offering documents will be provided before any decision.</p>
     </div>}
     <div className="pj-facts"><span className="dossier-kicker">Showcase status</span><p className="pj-status" data-testid="status-public-project-review">{published ? 'Approved.' : data.showcase_requested ? 'Pending review.' : 'Not requested.'}</p><p>{published ? 'This project has been approved for showcase.' : data.showcase_requested ? 'A showcase request is pending review. This page is unlisted but anyone with its link can view it.' : 'No showcase review has been requested. This page is unlisted but anyone with its link can view it.'} This is not a live investment opportunity.</p>{data.phone_verified && <p data-testid="badge-public-project-phone-verified"><strong>Phone verified.</strong> The filmmaker has verified a phone number with Firebase.</p>}</div>
+    <ProjectTimeline slug={data.slug} />
     {synopsis && <section className="dossier-section pj-sec"><span className="dossier-kicker">The story</span><h2>Synopsis.</h2><p>{storyText}</p>{longStory && <button type="button" className="pj-linkbtn" aria-expanded={storyOpen} onClick={() => setStoryOpen(v => !v)} data-testid="button-toggle-story">{storyOpen ? 'Show less' : 'Read the full story'}</button>}</section>}
     {(data.money_use || data.distribution_plan || data.team_links.length > 0 || data.team_info) && <details className="dossier-section pj-sec" data-testid="details-more-about-project"><summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 20 }}>More about this project</summary>
       {data.team_info && <><span className="dossier-kicker">The team</span><p>{data.team_info}</p></>}

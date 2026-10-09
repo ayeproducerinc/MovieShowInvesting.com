@@ -9,6 +9,24 @@ import type { AdminProjectUpdateEmailDecision } from './adminProjectUpdateEmailD
 import type { AdminProjectUpdateStatus } from './adminProjectUpdateStatus';
 
 export interface AdminProjectUpdate {
+  /** @minimum 0 */
+  emails_queued: number;
+  /** @minimum 0 */
+  emails_sent: number;
+  /**
+     * Backers whose new pledge came from this update's email button
+     * @minimum 0
+     */
+  increase_count: number;
+  /** @minimum 0 */
+  increase_amount: number;
+  /**
+     * Backers whose first pledge came within 14 days after approval
+     * @minimum 0
+     */
+  new_pledge_count_14d: number;
+  /** @minimum 0 */
+  new_pledge_amount_14d: number;
   /** @minimum 1 */
   id: number;
   /** @minimum 1 */

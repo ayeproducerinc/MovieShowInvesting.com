@@ -9,6 +9,28 @@ import type { FilmmakerBacker } from './filmmakerBacker';
 
 export interface FilmmakerProjectBackers {
   /**
+     * Backers who pledged again after their first pledge
+     * @minimum 0
+     */
+  increase_count: number;
+  /**
+     * Sum of those later pledges
+     * @minimum 0
+     */
+  increase_amount: number;
+  /**
+     * Backers whose first pledge came after the last approved update
+     * @minimum 0
+     */
+  new_since_last_update_count: number;
+  /** @minimum 0 */
+  new_since_last_update_amount: number;
+  /**
+     * Latest approved update
+     * @nullable
+     */
+  last_update_at: Date | null;
+  /**
      * Sum of confirmed pledges to this project; private to its filmmaker
      * @minimum 0
      */

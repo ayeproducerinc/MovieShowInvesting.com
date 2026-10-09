@@ -13,7 +13,8 @@ export const CONFIRMED_BACKERS_SQL = `
   select pl.project_id, pl.investor_id, pl.amount,
     coalesce(nullif(trim(e.name), ''), nullif(trim(i.name), '')) as name, i.email,
     case when pl.entry_id is null then i.confirmed_at else e.confirmed_at end as confirmed_at,
-    case when pl.entry_id is null then i.confirmation_evidence else e.confirmation_evidence end as evidence
+    case when pl.entry_id is null then i.confirmation_evidence else e.confirmation_evidence end as evidence,
+    nullif((case when pl.entry_id is null then i.submitted_answers else e.submitted_answers end) ->> 'source_update_id', '')::int as source_update_id
   from pledges pl
   join investors i on i.id = pl.investor_id
   left join interest_entries e on e.id = pl.entry_id
@@ -27,6 +28,7 @@ export type BackerRow = {
   email: string | null;
   confirmed_at: Date | null;
   evidence: Record<string, unknown> | null;
+  source_update_id: number | null;
 };
 
 function sawNotice(row: BackerRow): boolean {

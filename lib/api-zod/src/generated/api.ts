@@ -887,6 +887,14 @@ export const GetFilmmakerProjectBackersParams = zod.object({
   "project_id": zod.coerce.number().int().min(1)
 })
 
+export const getFilmmakerProjectBackersResponseIncreaseCountMin = 0;
+
+export const getFilmmakerProjectBackersResponseIncreaseAmountMin = 0;
+
+export const getFilmmakerProjectBackersResponseNewSinceLastUpdateCountMin = 0;
+
+export const getFilmmakerProjectBackersResponseNewSinceLastUpdateAmountMin = 0;
+
 export const getFilmmakerProjectBackersResponseConfirmedPledgeTotalMin = 0;
 
 export const getFilmmakerProjectBackersResponseBackerCountMin = 0;
@@ -895,6 +903,11 @@ export const getFilmmakerProjectBackersResponseBackerCountMin = 0;
 
 
 export const GetFilmmakerProjectBackersResponse = zod.object({
+  "increase_count": zod.number().int().min(getFilmmakerProjectBackersResponseIncreaseCountMin).describe('Backers who pledged again after their first pledge'),
+  "increase_amount": zod.number().int().min(getFilmmakerProjectBackersResponseIncreaseAmountMin).describe('Sum of those later pledges'),
+  "new_since_last_update_count": zod.number().int().min(getFilmmakerProjectBackersResponseNewSinceLastUpdateCountMin).describe('Backers whose first pledge came after the last approved update'),
+  "new_since_last_update_amount": zod.number().int().min(getFilmmakerProjectBackersResponseNewSinceLastUpdateAmountMin),
+  "last_update_at": zod.coerce.date().nullable().describe('Latest approved update'),
   "confirmed_pledge_total": zod.number().int().min(getFilmmakerProjectBackersResponseConfirmedPledgeTotalMin).describe('Sum of confirmed pledges to this project; private to its filmmaker'),
   "backer_count": zod.number().int().min(getFilmmakerProjectBackersResponseBackerCountMin).describe('Distinct people with a confirmed pledge to this project'),
   "backers": zod.array(zod.object({
@@ -1005,6 +1018,18 @@ export const GetAdminProjectUpdatesQueryParams = zod.object({
   "status": zod.enum(['pending', 'approved', 'rejected']).default(getAdminProjectUpdatesQueryStatusDefault)
 })
 
+export const getAdminProjectUpdatesResponseUpdatesItemEmailsQueuedMin = 0;
+
+export const getAdminProjectUpdatesResponseUpdatesItemEmailsSentMin = 0;
+
+export const getAdminProjectUpdatesResponseUpdatesItemIncreaseCountMin = 0;
+
+export const getAdminProjectUpdatesResponseUpdatesItemIncreaseAmountMin = 0;
+
+export const getAdminProjectUpdatesResponseUpdatesItemNewPledgeCount14dMin = 0;
+
+export const getAdminProjectUpdatesResponseUpdatesItemNewPledgeAmount14dMin = 0;
+
 
 
 export const getAdminProjectUpdatesResponseUpdatesItemBackersToEmailMin = 0;
@@ -1013,6 +1038,12 @@ export const getAdminProjectUpdatesResponseUpdatesItemBackersToEmailMin = 0;
 
 export const GetAdminProjectUpdatesResponse = zod.object({
   "updates": zod.array(zod.object({
+  "emails_queued": zod.number().int().min(getAdminProjectUpdatesResponseUpdatesItemEmailsQueuedMin),
+  "emails_sent": zod.number().int().min(getAdminProjectUpdatesResponseUpdatesItemEmailsSentMin),
+  "increase_count": zod.number().int().min(getAdminProjectUpdatesResponseUpdatesItemIncreaseCountMin).describe('Backers whose new pledge came from this update\'s email button'),
+  "increase_amount": zod.number().int().min(getAdminProjectUpdatesResponseUpdatesItemIncreaseAmountMin),
+  "new_pledge_count_14d": zod.number().int().min(getAdminProjectUpdatesResponseUpdatesItemNewPledgeCount14dMin).describe('Backers whose first pledge came within 14 days after approval'),
+  "new_pledge_amount_14d": zod.number().int().min(getAdminProjectUpdatesResponseUpdatesItemNewPledgeAmount14dMin),
   "id": zod.number().int().min(1),
   "project_id": zod.number().int().min(1),
   "project_title": zod.string().nullable(),
@@ -1044,6 +1075,18 @@ export const ApproveAdminProjectUpdateParams = zod.object({
   "update_id": zod.coerce.number().int().min(1)
 })
 
+export const approveAdminProjectUpdateResponseEmailsQueuedMin = 0;
+
+export const approveAdminProjectUpdateResponseEmailsSentMin = 0;
+
+export const approveAdminProjectUpdateResponseIncreaseCountMin = 0;
+
+export const approveAdminProjectUpdateResponseIncreaseAmountMin = 0;
+
+export const approveAdminProjectUpdateResponseNewPledgeCount14dMin = 0;
+
+export const approveAdminProjectUpdateResponseNewPledgeAmount14dMin = 0;
+
 
 
 export const approveAdminProjectUpdateResponseBackersToEmailMin = 0;
@@ -1051,6 +1094,12 @@ export const approveAdminProjectUpdateResponseBackersToEmailMin = 0;
 
 
 export const ApproveAdminProjectUpdateResponse = zod.object({
+  "emails_queued": zod.number().int().min(approveAdminProjectUpdateResponseEmailsQueuedMin),
+  "emails_sent": zod.number().int().min(approveAdminProjectUpdateResponseEmailsSentMin),
+  "increase_count": zod.number().int().min(approveAdminProjectUpdateResponseIncreaseCountMin).describe('Backers whose new pledge came from this update\'s email button'),
+  "increase_amount": zod.number().int().min(approveAdminProjectUpdateResponseIncreaseAmountMin),
+  "new_pledge_count_14d": zod.number().int().min(approveAdminProjectUpdateResponseNewPledgeCount14dMin).describe('Backers whose first pledge came within 14 days after approval'),
+  "new_pledge_amount_14d": zod.number().int().min(approveAdminProjectUpdateResponseNewPledgeAmount14dMin),
   "id": zod.number().int().min(1),
   "project_id": zod.number().int().min(1),
   "project_title": zod.string().nullable(),
@@ -1081,6 +1130,18 @@ export const RejectAdminProjectUpdateParams = zod.object({
   "update_id": zod.coerce.number().int().min(1)
 })
 
+export const rejectAdminProjectUpdateResponseEmailsQueuedMin = 0;
+
+export const rejectAdminProjectUpdateResponseEmailsSentMin = 0;
+
+export const rejectAdminProjectUpdateResponseIncreaseCountMin = 0;
+
+export const rejectAdminProjectUpdateResponseIncreaseAmountMin = 0;
+
+export const rejectAdminProjectUpdateResponseNewPledgeCount14dMin = 0;
+
+export const rejectAdminProjectUpdateResponseNewPledgeAmount14dMin = 0;
+
 
 
 export const rejectAdminProjectUpdateResponseBackersToEmailMin = 0;
@@ -1088,6 +1149,12 @@ export const rejectAdminProjectUpdateResponseBackersToEmailMin = 0;
 
 
 export const RejectAdminProjectUpdateResponse = zod.object({
+  "emails_queued": zod.number().int().min(rejectAdminProjectUpdateResponseEmailsQueuedMin),
+  "emails_sent": zod.number().int().min(rejectAdminProjectUpdateResponseEmailsSentMin),
+  "increase_count": zod.number().int().min(rejectAdminProjectUpdateResponseIncreaseCountMin).describe('Backers whose new pledge came from this update\'s email button'),
+  "increase_amount": zod.number().int().min(rejectAdminProjectUpdateResponseIncreaseAmountMin),
+  "new_pledge_count_14d": zod.number().int().min(rejectAdminProjectUpdateResponseNewPledgeCount14dMin).describe('Backers whose first pledge came within 14 days after approval'),
+  "new_pledge_amount_14d": zod.number().int().min(rejectAdminProjectUpdateResponseNewPledgeAmount14dMin),
   "id": zod.number().int().min(1),
   "project_id": zod.number().int().min(1),
   "project_title": zod.string().nullable(),
