@@ -66,7 +66,7 @@ export function InvestorResultCard({ entry }: { entry: InvestorInterestHistoryIt
         entry.allocations.length ? entry.allocations.map(row => <li key={row.project_id} data-testid={`done-allocation-${row.project_id}`}><span>{row.project_title ?? `Project #${row.project_id}`}</span><strong>{dollars(row.amount)}</strong></li>) :
         <li><span>No project allocations are on record.</span></li>}
     </ul>
-     <p className="investor-result__legal">This is a private record of non-binding interest, not an investment or offer of securities. No money has been collected. If a project opens for investment, full offering documents will be provided before you decide.</p>
+     <p className="investor-result__legal">This is a private record of non-binding interest, not an investment or offer of securities.</p>
     <div className="investor-result__share">
       <p className="inv-kicker">Separate from your private record</p>
       <h3>Share a story, not your interest.</h3>

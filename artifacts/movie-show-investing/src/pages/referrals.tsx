@@ -12,14 +12,15 @@ const money = (cents: number) => new Intl.NumberFormat('en-US', { style: 'curren
 const date = (v: string | null) => v ? new Date(v).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : null;
 const LABEL: Record<string, string> = { pending: 'Pending', eligible: 'Eligible', paid: 'Paid', cancelled: 'Cancelled', review_required: 'Under review' };
 
-function Rules() {
-  return <div className="ref-note" data-testid="text-referral-rules">
+function Rules({ folded = false }: { folded?: boolean }) {
+  const rules = <div className="ref-note" data-testid="text-referral-rules">
     <p>Earn $10 for each new person who signs up through your link and gets their first paid project approved and listed.</p>
     <p><strong className="font-bold">New accounts only</strong>. Existing members and your own signup don't count.</p>
     <p><strong className="font-bold">One reward per person</strong>. Declined and repeat projects don't count.</p>
     <p><strong className="font-bold">30-day window</strong>. Your link is remembered for 30 days from their first visit.</p>
     <p><strong className="font-bold">Paid by our team</strong>. Rewards are sent manually, not automatically.</p>
   </div>;
+  return folded ? <details className="ref-box"><summary className="ref-kicker" style={{ cursor: 'pointer' }}>How rewards work</summary>{rules}</details> : rules;
 }
 
 function SignedOut() {
@@ -66,7 +67,6 @@ function Member({ identity }: { identity: string }) {
   }
   return <>
     <h1 className="serif ref-title">My referrals</h1>
-    <Rules />
     {claim.identity === identity && claim.status === 'error' && <p className="ref-err" role="alert" data-testid="error-referral-claim">We could not apply a referral to your account. <button type="button" className="underline font-semibold" onClick={claim.retry} data-testid="button-retry-claim">Try again</button></p>}
     {claim.identity === identity && claim.status === 'pending' && <p className="ref-note" role="status">Checking for a referral…</p>}
     {q.isPending ? <div role="status" aria-label="Loading referrals" data-testid="status-referrals-loading"><div className="ref-skel" /><div className="ref-skel" style={{ height: 120 }} /><div className="ref-skel" /></div>
@@ -87,10 +87,11 @@ function Member({ identity }: { identity: string }) {
         <div className="ref-stat"><span className="ref-kicker">Paid</span><b data-testid="text-paid-amount">{money(d.paid_cents)}</b></div>
       </div>
       <h2 className="ref-kicker">Reward history</h2>
-      {d.rewards.length === 0 ? <div className="ref-box" data-testid="status-rewards-empty"><p>No rewards yet. Share your link; a pending reward appears after a referred person pays. It becomes eligible only after approval and public listing.</p></div>
+      {d.rewards.length === 0 ? <div className="ref-box" data-testid="status-rewards-empty"><p>No rewards yet. Share your link to get started.</p></div>
       : <ul className="ref-hist" data-testid="list-rewards">{d.rewards.map(r => <li key={r.id} data-testid={`row-reward-${r.id}`}>
         <span>{money(r.amount_cents)}{r.paid_at ? ` · paid ${date(r.paid_at)}` : r.payment_checked_at ? ` · checked ${date(r.payment_checked_at)}` : ''}{r.review_flag ? ' · being reviewed by our team' : ''}</span>
         <span className="ref-pill">{LABEL[r.status] ?? r.status}</span></li>)}</ul>}
+      <Rules folded />
     </>}
   </>;
 }

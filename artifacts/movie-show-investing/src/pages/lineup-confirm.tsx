@@ -113,11 +113,10 @@ export default function LineupConfirm() {
         <div className="lineup-section-head"><div><p className="inv-kicker">01 / Saved record</p><h2>What you’re confirming.</h2></div><span>Non-binding</span></div>
         <div className="lineup-review-total"><div><span>Saved interest / USD</span><p>{risk}</p></div><strong data-testid="confirm-total">{dollars(intent.amount)}</strong></div>
         <div className="lineup-section-head"><div><p className="inv-kicker">02 / Project choices</p><h2>{intent.unallocated ? 'No projects selected.' : 'Your allocations.'}</h2></div><span>{intent.allocations.length} {intent.allocations.length === 1 ? 'project' : 'projects'}</span></div>
-        <p className="lineup-help">{risk}</p>
         {intent.unallocated ? <div className="lineup-unallocated" data-testid="confirm-unallocated"><strong>{dollars(intent.amount)} unallocated</strong><p>Your interest is not allocated to any project.</p></div> :
            <div className="lineup-rows">{intent.allocations.map((row, index) => <div className="lineup-row" key={row.project_id} data-testid={`confirm-project-${row.project_id}`}><span className="lineup-number">{String(index + 1).padStart(2, '0')}</span><div className="lineup-project-detail"><p className="inv-kicker">{row.project_visible ? 'Project' : 'Not currently listed'}</p><h3>{row.project_title ?? `Project #${row.project_id}`}</h3></div><div className="lineup-row-amount"><span>Saved allocation</span><strong>{dollars(row.amount)}</strong></div></div>)}</div>}
         {intent.allocations.some(row => !row.project_visible) && <p className="lineup-help">A saved project is no longer publicly listed. You may still confirm your non-binding interest in it; its amount will not appear in public project totals while it remains unlisted.</p>}
-        <div className="lineup-legal"><p>{notice}</p><p>No money is collected by confirming. This is not an offer to sell securities.</p></div>
+        <div className="lineup-legal"><p>{notice}</p></div>
       </div>
       <aside className="lineup-review-aside">
         <p className="inv-kicker">03 / Your acknowledgment</p><h2>Sign the saved record.</h2>

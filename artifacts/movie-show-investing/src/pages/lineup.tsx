@@ -41,7 +41,7 @@ function ProjectLineupFigures({ slug, amount }: { slug: string; amount: number }
     ? amount * project.offer_per_100 / 100 : null;
   return <div className="lineup-project-figures" data-testid={`figures-lineup-project-${project.id}`}>
     <p>{dollars(project.confirmed_pledge_total)} total confirmed, non-binding interest in this project.</p>
-    {paybackGoal !== null && <p data-testid={`text-lineup-payback-goal-${project.id}`}>Payback goal: {paybackDollars(paybackGoal)} back on your {dollars(amount)}, based on the project’s current offer; this figure is illustrative, not guaranteed. Returns aren’t guaranteed. You may get back less, or nothing.</p>}
+    {paybackGoal !== null && <p data-testid={`text-lineup-payback-goal-${project.id}`}>Payback goal: {paybackDollars(paybackGoal)} back on your {dollars(amount)}, based on the project’s current offer; this figure is illustrative, not guaranteed.</p>}
   </div>;
 }
 
@@ -52,8 +52,7 @@ function SignedHistoryEntry({ entry, index }: { entry: InvestorInterestHistoryIt
       <h3>Signed {new Date(entry.confirmed_at).toLocaleDateString('en-US')}</h3>
       {entry.unallocated ? <p>Unallocated</p> : entry.allocations.length ? <ul className="lineup-history-projects">
         {entry.allocations.map(row => <li key={row.project_id}>
-          <strong>{row.project_title ?? `Project #${row.project_id}`}</strong> · {dollars(row.amount)} confirmed, non-binding interest
-          {row.project_visible && row.project_slug && <Link href={`/project/${row.project_slug}#message-filmmaker`} className="lineup-project-link" data-testid={`link-lineup-message-${row.project_id}`}>Message filmmaker about this project <ArrowRight size={14}/></Link>}{row.project_visible && row.project_slug && <ProjectLineupFigures slug={row.project_slug} amount={row.amount}/>}
+          <strong>{row.project_title ?? `Project #${row.project_id}`}</strong> · {dollars(row.amount)}
         </li>)}
       </ul> : <p>No project allocations are on record.</p>}
     </div>
@@ -110,7 +109,7 @@ export default function Lineup() {
     <div className="lineup-heading">
       <p className="inv-kicker">Your investor desk / Private record</p>
       <h1>Your <em>lineup.</em></h1>
-      <p>Your saved non-binding indication of interest and project choices live here. It does not reserve a project, require payment, or make an investment. No money has been collected.</p>
+      <p>Your saved interest and project choices. Saving does not reserve a project.</p>
     </div>
 
     {!ready || current.isPending || current.isFetching ? <div className="lineup-loading" role="status" aria-label="Loading your saved lineup"><div className="inv-skeleton" style={{height:120}}/><div className="inv-skeleton" style={{height:180}}/></div> :
@@ -119,9 +118,9 @@ export default function Lineup() {
     <>
       {(!confirmed || !latestConfirmedEntry) && <div className="lineup-summary" data-testid="lineup-summary">
         <div className="lineup-summary-main"><span className="inv-kicker">{confirmed ? 'Current confirmed entry' : 'Current saved, unconfirmed entry'} / USD</span><strong data-testid="lineup-total">{dollars(intent.amount)}</strong><p className="lineup-risk">Returns aren’t guaranteed. You may get back less, or nothing.</p></div>
-        <div className="lineup-summary-status"><span className="lineup-status" data-testid="status-lineup">{confirmed ? 'Signed · Non-binding interest' : 'Saved · Awaiting signature'}</span><p>{confirmed ? `Your saved interest record was signed${intent.confirmed_at ? ` on ${new Date(intent.confirmed_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}. No investment or payment has been made.` : 'Your saved interest is not signed or confirmed. No investment or payment has been made.'}</p></div>
+        <div className="lineup-summary-status"><span className="lineup-status" data-testid="status-lineup">{confirmed ? 'Signed · Non-binding interest' : 'Saved · Awaiting signature'}</span><p>{confirmed ? `Your saved interest record was signed${intent.confirmed_at ? ` on ${new Date(intent.confirmed_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}.` : 'Your saved interest is not signed or confirmed yet.'}</p></div>
       </div>}
-        {confirmed ? null : signedIn ? <div className="lineup-confirm-callout"><div><p className="inv-kicker">Finish your worksheet</p><h2>Review and submit once.</h2><p>Your interest is saved but unsigned. Finish the worksheet and confirm once in its final review, before Submit. No extra confirmation screen follows.</p></div><div className="inv-actions"><Link href="/invest?revise=1" className="inv-button" data-testid="link-lineup-confirm">Finish & submit interest <ArrowRight size={16}/></Link><Link href={`/invest?revise=1${intent.allocations[0]?.project_slug ? `&project=${encodeURIComponent(intent.allocations[0].project_slug)}` : ''}`} className="inv-button secondary" data-testid="link-lineup-revise">Revise saved interest</Link></div></div> : <div className="lineup-confirm-callout"><div><p className="inv-kicker">Next step / Sign in</p><h2>Sign in to finish.</h2><p>This guest interest is saved, but confirmation needs an account. After signing in, explicitly claim it from this original browser if it is not linked.</p></div><GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-lineup-confirm-sign-in" label="Sign in to continue" /></div>}
+        {confirmed ? null : signedIn ? <div className="lineup-confirm-callout"><div><p className="inv-kicker">Finish your worksheet</p><h2>Review and submit once.</h2><p>Your interest is saved but unsigned. Finish the worksheet and confirm once in its final review, before Submit.</p></div><div className="inv-actions"><Link href="/invest?revise=1" className="inv-button" data-testid="link-lineup-confirm">Finish & submit interest <ArrowRight size={16}/></Link><Link href={`/invest?revise=1${intent.allocations[0]?.project_slug ? `&project=${encodeURIComponent(intent.allocations[0].project_slug)}` : ''}`} className="inv-button secondary" data-testid="link-lineup-revise">Revise saved interest</Link></div></div> : <div className="lineup-confirm-callout"><div><p className="inv-kicker">Next step / Sign in</p><h2>Sign in to finish.</h2><p>This guest interest is saved, but confirmation needs an account. After signing in, explicitly claim it from this original browser if it is not linked.</p></div><GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-lineup-confirm-sign-in" label="Sign in to continue" /></div>}
        {confirmed && latestConfirmedEntry && <InvestorResultCard entry={latestConfirmedEntry}/>}
        <InvestorNotificationPermissionControl/>
        {signedIn && <UpdateEmailsToggle identityId={identityId}/>}
@@ -131,15 +130,15 @@ export default function Lineup() {
         <div className="lineup-rows">{intent.allocations.map((row, index) => {
           return <article className="lineup-row" key={row.project_id} data-testid={`lineup-project-${row.project_id}`}>
             <span className="lineup-number">{String(index + 1).padStart(2, '0')}</span>
-              <div className="lineup-project-detail"><p className="inv-kicker">{row.project_visible ? 'Approved for public listing' : 'Not currently listed'}</p><h3>{row.project_title ?? `Project #${row.project_id}`}</h3>{row.project_visible && row.project_slug && <Link href={`/project/${row.project_slug}`} className="lineup-project-link" data-testid={`link-lineup-project-${row.project_id}`}>View project <ArrowRight size={14}/></Link>}{row.project_visible && row.project_slug && <ProjectLineupFigures slug={row.project_slug} amount={row.amount}/>}</div>
+              <div className="lineup-project-detail"><p className="inv-kicker">{row.project_visible ? 'Approved for public listing' : 'Not currently listed'}</p><h3>{row.project_title ?? `Project #${row.project_id}`}</h3>{row.project_visible && row.project_slug && <><Link href={`/project/${row.project_slug}`} className="lineup-project-link" data-testid={`link-lineup-project-${row.project_id}`}>View project <ArrowRight size={14}/></Link> <Link href={`/project/${row.project_slug}#message-filmmaker`} className="lineup-project-link" data-testid={`link-lineup-message-${row.project_id}`}>Message filmmaker <ArrowRight size={14}/></Link></>}{row.project_visible && row.project_slug && <ProjectLineupFigures slug={row.project_slug} amount={row.amount}/>}</div>
              <div className="lineup-row-amount"><span>{confirmed ? 'Confirmed allocation' : 'Saved interest'}</span><strong>{dollars(row.amount)}</strong></div>
           </article>;
         })}</div>
         {allocated < intent.amount && <p className="lineup-help" role="status">Your {confirmed ? 'confirmed' : 'saved'} total includes {dollars(intent.amount - allocated)} not attached to a project choice shown here.</p>}
       </> : <div className="lineup-unallocated" role="status"><strong>No project allocations are on record.</strong><p>Your {confirmed ? 'confirmed' : 'saved'} total remains {dollars(intent.amount)}.</p></div>}
         </details>
-        {history.length > 0 && <details className="lineup-legal" data-testid="lineup-confirmed-history"><summary style={{cursor:'pointer',fontWeight:600}}>Signed interest history · {history.length} {history.length===1?'entry':'entries'}</summary><p>{dollars(confirmedTotal)} total confirmed, non-binding interest across {history.length} {history.length===1?'entry':'entries'}. Any saved but unconfirmed entry above is not included. These entries are not payments or investments.</p>{[...history].reverse().map((entry, index)=><SignedHistoryEntry key={entry.entry_id ?? 'original'} entry={entry} index={history.length-index}/>)}</details>}
-      <div className="lineup-legal"><p>Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.</p><p>No money is collected. This is not an offer to sell securities.</p></div>
+        {history.length > 0 && <details className="lineup-legal" data-testid="lineup-confirmed-history"><summary style={{cursor:'pointer',fontWeight:600}}>Signed interest history · {history.length} {history.length===1?'entry':'entries'}</summary><p>{dollars(confirmedTotal)} total confirmed, non-binding interest across {history.length} {history.length===1?'entry':'entries'}. Any saved but unconfirmed entry above is not included.</p>{[...history].reverse().map((entry, index)=><SignedHistoryEntry key={entry.entry_id ?? 'original'} entry={entry} index={history.length-index}/>)}</details>}
+      <div className="lineup-legal"><p>Pledge your interest in future investment opportunities. If a project opens for investment, it will be offered only in compliance with securities laws, and you'll get full offering documents before you decide.</p></div>
       <div className="inv-actions lineup-actions"><Link href="/explore" className="inv-button secondary">Explore projects <ArrowRight size={16}/></Link><Link href="/messages" className="inv-button secondary" data-testid="link-lineup-messages">Messages <ArrowRight size={16}/></Link></div>
     </>}
   </div></section>;
