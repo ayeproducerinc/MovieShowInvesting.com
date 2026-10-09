@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useLocation } from 'wouter';
-import { DraftPitchMaterials, type DraftPitchMaterialsHandle } from './draft-pitch-materials';
+import { DraftPitchMaterials, UnsavedMaterialError, type DraftPitchMaterialsHandle } from './draft-pitch-materials';
 
 export function ProjectMaterialsEditor({ projectId, title }: { projectId: number; title: string }) {
   const [, navigate] = useLocation();
@@ -22,8 +22,9 @@ export function ProjectMaterialsEditor({ projectId, title }: { projectId: number
     try {
       await materials.current?.flush();
       navigate('/start/filmmaker/done?details=materials');
-    } catch {
-      setError('Your latest materials could not be saved. Retry the save or clear the unfinished change before returning.');
+    } catch (cause) {
+      setError(cause instanceof UnsavedMaterialError ? cause.message
+        : 'Your latest materials could not be saved. Retry the save or clear the unfinished change before returning.');
     } finally {
       setReturning(false);
     }

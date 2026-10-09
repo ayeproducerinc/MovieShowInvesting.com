@@ -23,9 +23,29 @@ export type PitchMaterialsSnapshot = {
 };
 
 export type DraftPitchMaterialsHandle = {
-  /** Flushes the debounced synopsis/trailer save and rejects if persistence failed. */
+  /**
+   * Flushes the debounced synopsis/trailer save and rejects if persistence failed.
+   * Rejects with UnsavedMaterialError when a chosen file has not been saved yet.
+   */
   flush: () => Promise<void>;
 };
+
+export const UNSAVED_MATERIAL_MESSAGE = "You chose a file but haven't saved it yet. Click Save, or Clear selection, before continuing.";
+
+/** A file was chosen but never saved; leaving now would silently drop it. */
+export class UnsavedMaterialError extends Error {
+  constructor() {
+    super(UNSAVED_MATERIAL_MESSAGE);
+    this.name = 'UnsavedMaterialError';
+  }
+}
+
+/** The server's own short JSON `error`, so failures name their real cause. */
+function serverErrorText(error: unknown): string | null {
+  const data = error && typeof error === 'object' && 'data' in error ? (error as { data: unknown }).data : null;
+  const text = data && typeof data === 'object' && 'error' in data ? (data as { error: unknown }).error : null;
+  return typeof text === 'string' && text.trim() && text.length <= 300 ? text.trim() : null;
+}
 
 export type DraftPitchMaterialsProps = {
   draftId: number | null;
@@ -114,6 +134,8 @@ export const DraftPitchMaterials = forwardRef<DraftPitchMaterialsHandle, DraftPi
   const [openingDeck, setOpeningDeck] = useState(false);
   const [deckViewError, setDeckViewError] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<Partial<Record<UploadKind, File>>>({});
+  const selectedFilesRef = useRef(selectedFiles);
+  selectedFilesRef.current = selectedFiles;
   const [fileError, setFileError] = useState<Partial<Record<UploadKind, string>>>({});
   const [previewUrls, setPreviewUrls] = useState<Partial<Record<'poster' | 'share', string>>>({});
   const previewUrlsRef = useRef(previewUrls);
@@ -244,8 +266,16 @@ export const DraftPitchMaterials = forwardRef<DraftPitchMaterialsHandle, DraftPi
   }, [performTextSave]);
 
   useEffect(() => {
-    if (typeof ref === 'function') ref({ flush });
-    else if (ref) ref.current = { flush };
+    // Callers flush before leaving the step; an unsaved chosen file must block
+    // that instead of vanishing. upload() itself calls the inner flush.
+    const handle: DraftPitchMaterialsHandle = {
+      flush: async () => {
+        if (Object.values(selectedFilesRef.current).some(Boolean)) throw new UnsavedMaterialError();
+        await flush();
+      },
+    };
+    if (typeof ref === 'function') ref(handle);
+    else if (ref) ref.current = handle;
   }, [flush, ref]);
 
   function updateText(field: 'synopsis' | 'trailer', value: string) {
@@ -356,7 +386,10 @@ export const DraftPitchMaterials = forwardRef<DraftPitchMaterialsHandle, DraftPi
     } catch (error) {
       const status = error && typeof error === 'object' && 'status' in error ? Number(error.status) : 0;
       const noun = kind === 'pitch-deck' ? 'pitch deck' : kind === 'trailer' ? 'trailer' : kind === 'poster' ? 'poster' : 'share image';
-      setError(status === 413 ? `The server rejected this ${noun} because it exceeds the allowed size. Your existing file is unchanged.` : `The ${noun} could not be saved. Your existing file is unchanged; please try again.`);
+      const reason = serverErrorText(error);
+      setError(status === 413 ? `The server rejected this ${noun} because it exceeds the allowed size. Your existing file is unchanged.`
+        : reason ? `The ${noun} could not be saved: ${reason} Your existing file is unchanged.`
+        : `The ${noun} could not be saved. Your existing file is unchanged; please try again.`);
       setUploadStatus('');
     } finally {
       setBusy(false);

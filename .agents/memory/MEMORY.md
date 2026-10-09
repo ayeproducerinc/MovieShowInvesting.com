@@ -43,3 +43,4 @@
 - [Esbuild module identity](esbuild-module-identity.md) — canonicalize plugin-resolved paths so aliased stateful fixtures share one module instance.
 - [Stripe checkout idempotency](stripe-checkout-idempotency.md) — cached failures require exact request replay; conflicts and expired keys cannot safely release reservations.
 - [Review checkout needs attention](review-checkout-needs-attention.md) — completed-but-unfulfillable checkouts are flagged, alerted and block new charges; resolve manually.
+- [Silent background auth revalidation](silent-auth-revalidation.md) — focus/tab session checks must not flip auth loading or drop the token; it unmounted the worksheet and lost uploads.

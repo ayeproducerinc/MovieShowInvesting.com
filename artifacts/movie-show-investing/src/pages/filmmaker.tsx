@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
@@ -9,7 +9,7 @@ import { getGetFilmmakerResultQueryKey, getGetFilmmakerSubmissionConfigQueryKey,
 import type { FilmmakerProposalInput, FilmmakerSubmissionInput } from '@workspace/api-client-react';
 import { getInitializedAuth, useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
-import { DraftPitchMaterials, type DraftPitchMaterialsHandle } from '@/components/draft-pitch-materials';
+import { DraftPitchMaterials, UnsavedMaterialError, UNSAVED_MATERIAL_MESSAGE, type DraftPitchMaterialsHandle } from '@/components/draft-pitch-materials';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
   clearFilmmakerAuthHandoff,
@@ -187,6 +187,9 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoadin
   const autoClaimStarted = useRef<number | null>(null);
   const editTimer = useRef<number | null>(null);
   const materialsRef = useRef<DraftPitchMaterialsHandle | null>(null);
+  // Stable so the child reports only real error changes; an inline callback
+  // re-fired on every render and wiped worksheet-level materials messages.
+  const onMaterialsErrorChange = useCallback((error: string | null) => setMaterialsError(error ?? ''), []);
   const savingRef = useRef(saving);
   const materialsBusyRef = useRef(materialsBusy);
   const prepareHandoffRef = useRef<(draftId:number)=>Promise<boolean>>(async()=>false);
@@ -353,9 +356,12 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoadin
     }
     try {
       await materialsRef.current?.flush();
+      // The unsaved-file notice is resolved once flush passes; keep real upload errors.
+      setMaterialsError(current => current === UNSAVED_MATERIAL_MESSAGE ? '' : current);
       return true;
-    } catch {
-      setMaterialsError('Your optional pitch details could not be saved yet. Retry the save or remove the unfinished optional change before continuing.');
+    } catch (error) {
+      setMaterialsError(error instanceof UnsavedMaterialError ? error.message
+        : 'Your optional pitch details could not be saved yet. Retry the save or remove the unfinished optional change before continuing.');
       return false;
     }
   }
@@ -692,7 +698,7 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail, authLoadin
                ref={materialsRef}
                draftId={worksheetDraftId ?? null}
                onBusyChange={onMaterialsBusyChange}
-               onErrorChange={error=>setMaterialsError(error ?? '')}
+               onErrorChange={onMaterialsErrorChange}
              />
              {materialsError && <p className="fm-error" role="alert" data-testid="error-draft-materials">{materialsError}</p>}
             <OptionalSpecifics a={a} change={change}/>

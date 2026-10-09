@@ -17,6 +17,7 @@ const ACTIVE_KEY = 'msi_replit_auth_active';
 let user: AuthUser | null = null;
 let loading = true;
 let initialLoadStarted = false;
+let initialResolved = false;
 let listeners = new Set<() => void>();
 let currentIdentity: string | null | undefined;
 let inFlight: Promise<void> | null = null;
@@ -91,7 +92,10 @@ function notifyOtherTabs() {
   }
 }
 
-function revalidate() {
+// Background checks (focus, visibility, other tabs) run silently once the
+// session is known: flipping to loading would unmount auth-gated pages and
+// drop the bearer token mid-upload. A real identity change still publishes.
+function revalidate(background = false) {
   if (typeof window === 'undefined') return;
   if (logoutPending) {
     refreshAgain = true;
@@ -101,9 +105,12 @@ function revalidate() {
     refreshAgain = true;
     return;
   }
-  loading = true;
-  setAuthTokenGetter(null);
-  publish();
+  const silent = background && initialResolved;
+  if (!silent) {
+    loading = true;
+    setAuthTokenGetter(null);
+    publish();
+  }
   let resolved = false;
   inFlight = fetch('/api/auth/user', { credentials: 'include', cache: 'no-store' })
     .then(response => {
@@ -117,15 +124,16 @@ function revalidate() {
     })
     .catch(() => {
       if (!isReplitAuthActive()) user = null;
-      else setAuthTokenGetter(null);
+      else if (!silent) setAuthTokenGetter(null);
     })
     .finally(() => {
-      loading = !resolved && isReplitAuthActive();
+      if (!silent) loading = !resolved && isReplitAuthActive();
+      if (!loading) initialResolved = true;
       inFlight = null;
       publish();
       if (refreshAgain) {
         refreshAgain = false;
-        revalidate();
+        revalidate(initialResolved);
       }
     });
 }
@@ -137,18 +145,18 @@ function initializeBrowserListeners() {
     try {
       broadcast = new BroadcastChannel('msi-replit-auth');
       broadcast.addEventListener('message', event => {
-        if (event.data?.type === 'revalidate-session') revalidate();
+        if (event.data?.type === 'revalidate-session') revalidate(true);
       });
     } catch {
       broadcast = null;
     }
   }
   window.addEventListener('storage', event => {
-    if (event.key === ACTIVE_KEY) revalidate();
+    if (event.key === ACTIVE_KEY) revalidate(true);
   });
-  window.addEventListener('focus', revalidate);
+  window.addEventListener('focus', () => revalidate(true));
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') revalidate();
+    if (document.visibilityState === 'visible') revalidate(true);
   });
 }
 
