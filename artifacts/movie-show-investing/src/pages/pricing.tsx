@@ -20,14 +20,12 @@ export default function Pricing() {
           <span className="dossier-kicker">Pitch Collection / editorial review</span>
           <h2 className="serif mt-4 text-5xl">$49 <small className="text-base not-italic">one time per pitch</small></h2>
           <p className="mt-6 leading-relaxed">Submit one film or show pitch for editorial review. Payment sends your pitch to our review queue. <strong>Approval is not guaranteed.</strong> If approved, we’ll list it in Explore’s public Pitch Collection, with no preset expiration date.</p>
-          <p className="mt-4 leading-relaxed">Join the early filmmaker lineup as we build the Pitch Collection that investors will be able to browse when they join.</p>
           <p className="mt-4 text-sm">The review fee is not automatically refunded if we complete your review and decline the pitch. If we cannot deliver the review, we’ll refund it, subject to applicable law.</p>
-           <p className="mt-4 text-sm font-semibold">Complete your pitch, then continue to checkout for editorial review.</p>
           <Link href="/start/filmmaker?new=1" onClick={() => choosePitchReview(true)} className="dossier-button mt-8 inline-flex" data-testid="link-paid-pitch">Create your pitch <ArrowRight size={17}/></Link>
           <p className="mt-4 text-sm">Already have a pitch? <Link href="/me/projects?action=manage" className="underline">Open My projects</Link>.</p>
         </div>
       </div>
-        <p className="mt-8 text-sm">You can choose paid review after finishing your pitch. Starting free never obligates you to pay. Only a verified payment sends your pitch to review.</p>
+        <p className="mt-8 text-sm">Pledging interest is free for investors. Questions? <Link href="/faq" className="underline">Read the FAQ</Link>.</p>
     </div>
   </section>;
 }

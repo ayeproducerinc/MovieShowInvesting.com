@@ -10,7 +10,6 @@ import './explore.css';
 
 const stages = [['','All stages'],['distribution','Distribution'],['production','Production'],['idea','Idea']] as const;
 const genres = ['','Horror','Drama','Comedy','Thriller','Documentary','Sci-Fi','Romance','Action','Animation','Other'];
-const securitiesNotice = "Project profiles are not investment offers. Expressing interest is non-binding, and no money is collected here. If an investment opportunity opens, full offering documents will be available before you decide. Returns aren’t guaranteed.";
 type ExploreProjectWithPitchDeck = ExploreProject & { pitch_deck_url?: string | null; pitch_deck_name?: string | null };
 
 export default function Explore() {
@@ -33,11 +32,10 @@ export default function Explore() {
     <div className="page-wrap">
       <header className="explore-masthead">
         <h1>Find the stories <em>worth investing.</em></h1>
-        <p className="explore-disclosure" role="note" data-testid="text-securities-notice">{securitiesNotice}</p>
       </header>
       <div className="explore-browse">
         <a href="#explore-projects" data-testid="link-browse-projects">↓ Scroll to explore approved projects</a>
-        <Link href="/invest" data-testid="link-explore-invest">Express interest <ArrowRight size={13}/></Link>
+        <Link href="/invest" data-testid="link-explore-invest">Start investor worksheet <ArrowRight size={13}/></Link>
       </div>
     </div>
     <div className="page-wrap">
@@ -48,7 +46,7 @@ export default function Explore() {
         <div className="inv-field"><label htmlFor="explore-sort">Order</label><select id="explore-sort" className="inv-input" data-testid="select-explore-sort" value={sort} onChange={e=>setSort(e.target.value)}><option value="">Recently added</option><option value="title">Title</option></select></div>
       </div>
       <div className="explore-results" id="explore-projects">
-      <h2 className="explore-results-title">Approved projects</h2>
+      <h2 className="explore-results-title">Approved projects{projects.data && <span className="explore-results-count" data-testid="text-explore-count"> · {projects.data.projects.length}</span>}</h2>
       {!authReady || projects.isPending ? <div className="inv-projects" aria-label="Loading projects">{[1,2,3].map(i=><div key={i} className="inv-skeleton" style={{height:185}}/>)}</div> :
       projects.isError ? <div className="inv-state"><p className="inv-kicker">Connection interrupted</p><h1>The collection couldn’t load.</h1><p>Try again to see the latest approved projects.</p><button className="inv-button" data-testid="button-retry-explore" onClick={()=>void projects.refetch()}><RotateCcw size={16}/> Try again</button></div> :
        projects.data?.projects.length ? <div className="inv-projects">{projects.data.projects.map(project=><InvestorProjectCard key={project.id} project={project as ExploreProjectWithPitchDeck} variant="explore"/>)}</div> :

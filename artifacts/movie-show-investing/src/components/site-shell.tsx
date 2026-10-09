@@ -16,9 +16,9 @@ const navigation = [
   { href: '/start/filmmaker', label: 'Pitch' },
   { href: '/invest', label: 'Pledge' },
   { href: '/pricing', label: 'Pricing' },
-  { href: '/faq', label: 'FAQs' },
-  { href: '/messages', label: 'Messages' },
+  { href: '/faq', label: 'FAQ' },
 ];
+const accountLink = (active: boolean) => `text-[12px] font-bold whitespace-nowrap ${active ? 'text-[#26303d] underline underline-offset-4' : 'text-[#902f4d]'}`;
 
 export function SiteShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -83,9 +83,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-4">
             <div className="hidden items-center gap-3 lg:flex">
               {signedIn ? <>
-                <Link href="/lineup" data-testid="link-header-lineup" className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">My lineup</Link>
-                <Link href="/referrals" data-testid="link-header-referrals" className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">Referrals</Link>
-                <Link href="/me/projects" data-testid="link-header-my-projects" className="text-[12px] font-bold whitespace-nowrap text-[#902f4d]">My projects</Link>
+                <Link href="/lineup" data-testid="link-header-lineup" className={accountLink(location.startsWith('/lineup'))}>My lineup</Link>
+                <Link href="/messages" data-testid="link-nav--messages" className={accountLink(location.startsWith('/messages'))}>Messages</Link>
+                <Link href="/referrals" data-testid="link-header-referrals" className={accountLink(location === '/referrals')}>Referrals</Link>
+                <Link href="/me/projects" data-testid="link-header-my-projects" className={accountLink(location === '/me/projects')}>My projects</Link>
                 <button type="button" data-testid="button-header-sign-out" onClick={() => void leave()} disabled={signingOut} className="text-[12px] font-semibold whitespace-nowrap underline underline-offset-4">Sign out</button>
               </> : <>
                 <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inline-flex items-center gap-2 text-[12px] font-bold whitespace-nowrap text-[#902f4d]" testId="button-header-google-sign-in" label="Sign in" onSignedIn={onHomepageSignedIn} />
@@ -97,6 +98,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
         <div className="page-wrap flex min-h-10 items-center justify-end gap-5 border-t border-[#d7d0c5] py-2 lg:hidden" aria-label="Account controls">
           {signedIn ? <>
             <Link href="/lineup" data-testid="link-mobile-lineup" onClick={() => setOpen(false)} className="text-[12px] font-bold text-[#902f4d]">My lineup</Link>
+            <Link href="/messages" data-testid="link-mobile--messages" onClick={() => setOpen(false)} className="text-[12px] font-bold text-[#902f4d]">Messages</Link>
             <Link href="/referrals" data-testid="link-mobile-referrals" onClick={() => setOpen(false)} className="text-[12px] font-bold text-[#902f4d]">Referrals</Link>
             <Link href="/me/projects" data-testid="link-mobile-my-projects" onClick={() => setOpen(false)} className="text-[12px] font-bold text-[#902f4d]">My projects</Link>
             <button type="button" data-testid="button-mobile-sign-out" onClick={() => void leave()} disabled={signingOut} className="text-[12px] font-semibold underline underline-offset-4">Sign out</button>
@@ -125,10 +127,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
                 <Link href="/" data-testid="link-footer-home" className="hover:text-[#dfb674]">Home</Link>
                 <Link href="/explore" data-testid="link-footer-explore" className="hover:text-[#dfb674]">Explore projects</Link>
                 <Link href="/faq" data-testid="link-footer-faq" className="hover:text-[#dfb674]">FAQ</Link>
-                <Link href="/start/filmmaker" data-testid="link-footer-filmmaker" className="hover:text-[#dfb674]">For filmmakers</Link>
+                <Link href="/start/filmmaker" data-testid="link-footer-filmmaker" className="hover:text-[#dfb674]">Pitch</Link>
                 <Link href="/pricing" className="hover:text-[#dfb674]">Pricing</Link>
-                <Link href="/invest" data-testid="link-footer-invest" className="hover:text-[#dfb674]">For investors</Link>
-                <Link href="/messages" data-testid="link-footer-messages" className="hover:text-[#dfb674]">Messages</Link>
+                <Link href="/invest" data-testid="link-footer-invest" className="hover:text-[#dfb674]">Pledge</Link>
+                {signedIn && <Link href="/messages" data-testid="link-footer-messages" className="hover:text-[#dfb674]">Messages</Link>}
               </div>
               <div className="flex flex-col gap-4">
                 <Link href="/privacy" data-testid="link-footer-privacy" className="hover:text-[#dfb674]">Privacy</Link>

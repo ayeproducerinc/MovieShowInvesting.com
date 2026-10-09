@@ -50,7 +50,6 @@ export default function Home() {
               <ArrowButton href="/explore" testId="link-home-explore" outline>Explore projects</ArrowButton>
             </div>
             <Link href="/pricing" className="mt-5 inline-block text-sm font-semibold underline underline-offset-4">View filmmaker pricing</Link>
-            <p className="home-hero__notice">Pledges are non-binding. No money is collected, and no investment is offered on this site today.</p>
             {stats.isLoading && <div role="status" aria-label="Loading filmmaker count" className="home-hero__count-skeleton" />}
             {stats.isError && <div className="home-hero__count-error" role="status">Community count is temporarily unavailable. <button type="button" data-testid="button-retry-stats" onClick={() => stats.refetch()}>Try again</button></div>}
             {typeof stats.data?.filmmakers === 'number' && stats.data.filmmakers > 0 && <p data-testid="text-filmmaker-count" className="home-hero__count"><span aria-hidden="true" /> {stats.data.filmmakers.toLocaleString()} filmmakers have joined</p>}
