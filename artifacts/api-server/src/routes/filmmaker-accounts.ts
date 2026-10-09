@@ -31,7 +31,7 @@ import {
   GetFilmmakerProjectBackersResponse,
 } from "@workspace/api-zod";
 import { authenticateFilmmaker } from "../lib/filmmaker-auth";
-import { CONFIRMED_BACKERS_SQL, filmmakerBackers, type BackerRow } from "../lib/backer-visibility";
+import { CONFIRMED_BACKERS_SQL, backerTotals, filmmakerBackers, type BackerRow } from "../lib/backer-visibility";
 import { syncReferralRewards } from "../lib/referral-reward-sync";
 
 const router: IRouter = Router();
@@ -140,6 +140,12 @@ router.get("/filmmakers/projects", async (req, res): Promise<void> => {
   const identity = await authenticateFilmmaker(req, res, true);
   if (!identity) return;
   const result = await listFilmmakerAccountProjects(identity.uid, identity.provider);
+  // Private pledge totals for the filmmaker's own projects, listed or not.
+  const pledgeRows = result.projects.length
+    ? (await pool.query<{ project_id: number; investor_id: number; amount: number }>(
+      "select project_id, investor_id, amount from pledges where confirmed = true and project_id = any($1::int[])",
+      [result.projects.map((project) => project.id)],
+    )).rows : [];
   // This is filmmaker hub entry, not a generic authentication or investor request.
   await recordFilmmakerAccountActivity(identity.uid, identity.provider);
   res.json(GetFilmmakerProjectsResponse.parse({
@@ -149,6 +155,7 @@ router.get("/filmmakers/projects", async (req, res): Promise<void> => {
       title: project.title,
       review_state: project.reviewState,
       created_at: project.createdAt,
+      ...backerTotals(pledgeRows.filter((row) => row.project_id === project.id)),
     })),
     has_resumable_draft: result.hasResumableDraft,
     phone_verified: result.phoneVerified,
@@ -288,7 +295,7 @@ router.get("/filmmakers/projects/:project_id/backers", async (req, res): Promise
     return;
   }
   const { rows } = await pool.query<BackerRow>(CONFIRMED_BACKERS_SQL, [[params.data.project_id]]);
-  res.json(GetFilmmakerProjectBackersResponse.parse({ backers: filmmakerBackers(rows) }));
+  res.json(GetFilmmakerProjectBackersResponse.parse({ backers: filmmakerBackers(rows), ...backerTotals(rows) }));
 });
 
 export default router;

@@ -54,6 +54,14 @@ export function filmmakerBackers(rows: BackerRow[]) {
     });
 }
 
+/** Private totals for the filmmaker: confirmed amount and distinct people. */
+export function backerTotals(rows: { investor_id: number; amount: number }[]) {
+  return {
+    confirmed_pledge_total: rows.reduce((sum, row) => sum + row.amount, 0),
+    backer_count: new Set(rows.map((row) => row.investor_id)).size,
+  };
+}
+
 /** Public names for one project: opted-in backers only, summed per person, largest first. */
 export function publicBackers(rows: BackerRow[]) {
   const byInvestor = new Map<number, { name: string; amount: number }>();

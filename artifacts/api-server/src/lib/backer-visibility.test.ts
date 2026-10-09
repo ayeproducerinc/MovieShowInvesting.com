@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { backerEvidence, filmmakerBackers, publicBackers, type BackerRow } from "./backer-visibility";
+import { backerEvidence, backerTotals, filmmakerBackers, publicBackers, type BackerRow } from "./backer-visibility";
+
+test("totals add every confirmed pledge and count each person once", () => {
+  assert.deepEqual(backerTotals([
+    { investor_id: 1, amount: 100 }, { investor_id: 1, amount: 250 }, { investor_id: 2, amount: 500 },
+  ]), { confirmed_pledge_total: 850, backer_count: 2 });
+  assert.deepEqual(backerTotals([]), { confirmed_pledge_total: 0, backer_count: 0 });
+});
 
 const row = (over: Partial<BackerRow>): BackerRow => ({
   project_id: 1, investor_id: 1, amount: 100, name: "Jane Doe", email: "jane@example.com",

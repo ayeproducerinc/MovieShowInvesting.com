@@ -745,6 +745,10 @@ export const JoinFilmmakerCommunityResponse = zod.object({
  * @summary List projects and draft state for the signed-in filmmaker
  */
 
+export const getFilmmakerProjectsResponseProjectsItemConfirmedPledgeTotalMin = 0;
+
+export const getFilmmakerProjectsResponseProjectsItemBackerCountMin = 0;
+
 
 
 export const GetFilmmakerProjectsResponse = zod.object({
@@ -753,7 +757,9 @@ export const GetFilmmakerProjectsResponse = zod.object({
   "slug": zod.string().nullable(),
   "title": zod.string().nullable(),
   "review_state": zod.enum(['pending', 'approved', 'hidden']),
-  "created_at": zod.coerce.date()
+  "created_at": zod.coerce.date(),
+  "confirmed_pledge_total": zod.number().int().min(getFilmmakerProjectsResponseProjectsItemConfirmedPledgeTotalMin).describe('Sum of confirmed pledges to this project; private to its filmmaker'),
+  "backer_count": zod.number().int().min(getFilmmakerProjectsResponseProjectsItemBackerCountMin).describe('Distinct people with a confirmed pledge to this project')
 })),
   "has_resumable_draft": zod.boolean(),
   "phone_verified": zod.boolean()
@@ -881,10 +887,16 @@ export const GetFilmmakerProjectBackersParams = zod.object({
   "project_id": zod.coerce.number().int().min(1)
 })
 
+export const getFilmmakerProjectBackersResponseConfirmedPledgeTotalMin = 0;
+
+export const getFilmmakerProjectBackersResponseBackerCountMin = 0;
+
 
 
 
 export const GetFilmmakerProjectBackersResponse = zod.object({
+  "confirmed_pledge_total": zod.number().int().min(getFilmmakerProjectBackersResponseConfirmedPledgeTotalMin).describe('Sum of confirmed pledges to this project; private to its filmmaker'),
+  "backer_count": zod.number().int().min(getFilmmakerProjectBackersResponseBackerCountMin).describe('Distinct people with a confirmed pledge to this project'),
   "backers": zod.array(zod.object({
   "name": zod.string().nullable().describe('Null for pledges signed before the backer-visibility notice existed'),
   "email": zod.string().nullable().describe('Null for pledges signed before the backer-visibility notice existed'),

@@ -9,6 +9,9 @@ export type ProjectHubItem = {
   approved: boolean;
   hidden: boolean;
   created_at: string;
+  /** Private confirmed pledge total and distinct backers. */
+  pledged_total?: number;
+  backer_count?: number;
 };
 
 export type ProjectHubViewProps = {
@@ -149,6 +152,7 @@ export function ProjectHubView({
                             <span>
                               <span className="project-hub__project-title" data-testid={`text-project-title-${project.project_id}`}>{project.title?.trim() || 'Untitled project'}</span>
                               <span className="project-hub__project-date" data-testid={`text-project-date-${project.project_id}`}>Saved {formattedDate(project.created_at)}</span>
+                              {project.backer_count !== undefined && <span className="project-hub__project-date" data-testid={`text-project-pledged-${project.project_id}`}>{project.backer_count ? `${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(project.pledged_total ?? 0)} pledged · ${project.backer_count} backer${project.backer_count === 1 ? '' : 's'}` : 'No pledges yet'}</span>}
                             </span>
                             <span className={`project-hub__status project-hub__meta project-hub__status--${status.toLowerCase()}`} data-testid={`status-project-${project.project_id}`}>{status}</span>
                             <ArrowUpRight className="project-hub__project-arrow" size={19} strokeWidth={1.7} aria-hidden="true" />

@@ -3055,7 +3055,7 @@ components:
     FilmmakerProjectListItem:
       type: object
       additionalProperties: false
-      required: [id, slug, title, review_state, created_at]
+      required: [id, slug, title, review_state, created_at, confirmed_pledge_total, backer_count]
       properties:
         id: { type: integer, minimum: 1 }
         slug: { type: ["string", "null"] }
@@ -3064,6 +3064,8 @@ components:
           type: string
           enum: [pending, approved, hidden]
         created_at: { type: string, format: date-time }
+        confirmed_pledge_total: { type: integer, minimum: 0, description: Sum of confirmed pledges to this project; private to its filmmaker }
+        backer_count: { type: integer, minimum: 0, description: Distinct people with a confirmed pledge to this project }
     FilmmakerProjectClaim:
       type: object
       additionalProperties: false
@@ -3260,8 +3262,10 @@ components:
     FilmmakerProjectBackers:
       type: object
       additionalProperties: false
-      required: [backers]
+      required: [backers, confirmed_pledge_total, backer_count]
       properties:
+        confirmed_pledge_total: { type: integer, minimum: 0, description: Sum of confirmed pledges to this project; private to its filmmaker }
+        backer_count: { type: integer, minimum: 0, description: Distinct people with a confirmed pledge to this project }
         backers:
           type: array
           items:

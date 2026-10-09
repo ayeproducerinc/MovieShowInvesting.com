@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { backerLabel, publicBackersLine } from './backer-display.js';
+import { backerLabel, pledgeSummary, publicBackersLine } from './backer-display.js';
+
+test('the filmmaker sees the total and how many people pledged', () => {
+  const fmt = (n: number) => `$${n}`;
+  assert.equal(pledgeSummary({ confirmed_pledge_total: 0, backer_count: 0 }, fmt), 'No pledges yet');
+  assert.equal(pledgeSummary({ confirmed_pledge_total: 100, backer_count: 1 }, fmt), '$100 from 1 backer');
+  assert.equal(pledgeSummary({ confirmed_pledge_total: 850, backer_count: 2 }, fmt), '$850 from 2 backers');
+});
 
 test('pre-notice pledges show as an unnamed backer', () => {
   assert.equal(backerLabel({ name: null, name_shared: false }), 'Backer (name not shared)');

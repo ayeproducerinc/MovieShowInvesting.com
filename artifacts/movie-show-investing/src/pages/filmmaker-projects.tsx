@@ -180,6 +180,8 @@ export default function FilmmakerProjects() {
     approved: project.review_state === 'approved',
     hidden: project.review_state === 'hidden',
     created_at: project.created_at,
+    pledged_total: project.confirmed_pledge_total,
+    backer_count: project.backer_count,
   }));
   return <>
     {claimError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{claimError} <Link href="/start/filmmaker">Open this browser’s worksheet</Link> · <button type="button" onClick={() => void linkCurrentVisit()}>Try linking again</button></div>}

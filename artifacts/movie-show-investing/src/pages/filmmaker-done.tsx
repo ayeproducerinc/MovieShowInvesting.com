@@ -3,7 +3,7 @@ import { ArrowRight, Check, RotateCcw, X } from 'lucide-react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { getFilmmakerResult, getGetFilmmakerResultQueryKey, useGetFilmmakerResult, useGetPitchReviewCheckoutConfig, useGetPitchReviewCheckoutStatus, useStartPitchReviewCheckout, useUpdateFilmmakerShowcase } from '@workspace/api-client-react';
 import type { FilmmakerResult, FilmmakerShowcaseUpdate, GetPitchReviewCheckoutStatus200 } from '@workspace/api-client-react';
-import { FilmmakerBackers } from '@/components/filmmaker-backers';
+import { FilmmakerBackers, PledgedSoFar } from '@/components/filmmaker-backers';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
 import { closeGuestConfirmation, guestConfirmationVisible } from '@/lib/filmmaker-confirmation';
 import { setFilmmakerAction } from '@/lib/filmmaker-intent';
@@ -495,6 +495,7 @@ function FilmmakerDoneContent({ identityId }: { identityId: string }) {
                 <span className="dossier-kicker">Where things stand</span>
                 <div className="dossier-value" data-testid="status-project-review">{activeShowcaseStatus?.hidden ? 'Hidden.' : activeShowcaseStatus?.approved && activeShowcaseStatus.showcase_requested ? 'Approved for listing.' : reviewStatus.data?.declined ? 'Review completed.' : activeShowcaseStatus?.showcase_requested ? 'Review pending.' : 'Unlisted.'}</div>
                 <p>{activeShowcaseStatus?.hidden ? 'This project is hidden and its page is unavailable to viewers, including people with its link. Contact us if you believe this is an error.' : activeShowcaseStatus?.approved && activeShowcaseStatus.showcase_requested ? 'Showcase review is approved. This project is eligible for discovery while it remains approved and not hidden.' : reviewStatus.data?.declined ? 'Your pitch was not approved. Your free unlisted page remains available.' : activeShowcaseStatus?.showcase_requested ? 'Your showcase review request is pending. The page is accessible to anyone with its link but is not listed for discovery.' : 'Your project page is accessible to anyone with its link but is not listed for discovery. No showcase review has been requested.'}</p>
+                 {user && data.project_id && <PledgedSoFar projectId={data.project_id} identityId={identityId} listed={Boolean(activeShowcaseStatus?.approved && activeShowcaseStatus.showcase_requested)}/>}
                  <p className="dossier-line">Investors can pledge non-binding interest from your project page as soon as it’s submitted. Only approved projects appear in Explore, and pledge totals show publicly only after approval. No investment money is collected here. Editorial review is optional and costs $49 once per pitch. {!checkoutEnabled && 'Checkout is currently unavailable; your free pitch remains saved.'}</p>
               </div>
               <div className="dossier-actions" style={{ marginTop: 22 }}>

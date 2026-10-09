@@ -788,6 +788,16 @@ export interface FilmmakerProjectListItem {
   title: string | null;
   review_state: FilmmakerProjectListItemReviewState;
   created_at: string;
+  /**
+     * Sum of confirmed pledges to this project; private to its filmmaker
+     * @minimum 0
+     */
+  confirmed_pledge_total: number;
+  /**
+     * Distinct people with a confirmed pledge to this project
+     * @minimum 0
+     */
+  backer_count: number;
 }
 
 export interface FilmmakerProjects {
@@ -1107,6 +1117,16 @@ export interface FilmmakerBacker {
 }
 
 export interface FilmmakerProjectBackers {
+  /**
+     * Sum of confirmed pledges to this project; private to its filmmaker
+     * @minimum 0
+     */
+  confirmed_pledge_total: number;
+  /**
+     * Distinct people with a confirmed pledge to this project
+     * @minimum 0
+     */
+  backer_count: number;
   backers: FilmmakerBacker[];
 }
 
