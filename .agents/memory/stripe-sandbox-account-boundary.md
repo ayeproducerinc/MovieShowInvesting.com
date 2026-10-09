@@ -14,3 +14,9 @@ Application environment and connector credential selection are independent. A de
 **Why:** Selecting development mode changes the application's expected account, not the external account returned by the connector.
 
 **How to apply:** Read-only account verification should precede sandbox checkout. If the approved live account is returned instead, preserve live access and obtain owner-approved sandbox access separately.
+
+The owner selected Replit preview only for testing features after sandbox payment. Do not switch the published site's checkout to sandbox as part of that setup.
+
+**Why:** The user explicitly chose preview-only testing with live payments unchanged.
+
+**How to apply:** Scope sandbox connection changes and test-payment verification to development. Obtain separate explicit approval before changing the published site's payment mode.
