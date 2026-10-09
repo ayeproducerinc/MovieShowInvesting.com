@@ -20,4 +20,6 @@ export const AdminSection = {
   messages: 'messages',
   channels: 'channels',
   'email-log': 'email-log',
+  quiet: 'quiet',
+  research: 'research',
 } as const;

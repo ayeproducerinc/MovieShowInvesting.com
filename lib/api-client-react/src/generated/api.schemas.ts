@@ -1426,6 +1426,40 @@ export interface InvestorUpdateEmailsInput {
   enabled: boolean;
 }
 
+/**
+ * @nullable
+ */
+export type InvestorResearchQuestionAnswer = typeof InvestorResearchQuestionAnswer[keyof typeof InvestorResearchQuestionAnswer] | null;
+
+
+export const InvestorResearchQuestionAnswer = {
+  yes: 'yes',
+  no: 'no',
+  not_sure: 'not_sure',
+} as const;
+
+export interface InvestorResearchQuestion {
+  question: string;
+  note: string;
+  /** @nullable */
+  answer: InvestorResearchQuestionAnswer;
+  /** True once the account has a signed pledge */
+  can_answer: boolean;
+}
+
+export type InvestorResearchAnswerInputAnswer = typeof InvestorResearchAnswerInputAnswer[keyof typeof InvestorResearchAnswerInputAnswer];
+
+
+export const InvestorResearchAnswerInputAnswer = {
+  yes: 'yes',
+  no: 'no',
+  not_sure: 'not_sure',
+} as const;
+
+export interface InvestorResearchAnswerInput {
+  answer: InvestorResearchAnswerInputAnswer;
+}
+
 export interface ExploreProject {
   /** Backers who chose public display; only on approved, listed projects */
   public_backers?: PublicBacker[];
@@ -1860,6 +1894,8 @@ export const AdminSection = {
   messages: 'messages',
   channels: 'channels',
   'email-log': 'email-log',
+  quiet: 'quiet',
+  research: 'research',
 } as const;
 
 export interface AdminTable {

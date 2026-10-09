@@ -9,6 +9,7 @@ import { InvestorProjectCard } from '@/components/investor-project-card';
 import { AgeAcknowledgment, useAgeStatus } from '@/components/age-acknowledgment';
 import { ProposalSummary } from '@/components/proposal-summary';
 import { InvestorResultCard } from '@/components/investor-result-card';
+import { ResearchQuestion } from '@/components/research-question';
 import { trackInvestorEvent } from '@/lib/analytics';
 import { LocationPicker } from '@/components/location-picker';
 import { canUseSingleProjectDraft, cap, projectPageNeedsNewEntry, MAX_PROJECTS, PROJECT_MINIMUM, selectAutoBuildProjects, singleProjectLineup, split } from '@/lib/investor-lineup';
@@ -119,6 +120,7 @@ export function InvestorDone() {
       <div className="inv-actions">{current.data.intent.status === 'saved' && (signedIn ? <Link href="/invest?revise=1" className="inv-button" data-testid="link-done-confirm">Finish my worksheet <ArrowRight size={16}/></Link> : <GoogleSignInButton auth={getInitializedAuth()} queryClient={queryClient} disabled={!firebaseReady} className="inv-button" testId="button-done-sign-in" label="Sign in to finish" />)}<Link href="/lineup" className={`inv-button ${current.data.intent.status === 'saved' ? 'secondary' : ''}`} data-testid="link-done-lineup">View my {current.data.intent.status === 'confirmed' ? 'confirmed' : 'saved'} lineup <ArrowRight size={16}/></Link><Link href="/explore" className="inv-button secondary" data-testid="link-done-explore">Explore projects</Link></div>
       {!signedIn && current.data.intent.status === 'saved' && <p className="inv-small">If this is guest interest, sign in and explicitly claim it from this original browser on your lineup if it is not linked to your account.</p>}
     </div> : latestConfirmedEntry ? <div className="inv-state" style={{maxWidth:850}}><p className="inv-kicker">Interest confirmed / Private record</p><h1>Your interest is confirmed.</h1><InvestorResultCard entry={latestConfirmedEntry}/><div className="inv-actions"><Link href="/lineup" className="inv-button">View my confirmed lineup <ArrowRight size={16}/></Link><Link href="/explore" className="inv-button secondary">Explore projects</Link></div></div> : <div className="inv-state"><p className="inv-kicker">Nothing linked yet</p><h1>Your story starts here.</h1><p>There is no saved investor interest associated with this {signedIn ? 'account' : 'visit'}. {signedIn ? 'If you saved as a guest in this browser, choose to claim it from your lineup.' : ''}</p><div className="inv-actions">{signedIn && <Link className="inv-button" href="/lineup" data-testid="link-done-claim">Check for guest interest <ArrowRight size={16}/></Link>}<Link className="inv-button secondary" href="/invest" data-testid="link-done-invest">Start the worksheet <ArrowRight size={16}/></Link></div></div>}
+    {signedIn && <ResearchQuestion identityId={identityId}/>}
   </div></section>;
 }
 

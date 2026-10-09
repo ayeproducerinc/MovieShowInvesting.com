@@ -12,6 +12,7 @@
     "migrate:onboarding": "node migrate-onboarding.mjs",
     "migrate:project-updates": "node migrate-project-updates.mjs",
     "migrate:money-date": "node migrate-money-date.mjs",
+    "migrate:research-answers": "node migrate-research-answers.mjs",
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
   },

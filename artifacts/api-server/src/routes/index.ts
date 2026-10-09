@@ -22,6 +22,7 @@ import conversationsRouter from "./conversations";
 import adminConversationsRouter from "./admin-conversations";
 import referralsRouter from "./referrals";
 import projectUpdatesRouter from "./project-updates";
+import researchRouter from "./research";
 
 const router: IRouter = Router();
 router.use(draftResetRouter);
@@ -48,5 +49,6 @@ router.use(interestAlertsRouter);
 router.use(conversationsRouter);
 router.use(adminConversationsRouter);
 router.use(projectUpdatesRouter);
+router.use(researchRouter);
 
 export default router;

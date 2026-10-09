@@ -105,6 +105,8 @@ import type {
   InvestorMatches,
   InvestorNotificationInput,
   InvestorNotificationPermission,
+  InvestorResearchAnswerInput,
+  InvestorResearchQuestion,
   InvestorUpdateEmails,
   InvestorUpdateEmailsInput,
   LocationSearchPayload,
@@ -3897,6 +3899,171 @@ export const useSetInvestorUpdateEmails = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getSetInvestorUpdateEmailsMutationOptions(options));
+    }
+
+export const getGetInvestorResearchQuestionUrl = () => {
+
+
+
+
+  return `/api/investor/research-question`
+}
+
+/**
+ * @summary The optional post-signing research question and the signed-in investor's answer, if any
+ */
+export const getInvestorResearchQuestion = async ( options?: Parameters<typeof customFetch>[1]): Promise<InvestorResearchQuestion> => {
+
+  return customFetch<InvestorResearchQuestion>(getGetInvestorResearchQuestionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInvestorResearchQuestionQueryKey = () => {
+    return [
+    `/api/investor/research-question`
+    ] as const;
+    }
+
+
+export const getGetInvestorResearchQuestionQueryOptions = <TData = Awaited<ReturnType<typeof getInvestorResearchQuestion>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvestorResearchQuestion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInvestorResearchQuestionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInvestorResearchQuestion>>> = ({ signal }) => getInvestorResearchQuestion({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInvestorResearchQuestion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInvestorResearchQuestionQueryResult = NonNullable<Awaited<ReturnType<typeof getInvestorResearchQuestion>>>
+export type GetInvestorResearchQuestionQueryError = ErrorType<void>
+
+
+/**
+ * @summary The optional post-signing research question and the signed-in investor's answer, if any
+ */
+
+export function useGetInvestorResearchQuestion<TData = Awaited<ReturnType<typeof getInvestorResearchQuestion>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvestorResearchQuestion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInvestorResearchQuestionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAnswerInvestorResearchQuestionUrl = () => {
+
+
+
+
+  return `/api/investor/research-question`
+}
+
+/**
+ * @summary Save the signed-in investor's answer to the research question (optional; can be changed)
+ */
+export const answerInvestorResearchQuestion = async (investorResearchAnswerInput: InvestorResearchAnswerInput, options?: Parameters<typeof customFetch>[1]): Promise<InvestorResearchQuestion> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InvestorResearchQuestion>(getAnswerInvestorResearchQuestionUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(investorResearchAnswerInput)
+  }
+);}
+
+
+
+
+
+export const getAnswerInvestorResearchQuestionMutationKey = () => ['answerInvestorResearchQuestion'] as const;
+
+export const getAnswerInvestorResearchQuestionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof answerInvestorResearchQuestion>>, TError,AnswerInvestorResearchQuestionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof answerInvestorResearchQuestion>>, TError,AnswerInvestorResearchQuestionMutationVariables, TContext> => {
+
+const mutationKey = getAnswerInvestorResearchQuestionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof answerInvestorResearchQuestion>>, AnswerInvestorResearchQuestionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  answerInvestorResearchQuestion(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnswerInvestorResearchQuestionMutationResult = NonNullable<Awaited<ReturnType<typeof answerInvestorResearchQuestion>>>
+    export type AnswerInvestorResearchQuestionMutationBody = BodyType<InvestorResearchAnswerInput>
+    export type AnswerInvestorResearchQuestionMutationError = ErrorType<void>
+    export type AnswerInvestorResearchQuestionMutationVariables = {data: BodyType<InvestorResearchAnswerInput>}
+
+    /**
+ * @summary Save the signed-in investor's answer to the research question (optional; can be changed)
+ */
+export const useAnswerInvestorResearchQuestion = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof answerInvestorResearchQuestion>>, TError,AnswerInvestorResearchQuestionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof answerInvestorResearchQuestion>>,
+        TError,
+        AnswerInvestorResearchQuestionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAnswerInvestorResearchQuestionMutationOptions(options));
     }
 
 export const getSelectFilmmakerProjectUrl = (projectId: number,) => {

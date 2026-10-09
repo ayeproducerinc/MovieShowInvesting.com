@@ -32,6 +32,8 @@ const SECTIONS: { id: AdminSection; label: string; description: string }[] = [
   { id: 'messages', label: 'Messages', description: 'Messages received through the site.' },
   { id: 'channels', label: 'Channels', description: 'Campaign and referral attribution in one place.' },
   { id: 'email-log', label: 'Email log', description: 'A record of outgoing email activity.' },
+  { id: 'quiet', label: 'Quiet projects', description: 'Projects with no approved update in 30 days. A list only; nothing is sent automatically.' },
+  { id: 'research', label: 'Research', description: 'Answers to the optional question investors see after signing.' },
 ];
 const APP_NAME = 'movie-show-investing';
 

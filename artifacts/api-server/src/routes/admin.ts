@@ -35,12 +35,13 @@ import {
   CleanupAdminTestProjectsResponse,
 } from "@workspace/api-zod";
 import { authorizeAdminIdentity } from "../lib/admin-auth";
+import { quietProjects, researchRows, RESEARCH_QUESTION_KEY } from "../lib/admin-followup";
 import { reconcileReviewCheckouts } from "../lib/pitch-review-payments";
 import { checkFilmmakerPitchDeckStatus, cleanupArchivedTestProjectMedia } from "./filmmaker-draft-materials";
 import { trailerThumbnail } from "./projects";
 
 const router: IRouter = Router();
-type Section = "summary" | "pledges" | "location" | "funnels" | "market" | "price-test" | "queues" | "messages" | "channels" | "email-log";
+type Section = "summary" | "pledges" | "location" | "funnels" | "market" | "price-test" | "queues" | "messages" | "channels" | "email-log" | "quiet" | "research";
 type AdminTable = { section: Section; title: string; columns: string[]; rows: string[][]; total: number };
 
 const SECTION_TITLES: Record<Section, string> = {
@@ -54,6 +55,8 @@ const SECTION_TITLES: Record<Section, string> = {
   messages: "Messages",
   channels: "Channels",
   "email-log": "Email log",
+  quiet: "Quiet projects",
+  research: "Research question",
 };
 
 function text(value: unknown): string {
@@ -368,6 +371,37 @@ async function getAdminTable(section: Section): Promise<AdminTable> {
       .sort((a, b) => a.kind.localeCompare(b.kind) || a.value.localeCompare(b.value))
       .map((item) => [item.kind, item.value, item.visitorIds.size, item.filmmakers, item.investors]);
     return buildTable(section, ["Attribution", "Value", "Visitors", "Filmmakers", "Investors"], rows);
+  }
+
+  if (section === "quiet") {
+    // A list only: no automatic messages. Tolerates a not-yet-migrated updates table.
+    const { rows: latest } = await pool.query<{ project_id: number; last: Date }>(
+      "select project_id, max(reviewed_at) as last from project_updates where status = 'approved' group by project_id",
+    ).catch(() => ({ rows: [] as { project_id: number; last: Date }[] }));
+    const lastByProject = new Map(latest.map((row) => [row.project_id, row.last]));
+    const filmmakerById = new Map(filmmakers.map((filmmaker) => [filmmaker.id, filmmaker]));
+    const quiet = quietProjects(projects.map((project) => {
+      const filmmaker = project.filmmakerId != null ? filmmakerById.get(project.filmmakerId) : undefined;
+      const backers = new Set(confirmedPledges.filter((pledge) => pledge.projectId === project.id).map((pledge) => pledge.investorId));
+      return {
+        id: project.id, title: project.title, createdAt: project.createdAt, hidden: project.hidden,
+        filmmakerName: filmmaker?.name ?? null, filmmakerEmail: filmmaker?.email ?? null,
+        lastApprovedUpdateAt: lastByProject.get(project.id) ?? null, backerCount: backers.size,
+      };
+    }), new Date());
+    const rows = quiet.map((project) => [
+      project.title ?? "", project.filmmakerName ?? "", project.filmmakerEmail ?? "",
+      project.lastApprovedUpdateAt ?? "None yet", project.backerCount,
+    ]);
+    return buildTable(section, ["Project", "Filmmaker", "Filmmaker email", "Last approved update", "Backers"], rows);
+  }
+
+  if (section === "research") {
+    const { rows: counts } = await pool.query<{ answer: string; count: number }>(
+      "select answer, count(*)::int as count from investor_research_answers where question_key = $1 group by answer",
+      [RESEARCH_QUESTION_KEY],
+    ).catch(() => ({ rows: [] as { answer: string; count: number }[] }));
+    return buildTable(section, ["Answer", "Count"], researchRows(counts));
   }
 
   const rows = emailLogs.map((entry) => [entry.to, entry.type, entry.status, entry.createdAt]);

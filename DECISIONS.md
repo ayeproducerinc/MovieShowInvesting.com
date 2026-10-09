@@ -174,7 +174,7 @@ The filmmaker sees their own stage's group plus the “Any stage” group.
 
 ## Admin follow-up and research
 
-- Quiet-project list: an admin page of projects with no approved update in 30 days, showing title, filmmaker contact, last update date, and number of backers. A list only; no automatic messages.
+- Quiet-project list: an admin page of projects with no approved update in 30 days, showing title, filmmaker contact, last update date, and number of backers. A list only; no automatic messages. Implementation (2026-10-09): projects younger than 30 days and hidden projects are not listed; quietest first.
 - Research question: after an investor signs, ask one optional question: **“If you could set this money aside today and earn interest until the offering opens, would you?”** Answers: Yes, No, Not sure. Under it show: **“This is a research question. No account is being offered.”** Store the answer and show the counts in admin.
 
 ## Do not add (pledge-first features)

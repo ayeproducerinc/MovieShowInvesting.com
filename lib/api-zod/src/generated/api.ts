@@ -1260,6 +1260,32 @@ export const SetInvestorUpdateEmailsResponse = zod.object({
 
 
 /**
+ * @summary The optional post-signing research question and the signed-in investor's answer, if any
+ */
+export const GetInvestorResearchQuestionResponse = zod.object({
+  "question": zod.string(),
+  "note": zod.string(),
+  "answer": zod.union([zod.literal('yes'),zod.literal('no'),zod.literal('not_sure'),zod.literal(null)]).nullable(),
+  "can_answer": zod.boolean().describe('True once the account has a signed pledge')
+})
+
+
+/**
+ * @summary Save the signed-in investor's answer to the research question (optional; can be changed)
+ */
+export const AnswerInvestorResearchQuestionBody = zod.object({
+  "answer": zod.enum(['yes', 'no', 'not_sure'])
+})
+
+export const AnswerInvestorResearchQuestionResponse = zod.object({
+  "question": zod.string(),
+  "note": zod.string(),
+  "answer": zod.union([zod.literal('yes'),zod.literal('no'),zod.literal('not_sure'),zod.literal(null)]).nullable(),
+  "can_answer": zod.boolean().describe('True once the account has a signed pledge')
+})
+
+
+/**
  * @summary Select an account-owned project for the existing visitor-scoped editing routes
  */
 
@@ -2818,7 +2844,7 @@ export const GetAdminMeResponse = zod.object({
  * @summary Read one real-data admin table for display and CSV export
  */
 export const GetAdminTableParams = zod.object({
-  "section": zod.enum(['summary', 'pledges', 'location', 'funnels', 'market', 'price-test', 'queues', 'messages', 'channels', 'email-log'])
+  "section": zod.enum(['summary', 'pledges', 'location', 'funnels', 'market', 'price-test', 'queues', 'messages', 'channels', 'email-log', 'quiet', 'research'])
 })
 
 export const getAdminTableResponseTotalMin = 0;
@@ -2826,7 +2852,7 @@ export const getAdminTableResponseTotalMin = 0;
 
 
 export const GetAdminTableResponse = zod.object({
-  "section": zod.enum(['summary', 'pledges', 'location', 'funnels', 'market', 'price-test', 'queues', 'messages', 'channels', 'email-log']),
+  "section": zod.enum(['summary', 'pledges', 'location', 'funnels', 'market', 'price-test', 'queues', 'messages', 'channels', 'email-log', 'quiet', 'research']),
   "title": zod.string(),
   "columns": zod.array(zod.string()),
   "rows": zod.array(zod.array(zod.string())),

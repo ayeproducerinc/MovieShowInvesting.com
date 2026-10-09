@@ -1050,6 +1050,45 @@ paths:
           description: Verified sign-in required
         "404":
           description: No investor record for this account
+  /investor/research-question:
+    get:
+      operationId: getInvestorResearchQuestion
+      tags: [investor]
+      summary: The optional post-signing research question and the signed-in investor's answer, if any
+      security:
+        - firebaseBearer: []
+      responses:
+        "200":
+          description: Question and current answer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestorResearchQuestion"
+        "401":
+          description: Verified sign-in required
+    put:
+      operationId: answerInvestorResearchQuestion
+      tags: [investor]
+      summary: Save the signed-in investor's answer to the research question (optional; can be changed)
+      security:
+        - firebaseBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestorResearchAnswerInput"
+      responses:
+        "200":
+          description: Answer saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestorResearchQuestion"
+        "401":
+          description: Verified sign-in required
+        "404":
+          description: No signed pledge on this account yet
   /filmmakers/projects/{project_id}/select:
     post:
       operationId: selectFilmmakerProject
@@ -3671,6 +3710,23 @@ components:
       required: [enabled]
       properties:
         enabled: { type: boolean }
+    InvestorResearchQuestion:
+      type: object
+      additionalProperties: false
+      required: [question, note, answer, can_answer]
+      properties:
+        question: { type: string }
+        note: { type: string }
+        answer:
+          type: ["string", "null"]
+          enum: [yes, no, not_sure, null]
+        can_answer: { type: boolean, description: True once the account has a signed pledge }
+    InvestorResearchAnswerInput:
+      type: object
+      additionalProperties: false
+      required: [answer]
+      properties:
+        answer: { type: string, enum: [yes, no, not_sure] }
     ExploreProject:
       type: object
       additionalProperties: false
@@ -4071,7 +4127,7 @@ components:
         role: { type: string, enum: [admin] }
     AdminSection:
       type: string
-      enum: [summary, pledges, location, funnels, market, price-test, queues, messages, channels, email-log]
+      enum: [summary, pledges, location, funnels, market, price-test, queues, messages, channels, email-log, quiet, research]
     AdminTable:
       type: object
       required: [section, title, columns, rows, total]
