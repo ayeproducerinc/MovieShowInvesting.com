@@ -1130,6 +1130,180 @@ export interface FilmmakerProjectBackers {
   backers: FilmmakerBacker[];
 }
 
+export interface FilmmakerProjectUpdateInput {
+  milestone_key: string;
+  /** @nullable */
+  role?: string | null;
+  /**
+     * @maxLength 80
+     * @nullable
+     */
+  person_name?: string | null;
+  /** The named person agreed to be named publicly */
+  name_consent?: boolean;
+  /**
+     * @maxLength 60
+     * @nullable
+     */
+  custom_label?: string | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  note?: string | null;
+}
+
+export interface PublicProjectUpdate {
+  /** @minimum 1 */
+  id: number;
+  milestone_key: string;
+  label: string;
+  /** @nullable */
+  role: string | null;
+  /**
+     * Shown only when the filmmaker confirmed the person agreed to be named
+     * @nullable
+     */
+  person_name: string | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  note: string | null;
+  approved_at: string;
+}
+
+export interface PublicProjectUpdates {
+  updates: PublicProjectUpdate[];
+  /**
+     * Latest approval for listing
+     * @nullable
+     */
+  listed_at: string | null;
+}
+
+export type FilmmakerProjectUpdateStatus = typeof FilmmakerProjectUpdateStatus[keyof typeof FilmmakerProjectUpdateStatus];
+
+
+export const FilmmakerProjectUpdateStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface FilmmakerProjectUpdate {
+  /** @minimum 1 */
+  id: number;
+  milestone_key: string;
+  label: string;
+  /** @nullable */
+  role: string | null;
+  /**
+     * Shown only when the filmmaker confirmed the person agreed to be named
+     * @nullable
+     */
+  person_name: string | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  note: string | null;
+  approved_at: string;
+  status: FilmmakerProjectUpdateStatus;
+  created_at: string;
+  /** @nullable */
+  reviewed_at: string | null;
+}
+
+export type MilestoneOptionGroup = typeof MilestoneOptionGroup[keyof typeof MilestoneOptionGroup];
+
+
+export const MilestoneOptionGroup = {
+  idea: 'idea',
+  production: 'production',
+  distribution: 'distribution',
+  any: 'any',
+} as const;
+
+export interface MilestoneOption {
+  key: string;
+  label: string;
+  group: MilestoneOptionGroup;
+}
+
+export interface TeamRoleOption {
+  key: string;
+  label: string;
+}
+
+export interface FilmmakerProjectUpdates {
+  updates: FilmmakerProjectUpdate[];
+  milestone_options: MilestoneOption[];
+  team_roles: TeamRoleOption[];
+  /**
+     * Confirmed backers whose latest notification permission is allowed
+     * @minimum 0
+     */
+  backers_to_email: number;
+}
+
+export type AdminProjectUpdateStatus = typeof AdminProjectUpdateStatus[keyof typeof AdminProjectUpdateStatus];
+
+
+export const AdminProjectUpdateStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+/**
+ * send when no update email went to this project's backers in the last 14 days
+ */
+export type AdminProjectUpdateEmailDecision = typeof AdminProjectUpdateEmailDecision[keyof typeof AdminProjectUpdateEmailDecision];
+
+
+export const AdminProjectUpdateEmailDecision = {
+  send: 'send',
+  skip_recent: 'skip_recent',
+} as const;
+
+export interface AdminProjectUpdate {
+  /** @minimum 1 */
+  id: number;
+  /** @minimum 1 */
+  project_id: number;
+  /** @nullable */
+  project_title: string | null;
+  /** @nullable */
+  project_slug: string | null;
+  /** @nullable */
+  filmmaker_name: string | null;
+  /** @nullable */
+  filmmaker_email: string | null;
+  milestone_key: string;
+  label: string;
+  /** @nullable */
+  role: string | null;
+  /** @nullable */
+  person_name: string | null;
+  /** @nullable */
+  note: string | null;
+  status: AdminProjectUpdateStatus;
+  created_at: string;
+  /** @nullable */
+  reviewed_at: string | null;
+  /** @nullable */
+  reviewed_by: string | null;
+  /** send when no update email went to this project's backers in the last 14 days */
+  email_decision: AdminProjectUpdateEmailDecision;
+  /** @minimum 0 */
+  backers_to_email: number;
+}
+
+export interface AdminProjectUpdates {
+  updates: AdminProjectUpdate[];
+}
+
 export interface ExploreProject {
   /** Backers who chose public display; only on approved, listed projects */
   public_backers?: PublicBacker[];
@@ -1761,6 +1935,19 @@ export type SearchLocationsParams = {
  */
 query: string;
 };
+
+export type GetAdminProjectUpdatesParams = {
+status?: GetAdminProjectUpdatesStatus;
+};
+
+export type GetAdminProjectUpdatesStatus = typeof GetAdminProjectUpdatesStatus[keyof typeof GetAdminProjectUpdatesStatus];
+
+
+export const GetAdminProjectUpdatesStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
 
 export type UploadFilmmakerDraftImageParams = {
 kind: UploadFilmmakerDraftImageKind;

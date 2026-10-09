@@ -908,6 +908,233 @@ export const GetFilmmakerProjectBackersResponse = zod.object({
 
 
 /**
+ * @summary The filmmaker's own project updates (any status), milestone options and the number of backers who would be emailed
+ */
+
+
+
+export const GetFilmmakerProjectUpdatesParams = zod.object({
+  "project_id": zod.coerce.number().int().min(1)
+})
+
+
+export const getFilmmakerProjectUpdatesResponseUpdatesItemNoteMax = 500;
+
+export const getFilmmakerProjectUpdatesResponseBackersToEmailMin = 0;
+
+
+
+export const GetFilmmakerProjectUpdatesResponse = zod.object({
+  "updates": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "milestone_key": zod.string(),
+  "label": zod.string(),
+  "role": zod.string().nullable(),
+  "person_name": zod.string().nullable().describe('Shown only when the filmmaker confirmed the person agreed to be named'),
+  "note": zod.string().max(getFilmmakerProjectUpdatesResponseUpdatesItemNoteMax).nullable(),
+  "approved_at": zod.coerce.date(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "created_at": zod.coerce.date(),
+  "reviewed_at": zod.coerce.date().nullable()
+})),
+  "milestone_options": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "group": zod.enum(['idea', 'production', 'distribution', 'any'])
+})),
+  "team_roles": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string()
+})),
+  "backers_to_email": zod.number().int().min(getFilmmakerProjectUpdatesResponseBackersToEmailMin).describe('Confirmed backers whose latest notification permission is allowed')
+})
+
+
+/**
+ * @summary Post a milestone update; it waits for owner review before appearing publicly or being emailed
+ */
+
+
+
+export const CreateFilmmakerProjectUpdateParams = zod.object({
+  "project_id": zod.coerce.number().int().min(1)
+})
+
+export const createFilmmakerProjectUpdateBodyPersonNameMax = 80;
+
+export const createFilmmakerProjectUpdateBodyCustomLabelMax = 60;
+
+export const createFilmmakerProjectUpdateBodyNoteMax = 500;
+
+
+
+export const CreateFilmmakerProjectUpdateBody = zod.object({
+  "milestone_key": zod.string(),
+  "role": zod.string().nullish(),
+  "person_name": zod.string().max(createFilmmakerProjectUpdateBodyPersonNameMax).nullish(),
+  "name_consent": zod.boolean().optional().describe('The named person agreed to be named publicly'),
+  "custom_label": zod.string().max(createFilmmakerProjectUpdateBodyCustomLabelMax).nullish(),
+  "note": zod.string().max(createFilmmakerProjectUpdateBodyNoteMax).nullish()
+})
+
+
+export const createFilmmakerProjectUpdateResponseNoteMax = 500;
+
+
+
+export const CreateFilmmakerProjectUpdateResponse = zod.object({
+  "id": zod.number().int().min(1),
+  "milestone_key": zod.string(),
+  "label": zod.string(),
+  "role": zod.string().nullable(),
+  "person_name": zod.string().nullable().describe('Shown only when the filmmaker confirmed the person agreed to be named'),
+  "note": zod.string().max(createFilmmakerProjectUpdateResponseNoteMax).nullable(),
+  "approved_at": zod.coerce.date(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "created_at": zod.coerce.date(),
+  "reviewed_at": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Project updates by status, with whether approval would send an email under the 14-day rule
+ */
+export const getAdminProjectUpdatesQueryStatusDefault = `pending`;
+
+export const GetAdminProjectUpdatesQueryParams = zod.object({
+  "status": zod.enum(['pending', 'approved', 'rejected']).default(getAdminProjectUpdatesQueryStatusDefault)
+})
+
+
+
+export const getAdminProjectUpdatesResponseUpdatesItemBackersToEmailMin = 0;
+
+
+
+export const GetAdminProjectUpdatesResponse = zod.object({
+  "updates": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "project_id": zod.number().int().min(1),
+  "project_title": zod.string().nullable(),
+  "project_slug": zod.string().nullable(),
+  "filmmaker_name": zod.string().nullable(),
+  "filmmaker_email": zod.string().nullable(),
+  "milestone_key": zod.string(),
+  "label": zod.string(),
+  "role": zod.string().nullable(),
+  "person_name": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "created_at": zod.coerce.date(),
+  "reviewed_at": zod.coerce.date().nullable(),
+  "reviewed_by": zod.string().nullable(),
+  "email_decision": zod.enum(['send', 'skip_recent']).describe('send when no update email went to this project\'s backers in the last 14 days'),
+  "backers_to_email": zod.number().int().min(getAdminProjectUpdatesResponseUpdatesItemBackersToEmailMin)
+}))
+})
+
+
+/**
+ * @summary Approve a pending update so it appears on the project timeline
+ */
+
+
+
+export const ApproveAdminProjectUpdateParams = zod.object({
+  "update_id": zod.coerce.number().int().min(1)
+})
+
+
+
+export const approveAdminProjectUpdateResponseBackersToEmailMin = 0;
+
+
+
+export const ApproveAdminProjectUpdateResponse = zod.object({
+  "id": zod.number().int().min(1),
+  "project_id": zod.number().int().min(1),
+  "project_title": zod.string().nullable(),
+  "project_slug": zod.string().nullable(),
+  "filmmaker_name": zod.string().nullable(),
+  "filmmaker_email": zod.string().nullable(),
+  "milestone_key": zod.string(),
+  "label": zod.string(),
+  "role": zod.string().nullable(),
+  "person_name": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "created_at": zod.coerce.date(),
+  "reviewed_at": zod.coerce.date().nullable(),
+  "reviewed_by": zod.string().nullable(),
+  "email_decision": zod.enum(['send', 'skip_recent']).describe('send when no update email went to this project\'s backers in the last 14 days'),
+  "backers_to_email": zod.number().int().min(approveAdminProjectUpdateResponseBackersToEmailMin)
+})
+
+
+/**
+ * @summary Reject a pending update; it is never shown or emailed
+ */
+
+
+
+export const RejectAdminProjectUpdateParams = zod.object({
+  "update_id": zod.coerce.number().int().min(1)
+})
+
+
+
+export const rejectAdminProjectUpdateResponseBackersToEmailMin = 0;
+
+
+
+export const RejectAdminProjectUpdateResponse = zod.object({
+  "id": zod.number().int().min(1),
+  "project_id": zod.number().int().min(1),
+  "project_title": zod.string().nullable(),
+  "project_slug": zod.string().nullable(),
+  "filmmaker_name": zod.string().nullable(),
+  "filmmaker_email": zod.string().nullable(),
+  "milestone_key": zod.string(),
+  "label": zod.string(),
+  "role": zod.string().nullable(),
+  "person_name": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "created_at": zod.coerce.date(),
+  "reviewed_at": zod.coerce.date().nullable(),
+  "reviewed_by": zod.string().nullable(),
+  "email_decision": zod.enum(['send', 'skip_recent']).describe('send when no update email went to this project\'s backers in the last 14 days'),
+  "backers_to_email": zod.number().int().min(rejectAdminProjectUpdateResponseBackersToEmailMin)
+})
+
+
+/**
+ * @summary Approved updates for a visible project, newest first, with the date it was listed
+ */
+export const GetPublicProjectUpdatesParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+
+export const getPublicProjectUpdatesResponseUpdatesItemNoteMax = 500;
+
+
+
+export const GetPublicProjectUpdatesResponse = zod.object({
+  "updates": zod.array(zod.object({
+  "id": zod.number().int().min(1),
+  "milestone_key": zod.string(),
+  "label": zod.string(),
+  "role": zod.string().nullable(),
+  "person_name": zod.string().nullable().describe('Shown only when the filmmaker confirmed the person agreed to be named'),
+  "note": zod.string().max(getPublicProjectUpdatesResponseUpdatesItemNoteMax).nullable(),
+  "approved_at": zod.coerce.date()
+})),
+  "listed_at": zod.coerce.date().nullable().describe('Latest approval for listing')
+})
+
+
+/**
  * @summary Select an account-owned project for the existing visitor-scoped editing routes
  */
 

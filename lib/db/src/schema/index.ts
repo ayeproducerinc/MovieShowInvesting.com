@@ -44,3 +44,4 @@ export * from "./filmmaker-draft-materials";
 export * from "./conversations";
 export * from "./auth";
 export * from "./investor-notifications";
+export * from "./project-updates";

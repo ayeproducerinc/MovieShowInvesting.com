@@ -10,6 +10,7 @@ import "./review-checkout-policy.test";
 import "./referral-policy.test";
 import "./pledge-policy.test";
 import "./backer-visibility.test";
+import "./project-updates.test";
 
 process.env.NODE_ENV = "production"; // Test-double provider only; never calls live Stripe.
 process.env.REPLIT_DOMAINS = "checkout-fixture.example";

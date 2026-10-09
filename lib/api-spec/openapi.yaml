@@ -810,6 +810,181 @@ paths:
           description: Project is not available to this account
         "503":
           description: Firebase verification is unavailable
+  /filmmakers/projects/{project_id}/updates:
+    get:
+      operationId: getFilmmakerProjectUpdates
+      tags: [filmmakers]
+      summary: The filmmaker's own project updates (any status), milestone options and the number of backers who would be emailed
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Updates newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerProjectUpdates"
+        "400":
+          description: Invalid project ID
+        "401":
+          description: Verified sign-in required
+        "503":
+          description: Firebase verification is unavailable
+        "404":
+          description: Project is not available to this account
+    post:
+      operationId: createFilmmakerProjectUpdate
+      tags: [filmmakers]
+      summary: Post a milestone update; it waits for owner review before appearing publicly or being emailed
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FilmmakerProjectUpdateInput"
+      responses:
+        "201":
+          description: Update created, waiting for review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilmmakerProjectUpdate"
+        "400":
+          description: Invalid update
+        "401":
+          description: Verified sign-in required
+        "503":
+          description: Firebase verification is unavailable
+        "404":
+          description: Project is not available to this account
+        "429":
+          description: Too many updates; try again later
+  /admin/project-updates:
+    get:
+      operationId: getAdminProjectUpdates
+      tags: [admin]
+      summary: Project updates by status, with whether approval would send an email under the 14-day rule
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+            default: pending
+      responses:
+        "200":
+          description: Updates newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminProjectUpdates"
+        "401":
+          description: Verified sign-in required
+        "503":
+          description: Firebase verification is unavailable
+        "403":
+          description: Admin access required
+  /admin/project-updates/{update_id}/approve:
+    post:
+      operationId: approveAdminProjectUpdate
+      tags: [admin]
+      summary: Approve a pending update so it appears on the project timeline
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: update_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Update approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminProjectUpdate"
+        "401":
+          description: Verified sign-in required
+        "503":
+          description: Firebase verification is unavailable
+        "403":
+          description: Admin access required
+        "404":
+          description: Update not found
+        "409":
+          description: Update was already reviewed
+  /admin/project-updates/{update_id}/reject:
+    post:
+      operationId: rejectAdminProjectUpdate
+      tags: [admin]
+      summary: Reject a pending update; it is never shown or emailed
+      security:
+        - firebaseBearer: []
+      parameters:
+        - name: update_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Update rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminProjectUpdate"
+        "401":
+          description: Verified sign-in required
+        "503":
+          description: Firebase verification is unavailable
+        "403":
+          description: Admin access required
+        "404":
+          description: Update not found
+        "409":
+          description: Update was already reviewed
+  /projects/{slug}/updates:
+    get:
+      operationId: getPublicProjectUpdates
+      tags: [projects]
+      summary: Approved updates for a visible project, newest first, with the date it was listed
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approved updates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicProjectUpdates"
+        "404":
+          description: Project not found
   /filmmakers/projects/{project_id}/select:
     post:
       operationId: selectFilmmakerProject
@@ -3270,6 +3445,118 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FilmmakerBacker"
+    FilmmakerProjectUpdateInput:
+      type: object
+      additionalProperties: false
+      required: [milestone_key]
+      properties:
+        milestone_key: { type: string }
+        role: { type: ["string", "null"] }
+        person_name: { type: ["string", "null"], maxLength: 80 }
+        name_consent: { type: boolean, description: "The named person agreed to be named publicly" }
+        custom_label: { type: ["string", "null"], maxLength: 60 }
+        note: { type: ["string", "null"], maxLength: 500 }
+    PublicProjectUpdate:
+      type: object
+      additionalProperties: false
+      required: [id, milestone_key, label, role, person_name, note, approved_at]
+      properties:
+        id: { type: integer, minimum: 1 }
+        milestone_key: { type: string }
+        label: { type: string }
+        role: { type: ["string", "null"] }
+        person_name: { type: ["string", "null"], description: Shown only when the filmmaker confirmed the person agreed to be named }
+        note: { type: ["string", "null"], maxLength: 500 }
+        approved_at: { type: string, format: date-time }
+    PublicProjectUpdates:
+      type: object
+      additionalProperties: false
+      required: [updates, listed_at]
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicProjectUpdate"
+        listed_at: { type: ["string", "null"], format: date-time, description: Latest approval for listing, if any }
+    FilmmakerProjectUpdate:
+      type: object
+      additionalProperties: false
+      required: [id, milestone_key, label, role, person_name, note, approved_at, status, created_at, reviewed_at]
+      properties:
+        id: { type: integer, minimum: 1 }
+        milestone_key: { type: string }
+        label: { type: string }
+        role: { type: ["string", "null"] }
+        person_name: { type: ["string", "null"], description: Shown only when the filmmaker confirmed the person agreed to be named }
+        note: { type: ["string", "null"], maxLength: 500 }
+        approved_at: { type: string, format: date-time }
+        status: { type: string, enum: [pending, approved, rejected] }
+        created_at: { type: string, format: date-time }
+        reviewed_at: { type: ["string", "null"], format: date-time }
+    MilestoneOption:
+      type: object
+      additionalProperties: false
+      required: [key, label, group]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        group: { type: string, enum: [idea, production, distribution, any] }
+    TeamRoleOption:
+      type: object
+      additionalProperties: false
+      required: [key, label]
+      properties:
+        key: { type: string }
+        label: { type: string }
+    FilmmakerProjectUpdates:
+      type: object
+      additionalProperties: false
+      required: [updates, milestone_options, team_roles, backers_to_email]
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilmmakerProjectUpdate"
+        milestone_options:
+          type: array
+          items:
+            $ref: "#/components/schemas/MilestoneOption"
+        team_roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamRoleOption"
+        backers_to_email: { type: integer, minimum: 0, description: Confirmed backers whose latest notification permission is allowed }
+    AdminProjectUpdate:
+      type: object
+      additionalProperties: false
+      required: [id, project_id, project_title, project_slug, filmmaker_name, filmmaker_email, milestone_key, label, role, person_name, note, status, created_at, reviewed_at, reviewed_by, email_decision, backers_to_email]
+      properties:
+        id: { type: integer, minimum: 1 }
+        project_id: { type: integer, minimum: 1 }
+        project_title: { type: ["string", "null"] }
+        project_slug: { type: ["string", "null"] }
+        filmmaker_name: { type: ["string", "null"] }
+        filmmaker_email: { type: ["string", "null"] }
+        milestone_key: { type: string }
+        label: { type: string }
+        role: { type: ["string", "null"] }
+        person_name: { type: ["string", "null"] }
+        note: { type: ["string", "null"] }
+        status: { type: string, enum: [pending, approved, rejected] }
+        created_at: { type: string, format: date-time }
+        reviewed_at: { type: ["string", "null"], format: date-time }
+        reviewed_by: { type: ["string", "null"] }
+        email_decision: { type: string, enum: [send, skip_recent], description: "send when no update email went to this project's backers in the last 14 days" }
+        backers_to_email: { type: integer, minimum: 0 }
+    AdminProjectUpdates:
+      type: object
+      additionalProperties: false
+      required: [updates]
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminProjectUpdate"
     ExploreProject:
       type: object
       additionalProperties: false

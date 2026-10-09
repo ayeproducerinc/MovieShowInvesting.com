@@ -28,6 +28,8 @@ import type {
   AdminProjectReview,
   AdminProjectReviewDetail,
   AdminProjectReviewInput,
+  AdminProjectUpdate,
+  AdminProjectUpdates,
   AdminReviewNotesInput,
   AdminSection,
   AdminTable,
@@ -66,6 +68,9 @@ import type {
   FilmmakerProjectBackers,
   FilmmakerProjectClaim,
   FilmmakerProjectSelection,
+  FilmmakerProjectUpdate,
+  FilmmakerProjectUpdateInput,
+  FilmmakerProjectUpdates,
   FilmmakerProjects,
   FilmmakerQuestions,
   FilmmakerResult,
@@ -83,6 +88,7 @@ import type {
   Flow,
   FlowProgress,
   GetAdminInvestorsParams,
+  GetAdminProjectUpdatesParams,
   GetAdminReferralsParams,
   GetExploreParams,
   GetFilmmakerProjectPitchDeckParams,
@@ -103,6 +109,7 @@ import type {
   MessagingConfig,
   PriceGroup,
   PublicProject,
+  PublicProjectUpdates,
   QuestionAnswerInput,
   QuestionAnswerResult,
   QuestionConfig,
@@ -3153,6 +3160,481 @@ export function useGetFilmmakerProjectBackers<TData = Awaited<ReturnType<typeof 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetFilmmakerProjectBackersQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetFilmmakerProjectUpdatesUrl = (projectId: number,) => {
+
+
+
+
+  return `/api/filmmakers/projects/${projectId}/updates`
+}
+
+/**
+ * @summary The filmmaker's own project updates (any status), milestone options and the number of backers who would be emailed
+ */
+export const getFilmmakerProjectUpdates = async (projectId: number, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerProjectUpdates> => {
+
+  return customFetch<FilmmakerProjectUpdates>(getGetFilmmakerProjectUpdatesUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFilmmakerProjectUpdatesQueryKey = (projectId: number,) => {
+    return [
+    `/api/filmmakers/projects/${projectId}/updates`
+    ] as const;
+    }
+
+
+export const getGetFilmmakerProjectUpdatesQueryOptions = <TData = Awaited<ReturnType<typeof getFilmmakerProjectUpdates>>, TError = ErrorType<void>>(projectId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectUpdates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFilmmakerProjectUpdatesQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFilmmakerProjectUpdates>>> = ({ signal }) => getFilmmakerProjectUpdates(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectUpdates>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFilmmakerProjectUpdatesQueryResult = NonNullable<Awaited<ReturnType<typeof getFilmmakerProjectUpdates>>>
+export type GetFilmmakerProjectUpdatesQueryError = ErrorType<void>
+
+
+/**
+ * @summary The filmmaker's own project updates (any status), milestone options and the number of backers who would be emailed
+ */
+
+export function useGetFilmmakerProjectUpdates<TData = Awaited<ReturnType<typeof getFilmmakerProjectUpdates>>, TError = ErrorType<void>>(
+ projectId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFilmmakerProjectUpdates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFilmmakerProjectUpdatesQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateFilmmakerProjectUpdateUrl = (projectId: number,) => {
+
+
+
+
+  return `/api/filmmakers/projects/${projectId}/updates`
+}
+
+/**
+ * @summary Post a milestone update; it waits for owner review before appearing publicly or being emailed
+ */
+export const createFilmmakerProjectUpdate = async (projectId: number,
+    filmmakerProjectUpdateInput: FilmmakerProjectUpdateInput, options?: Parameters<typeof customFetch>[1]): Promise<FilmmakerProjectUpdate> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<FilmmakerProjectUpdate>(getCreateFilmmakerProjectUpdateUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(filmmakerProjectUpdateInput)
+  }
+);}
+
+
+
+
+
+export const getCreateFilmmakerProjectUpdateMutationKey = () => ['createFilmmakerProjectUpdate'] as const;
+
+export const getCreateFilmmakerProjectUpdateMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFilmmakerProjectUpdate>>, TError,CreateFilmmakerProjectUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFilmmakerProjectUpdate>>, TError,CreateFilmmakerProjectUpdateMutationVariables, TContext> => {
+
+const mutationKey = getCreateFilmmakerProjectUpdateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFilmmakerProjectUpdate>>, CreateFilmmakerProjectUpdateMutationVariables> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  createFilmmakerProjectUpdate(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFilmmakerProjectUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof createFilmmakerProjectUpdate>>>
+    export type CreateFilmmakerProjectUpdateMutationBody = BodyType<FilmmakerProjectUpdateInput>
+    export type CreateFilmmakerProjectUpdateMutationError = ErrorType<void>
+    export type CreateFilmmakerProjectUpdateMutationVariables = {projectId: number;data: BodyType<FilmmakerProjectUpdateInput>}
+
+    /**
+ * @summary Post a milestone update; it waits for owner review before appearing publicly or being emailed
+ */
+export const useCreateFilmmakerProjectUpdate = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFilmmakerProjectUpdate>>, TError,CreateFilmmakerProjectUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFilmmakerProjectUpdate>>,
+        TError,
+        CreateFilmmakerProjectUpdateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateFilmmakerProjectUpdateMutationOptions(options));
+    }
+
+export const getGetAdminProjectUpdatesUrl = (params?: GetAdminProjectUpdatesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/project-updates?${stringifiedParams}` : `/api/admin/project-updates`
+}
+
+/**
+ * @summary Project updates by status, with whether approval would send an email under the 14-day rule
+ */
+export const getAdminProjectUpdates = async (params?: GetAdminProjectUpdatesParams, options?: Parameters<typeof customFetch>[1]): Promise<AdminProjectUpdates> => {
+
+  return customFetch<AdminProjectUpdates>(getGetAdminProjectUpdatesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminProjectUpdatesQueryKey = (params?: GetAdminProjectUpdatesParams,) => {
+    return [
+    `/api/admin/project-updates`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminProjectUpdatesQueryOptions = <TData = Awaited<ReturnType<typeof getAdminProjectUpdates>>, TError = ErrorType<void>>(params?: GetAdminProjectUpdatesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminProjectUpdates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminProjectUpdatesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminProjectUpdates>>> = ({ signal }) => getAdminProjectUpdates(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminProjectUpdates>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminProjectUpdatesQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminProjectUpdates>>>
+export type GetAdminProjectUpdatesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Project updates by status, with whether approval would send an email under the 14-day rule
+ */
+
+export function useGetAdminProjectUpdates<TData = Awaited<ReturnType<typeof getAdminProjectUpdates>>, TError = ErrorType<void>>(
+ params?: GetAdminProjectUpdatesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminProjectUpdates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminProjectUpdatesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getApproveAdminProjectUpdateUrl = (updateId: number,) => {
+
+
+
+
+  return `/api/admin/project-updates/${updateId}/approve`
+}
+
+/**
+ * @summary Approve a pending update so it appears on the project timeline
+ */
+export const approveAdminProjectUpdate = async (updateId: number, options?: Parameters<typeof customFetch>[1]): Promise<AdminProjectUpdate> => {
+
+  return customFetch<AdminProjectUpdate>(getApproveAdminProjectUpdateUrl(updateId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getApproveAdminProjectUpdateMutationKey = () => ['approveAdminProjectUpdate'] as const;
+
+export const getApproveAdminProjectUpdateMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveAdminProjectUpdate>>, TError,ApproveAdminProjectUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveAdminProjectUpdate>>, TError,ApproveAdminProjectUpdateMutationVariables, TContext> => {
+
+const mutationKey = getApproveAdminProjectUpdateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveAdminProjectUpdate>>, ApproveAdminProjectUpdateMutationVariables> = (props) => {
+          const {updateId} = props ?? {};
+
+          return  approveAdminProjectUpdate(updateId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveAdminProjectUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof approveAdminProjectUpdate>>>
+
+    export type ApproveAdminProjectUpdateMutationError = ErrorType<void>
+    export type ApproveAdminProjectUpdateMutationVariables = {updateId: number}
+
+    /**
+ * @summary Approve a pending update so it appears on the project timeline
+ */
+export const useApproveAdminProjectUpdate = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveAdminProjectUpdate>>, TError,ApproveAdminProjectUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveAdminProjectUpdate>>,
+        TError,
+        ApproveAdminProjectUpdateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getApproveAdminProjectUpdateMutationOptions(options));
+    }
+
+export const getRejectAdminProjectUpdateUrl = (updateId: number,) => {
+
+
+
+
+  return `/api/admin/project-updates/${updateId}/reject`
+}
+
+/**
+ * @summary Reject a pending update; it is never shown or emailed
+ */
+export const rejectAdminProjectUpdate = async (updateId: number, options?: Parameters<typeof customFetch>[1]): Promise<AdminProjectUpdate> => {
+
+  return customFetch<AdminProjectUpdate>(getRejectAdminProjectUpdateUrl(updateId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRejectAdminProjectUpdateMutationKey = () => ['rejectAdminProjectUpdate'] as const;
+
+export const getRejectAdminProjectUpdateMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectAdminProjectUpdate>>, TError,RejectAdminProjectUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rejectAdminProjectUpdate>>, TError,RejectAdminProjectUpdateMutationVariables, TContext> => {
+
+const mutationKey = getRejectAdminProjectUpdateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejectAdminProjectUpdate>>, RejectAdminProjectUpdateMutationVariables> = (props) => {
+          const {updateId} = props ?? {};
+
+          return  rejectAdminProjectUpdate(updateId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RejectAdminProjectUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof rejectAdminProjectUpdate>>>
+
+    export type RejectAdminProjectUpdateMutationError = ErrorType<void>
+    export type RejectAdminProjectUpdateMutationVariables = {updateId: number}
+
+    /**
+ * @summary Reject a pending update; it is never shown or emailed
+ */
+export const useRejectAdminProjectUpdate = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectAdminProjectUpdate>>, TError,RejectAdminProjectUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rejectAdminProjectUpdate>>,
+        TError,
+        RejectAdminProjectUpdateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRejectAdminProjectUpdateMutationOptions(options));
+    }
+
+export const getGetPublicProjectUpdatesUrl = (slug: string,) => {
+
+
+
+
+  return `/api/projects/${slug}/updates`
+}
+
+/**
+ * @summary Approved updates for a visible project, newest first, with the date it was listed
+ */
+export const getPublicProjectUpdates = async (slug: string, options?: Parameters<typeof customFetch>[1]): Promise<PublicProjectUpdates> => {
+
+  return customFetch<PublicProjectUpdates>(getGetPublicProjectUpdatesUrl(slug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicProjectUpdatesQueryKey = (slug: string,) => {
+    return [
+    `/api/projects/${slug}/updates`
+    ] as const;
+    }
+
+
+export const getGetPublicProjectUpdatesQueryOptions = <TData = Awaited<ReturnType<typeof getPublicProjectUpdates>>, TError = ErrorType<void>>(slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicProjectUpdates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicProjectUpdatesQueryKey(slug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicProjectUpdates>>> = ({ signal }) => getPublicProjectUpdates(slug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: slug !== null && slug !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicProjectUpdates>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicProjectUpdatesQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicProjectUpdates>>>
+export type GetPublicProjectUpdatesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Approved updates for a visible project, newest first, with the date it was listed
+ */
+
+export function useGetPublicProjectUpdates<TData = Awaited<ReturnType<typeof getPublicProjectUpdates>>, TError = ErrorType<void>>(
+ slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicProjectUpdates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicProjectUpdatesQueryOptions(slug,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
