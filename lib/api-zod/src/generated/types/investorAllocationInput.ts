@@ -10,8 +10,8 @@ export interface InvestorAllocationInput {
   /** @minimum 1 */
   project_id: number;
   /**
-     * Whole-dollar allocation of at least $25
-     * @minimum 25
+     * Whole-dollar allocation of at least $100 per project (new pledges)
+     * @minimum 100
      * @maximum 2147483647
      */
   amount: number;

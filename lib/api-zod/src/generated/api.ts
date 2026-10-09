@@ -1973,7 +1973,7 @@ export const saveInvestorIntentBodyAmountMin = 100;
 export const saveInvestorIntentBodyAmountMax = 2147483647;
 
 
-export const saveInvestorIntentBodyAllocationsItemAmountMin = 25;
+export const saveInvestorIntentBodyAllocationsItemAmountMin = 100;
 export const saveInvestorIntentBodyAllocationsItemAmountMax = 2147483647;
 
 export const saveInvestorIntentBodyAllocationsMax = 5;
@@ -1996,8 +1996,8 @@ export const SaveInvestorIntentBody = zod.object({
   "amount": zod.number().int().min(saveInvestorIntentBodyAmountMin).max(saveInvestorIntentBodyAmountMax).describe('Whole-dollar total intent of at least $100'),
   "allocations": zod.array(zod.object({
   "project_id": zod.number().int().min(1),
-  "amount": zod.number().int().min(saveInvestorIntentBodyAllocationsItemAmountMin).max(saveInvestorIntentBodyAllocationsItemAmountMax).describe('Whole-dollar allocation of at least $25')
-})).max(saveInvestorIntentBodyAllocationsMax).describe('Distinct projects only; at most 4 projects for totals below $150 and 5 otherwise. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.'),
+  "amount": zod.number().int().min(saveInvestorIntentBodyAllocationsItemAmountMin).max(saveInvestorIntentBodyAllocationsItemAmountMax).describe('Whole-dollar allocation of at least $100 per project (new pledges)')
+})).max(saveInvestorIntentBodyAllocationsMax).describe('Distinct projects only; up to 5 projects at $100 or more each. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.'),
   "unallocated": zod.boolean().describe('True for Just pledge; requires zero project allocations'),
   "accredited": zod.boolean(),
   "experience": zod.array(zod.string()),
@@ -2131,7 +2131,7 @@ export const confirmInvestorIntentBodyAmountMax = 2147483647;
 
 
 
-export const confirmInvestorIntentBodyAllocationsItemAmountMin = 25;
+export const confirmInvestorIntentBodyAllocationsItemAmountMin = 100;
 export const confirmInvestorIntentBodyAllocationsItemAmountMax = 2147483647;
 
 export const confirmInvestorIntentBodyAllocationsMax = 5;
@@ -2146,7 +2146,7 @@ export const ConfirmInvestorIntentBody = zod.object({
   "entry_id": zod.number().int().min(1).nullish().describe('Identifies the exact reviewed entry; null for the original record'),
   "allocations": zod.array(zod.object({
   "project_id": zod.number().int().min(1),
-  "amount": zod.number().int().min(confirmInvestorIntentBodyAllocationsItemAmountMin).max(confirmInvestorIntentBodyAllocationsItemAmountMax).describe('Whole-dollar allocation of at least $25')
+  "amount": zod.number().int().min(confirmInvestorIntentBodyAllocationsItemAmountMin).max(confirmInvestorIntentBodyAllocationsItemAmountMax).describe('Whole-dollar allocation of at least $100 per project (new pledges)')
 })).max(confirmInvestorIntentBodyAllocationsMax)
 })
 

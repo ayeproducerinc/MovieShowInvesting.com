@@ -14,6 +14,7 @@ import {
 import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 import { deliverInterestAlertEmail } from "../lib/interest-alert-email";
 import { requireAccountAgeConfirmation } from "../lib/age-confirmation";
+import { allocationLimitError } from "../lib/pledge-policy";
 
 const router: IRouter = Router();
 router.use(cookieParser());
@@ -218,13 +219,14 @@ router.post("/investor/intents", async (req, res): Promise<void> => {
     return;
   }
   if (allocations.some((allocation) =>
-    !Number.isSafeInteger(allocation.amount) || allocation.amount < 25 || allocation.amount > MAX_POSTGRES_INTEGER
+    !Number.isSafeInteger(allocation.amount) || allocation.amount > MAX_POSTGRES_INTEGER
   )) {
-    res.status(400).json({ error: "Each project allocation must be a whole-dollar amount from $25 to $2,147,483,647." });
+    res.status(400).json({ error: "Each project allocation must be a whole-dollar amount no greater than $2,147,483,647." });
     return;
   }
-  if (allocations.length > (data.amount < 150 ? 4 : 5)) {
-    res.status(400).json({ error: "A total below $150 can include at most 4 projects; $150 or more can include at most 5." });
+  const limitError = allocationLimitError(data.amount, allocations.map((allocation) => allocation.amount));
+  if (limitError) {
+    res.status(400).json({ error: limitError });
     return;
   }
   if (new Set(allocations.map((allocation) => allocation.project_id)).size !== allocations.length) {
@@ -810,6 +812,13 @@ router.post("/investor/intents/confirm", async (req, res): Promise<void> => {
       || pledges.some(p => p.confirmed)) {
       await client.query("rollback");
       res.status(409).json({ error: "This saved interest is incomplete or has already changed. It cannot be confirmed." });
+      return;
+    }
+    // Unsigned choices saved under the old $25 minimum must be revised before signing.
+    const savedLimitError = allocationLimitError(amount, pledges.map((pledge) => pledge.amount));
+    if (savedLimitError) {
+      await client.query("rollback");
+      res.status(409).json({ error: `${savedLimitError} Update your saved choices before signing.` });
       return;
     }
     // The investor confirms the exact saved choices, not a new public listing.

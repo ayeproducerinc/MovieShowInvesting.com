@@ -1,6 +1,11 @@
 export type LineupProject = { id: number; stage: string | null };
 
-export const cap = (amount: number) => amount < 150 ? 4 : 5;
+/** New pledges: at least $100 per project, up to 5 projects (DECISIONS.md › Investor pledge limits). */
+export const PROJECT_MINIMUM = 100;
+export const MAX_PROJECTS = 5;
+
+/** Most projects a total can cover at $100 each, capped at 5. */
+export const cap = (amount: number) => Math.max(1, Math.min(MAX_PROJECTS, Math.floor(amount / PROJECT_MINIMUM)));
 
 export function split(amount: number, selected: LineupProject[]) {
   if (!selected.length) return [];

@@ -22,7 +22,7 @@ export interface InvestorIntentInput {
      */
   amount: number;
   /**
-     * Distinct projects only; at most 4 projects for totals below $150 and 5 otherwise. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.
+     * Distinct projects only; up to 5 projects at $100 or more each. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.
      * @maxItems 5
      */
   allocations: InvestorAllocationInput[];

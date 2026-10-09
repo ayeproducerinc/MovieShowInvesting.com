@@ -3310,7 +3310,7 @@ components:
       required: [project_id, amount]
       properties:
         project_id: { type: integer, minimum: 1 }
-        amount: { type: integer, minimum: 25, maximum: 2147483647, description: Whole-dollar allocation of at least $25, bounded by PostgreSQL integer storage }
+        amount: { type: integer, minimum: 100, maximum: 2147483647, description: Whole-dollar allocation of at least $100 per project (new pledges), bounded by PostgreSQL integer storage }
     InvestorAllocationView:
       type: object
       additionalProperties: false
@@ -3334,7 +3334,7 @@ components:
         allocations:
           type: array
           maxItems: 5
-          description: Distinct projects only; at most 4 projects for totals below $150 and 5 otherwise. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.
+          description: Distinct projects only; up to 5 projects at $100 or more each. When unallocated is false, allocation amounts must sum exactly to amount. When unallocated is true (Just pledge), this array must be empty.
           items:
             $ref: "#/components/schemas/InvestorAllocationInput"
         unallocated: { type: boolean, description: True for Just pledge; requires zero project allocations }
