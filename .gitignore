@@ -47,3 +47,22 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Secrets: environment files and keys must never be committed.
+# Any name starting or ending with .env (e.g. .env, .env.local, .envrc, prod.env, app.env.local).
+.env
+.env*
+*.env
+*.env.*
+# Private keys, certificates and credential files.
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*service-account*.json
+*serviceAccount*.json
+*credentials*.json
+secrets.json
+.secrets/
