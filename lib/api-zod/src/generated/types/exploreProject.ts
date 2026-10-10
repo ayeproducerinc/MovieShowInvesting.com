@@ -46,4 +46,9 @@ export interface ExploreProject {
   confirmed_pledge_total: number;
   /** True when the request has verified provider-qualified account ownership or the original project visitor cookie */
   is_owner: boolean;
+  /**
+   * Explicit public project credit
+   * @nullable
+   */
+  public_filmmaker_name?: string | null;
 }

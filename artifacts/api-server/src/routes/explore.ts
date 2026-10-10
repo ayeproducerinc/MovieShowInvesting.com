@@ -22,6 +22,7 @@ type ExploreRow = {
   offer_per_100: number | null;
   confirmed_pledge_total: number;
   is_owner: boolean;
+  public_filmmaker_name: string | null;
   created_at: Date;
 };
 
@@ -54,7 +55,7 @@ router.get("/explore", async (req, res): Promise<void> => {
   const visitorId = typeof cookieCandidate === "string" && UUID.test(cookieCandidate) ? cookieCandidate : null;
   const { rows: projects } = await pool.query<ExploreRow>(`
     select p.id, p.slug, p.title, p.logline, p.format, p.genre, p.stage,
-      p.poster_url, p.pitch_deck_name, (p.pitch_deck_storage_path is not null) as has_pitch_deck, p.budget, p.proposal,
+      p.poster_url, p.pitch_deck_name, (p.pitch_deck_storage_path is not null) as has_pitch_deck, p.public_filmmaker_name, p.budget, p.proposal,
       p.offer_per100 as offer_per_100, p.created_at,
       coalesce((
         ($1::text = 'firebase' and f.firebase_uid = $2)
@@ -124,6 +125,8 @@ router.get("/explore", async (req, res): Promise<void> => {
       proposal: project.proposal,
       confirmed_pledge_total: Number(project.confirmed_pledge_total),
       is_owner: project.is_owner,
+      // Only the credit the filmmaker chose to publish; never private contact names.
+      public_filmmaker_name: project.public_filmmaker_name?.trim() || null,
       public_backers: publicBackers(backerRows.filter((row) => row.project_id === project.id)),
     })),
   };

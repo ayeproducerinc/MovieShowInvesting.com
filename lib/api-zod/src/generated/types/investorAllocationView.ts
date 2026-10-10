@@ -23,4 +23,9 @@ export interface InvestorAllocationView {
   project_slug: string | null;
   /** Whether the project is currently approved and visible in Explore */
   project_visible: boolean;
+  /**
+   * Explicit public project credit
+   * @nullable
+   */
+  public_filmmaker_name?: string | null;
 }

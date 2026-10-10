@@ -42,6 +42,7 @@ type ProjectRow = {
   offer_per_100: number | null;
   confirmed_pledge_total: number;
   is_owner: boolean;
+  public_filmmaker_name: string | null;
 };
 type InvestorRow = {
   id: number;
@@ -89,7 +90,7 @@ async function getDiscoverableProjects(
 ): Promise<ProjectRow[]> {
   const { rows } = await pool.query<ProjectRow>(`
     select p.id, p.slug, p.title, p.logline, p.format, p.genre, p.stage,
-      p.poster_url, p.pitch_deck_name, (p.pitch_deck_storage_path is not null) as has_pitch_deck,
+      p.poster_url, p.pitch_deck_name, (p.pitch_deck_storage_path is not null) as has_pitch_deck, p.public_filmmaker_name,
       p.offer_per100 as offer_per_100, p.budget, p.proposal,
       coalesce((
         ($1::text = 'firebase' and f.firebase_uid = $2)
@@ -124,6 +125,7 @@ function projectCard(project: ProjectRow) {
     proposal: project.proposal,
     confirmed_pledge_total: Number(project.confirmed_pledge_total),
     is_owner: project.is_owner,
+    public_filmmaker_name: project.public_filmmaker_name?.trim() || null,
   };
 }
 
@@ -581,10 +583,12 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
     project_title: string | null;
     project_slug: string | null;
     project_visible: boolean;
+    public_filmmaker_name: string | null;
   }>(
     `select pl.entry_id, pl.confirmed, pl.project_id, pl.amount, p.title as project_title, p.slug as project_slug,
        coalesce(p.approved = true and p.showcase_requested = true and p.hidden = false
-         and p.stage in ('idea', 'production', 'distribution'), false) as project_visible
+         and p.stage in ('idea', 'production', 'distribution'), false) as project_visible,
+       p.public_filmmaker_name
      from pledges pl left join projects p on p.id = pl.project_id
       where pl.investor_id = $1 order by pl.id`,
     [investor.id],
@@ -594,6 +598,7 @@ router.get("/investor/intents/current", async (req, res): Promise<void> => {
     .map(row => ({
       project_id: row.project_id!, amount: row.amount, project_title: row.project_title,
       project_slug: row.project_slug, project_visible: row.project_visible,
+      public_filmmaker_name: row.project_visible ? row.public_filmmaker_name?.trim() || null : null,
     }));
   const history = [
     ...(investor.confirmed_at ? [{

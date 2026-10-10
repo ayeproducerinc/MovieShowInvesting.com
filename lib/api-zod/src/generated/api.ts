@@ -2312,7 +2312,8 @@ export const GetExploreResponse = zod.object({
   "pitch_deck_name": zod.string().nullable(),
   "offer_per_100": zod.number().int().min(getExploreResponseProjectsItemOfferPer100Min).nullable(),
   "confirmed_pledge_total": zod.number().min(getExploreResponseProjectsItemConfirmedPledgeTotalMin),
-  "is_owner": zod.boolean().describe('True when the request has verified provider-qualified account ownership or the original project visitor cookie')
+  "is_owner": zod.boolean().describe('True when the request has verified provider-qualified account ownership or the original project visitor cookie'),
+  "public_filmmaker_name": zod.string().nullish().describe('Explicit public project credit')
 }))
 })
 
@@ -2397,7 +2398,8 @@ export const MatchInvestorResponse = zod.object({
   "pitch_deck_name": zod.string().nullable(),
   "offer_per_100": zod.number().int().min(matchInvestorResponseProjectsItemOfferPer100Min).nullable(),
   "confirmed_pledge_total": zod.number().min(matchInvestorResponseProjectsItemConfirmedPledgeTotalMin),
-  "is_owner": zod.boolean().describe('True when the request has verified provider-qualified account ownership or the original project visitor cookie')
+  "is_owner": zod.boolean().describe('True when the request has verified provider-qualified account ownership or the original project visitor cookie'),
+  "public_filmmaker_name": zod.string().nullish().describe('Explicit public project credit')
 }))
 })
 
@@ -2506,7 +2508,8 @@ export const GetCurrentInvestorIntentResponse = zod.object({
   "amount": zod.number().int().min(1).max(getCurrentInvestorIntentResponseIntentOneAllocationsItemAmountMax),
   "project_title": zod.string().nullable().describe('Saved project\'s title'),
   "project_slug": zod.string().nullable(),
-  "project_visible": zod.boolean().describe('Whether the project is currently approved and visible in Explore')
+  "project_visible": zod.boolean().describe('Whether the project is currently approved and visible in Explore'),
+  "public_filmmaker_name": zod.string().nullish().describe('Explicit public project credit')
 })),
   "unallocated": zod.boolean(),
   "status": zod.enum(['saved', 'confirmed']),
@@ -2539,7 +2542,8 @@ export const GetCurrentInvestorIntentResponse = zod.object({
   "amount": zod.number().int().min(1).max(getCurrentInvestorIntentResponseHistoryItemAllocationsItemAmountMax),
   "project_title": zod.string().nullable().describe('Saved project\'s title'),
   "project_slug": zod.string().nullable(),
-  "project_visible": zod.boolean().describe('Whether the project is currently approved and visible in Explore')
+  "project_visible": zod.boolean().describe('Whether the project is currently approved and visible in Explore'),
+  "public_filmmaker_name": zod.string().nullish().describe('Explicit public project credit')
 }))
 }))
 })

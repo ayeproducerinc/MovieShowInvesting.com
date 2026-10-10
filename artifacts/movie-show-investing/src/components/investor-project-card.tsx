@@ -27,7 +27,9 @@ export function InvestorProjectCard({ project, action, matched = false, showPitc
       {project.is_owner && <span className="inv-match-badge" data-testid={`badge-owned-project-${project.id}`}>Your project</span>}
       {matched && <span className="inv-match-badge" data-testid={`badge-match-${project.id}`}>Matches your preferences</span>}
       <h2>{project.title}</h2>
+      {project.public_filmmaker_name && <p className="inv-small" data-testid={`text-project-filmmaker-${project.id}`}>by {project.public_filmmaker_name}</p>}
       <p data-testid={`story-project-${project.id}`}>{recap ? exploreStoryHook(project.logline) : project.logline || 'Read the project dossier for more about this story.'}</p>
+      {project.confirmed_pledge_total > 0 && <p className="inv-small" data-testid={`text-project-pledged-${project.id}`}>{whole(project.confirmed_pledge_total)} pledged</p>}
       {project.public_backers?.length ? <p className="inv-small" data-testid={`public-backers-${project.id}`} style={{overflowWrap:'anywhere'}}>Backed by {publicBackersLine(project.public_backers, whole)}.</p> : null}
       {!recap && (project.proposal || project.budget) && <ProposalSummary proposal={project.proposal} budget={project.budget} developmentAmount={project.development_amount} stage={project.stage} testId={`proposal-${project.id}`} />}
       <div className="inv-project-links">

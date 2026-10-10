@@ -51,6 +51,11 @@ test('other shared-card contexts retain full stories and standard or negotiated 
   assert.ok(negotiated.includes('Open to negotiation'));
 });
 
+test('cards credit the filmmaker only when a public name was chosen', () => {
+  assert.ok(render({ ...project, public_filmmaker_name: 'Jordan L.' }, { variant: 'explore' }).includes('by Jordan L.'));
+  assert.ok(!render({ ...project, public_filmmaker_name: null }, { variant: 'explore' }).includes('text-project-filmmaker-'));
+});
+
 test('Explore missing data and owner access stay usable', () => {
   const html = render({ ...project, logline: null, genre: null, stage: null, format: null, is_owner: true }, { variant: 'explore' });
   assert.ok(html.includes('View the project to discover more about this story.'));
