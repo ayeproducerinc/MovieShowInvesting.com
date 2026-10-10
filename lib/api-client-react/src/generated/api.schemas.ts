@@ -1499,9 +1499,9 @@ export interface ExploreProject {
   /** True when the request has verified provider-qualified account ownership or the original project visitor cookie */
   is_owner: boolean;
   /**
-   * Explicit public project credit
-   * @nullable
-   */
+     * Explicit public project credit
+     * @nullable
+     */
   public_filmmaker_name?: string | null;
 }
 
@@ -1578,9 +1578,9 @@ export interface InvestorAllocationView {
   /** Whether the project is currently approved and visible in Explore */
   project_visible: boolean;
   /**
-   * Explicit public project credit
-   * @nullable
-   */
+     * Explicit public project credit
+     * @nullable
+     */
   public_filmmaker_name?: string | null;
 }
 
@@ -1942,6 +1942,14 @@ export const AdminTestProjectCleanupInputEnvironment = {
   published: 'published',
 } as const;
 
+export type AdminTestProjectCleanupInputProjectScope = typeof AdminTestProjectCleanupInputProjectScope[keyof typeof AdminTestProjectCleanupInputProjectScope];
+
+
+export const AdminTestProjectCleanupInputProjectScope = {
+  historical: 'historical',
+  asdf: 'asdf',
+} as const;
+
 export type AdminTestProjectCleanupInputConfirmation = typeof AdminTestProjectCleanupInputConfirmation[keyof typeof AdminTestProjectCleanupInputConfirmation];
 
 
@@ -1954,6 +1962,7 @@ export interface AdminTestProjectCleanupInput {
   dry_run: boolean;
   cleanup_media?: boolean;
   cleanup_followups?: boolean;
+  project_scope?: AdminTestProjectCleanupInputProjectScope;
   confirmation: AdminTestProjectCleanupInputConfirmation;
 }
 
@@ -1965,6 +1974,14 @@ export const AdminTestProjectCleanupResultEnvironment = {
   published: 'published',
 } as const;
 
+export type AdminTestProjectCleanupResultProjectScope = typeof AdminTestProjectCleanupResultProjectScope[keyof typeof AdminTestProjectCleanupResultProjectScope];
+
+
+export const AdminTestProjectCleanupResultProjectScope = {
+  historical: 'historical',
+  asdf: 'asdf',
+} as const;
+
 export interface AdminTestProjectCleanupResult {
   environment: AdminTestProjectCleanupResultEnvironment;
   candidate_count: number;
@@ -1973,6 +1990,7 @@ export interface AdminTestProjectCleanupResult {
   archived_pledges: number;
   archived_checkouts: number;
   remaining_projects: number;
+  project_scope?: AdminTestProjectCleanupResultProjectScope;
   followup_candidate_count?: number;
   cleared_followups?: number;
   remaining_followups?: number;

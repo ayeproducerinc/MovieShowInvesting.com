@@ -4158,6 +4158,7 @@ components:
         dry_run: { type: boolean }
         cleanup_media: { type: boolean, default: false }
         cleanup_followups: { type: boolean, default: false }
+        project_scope: { type: string, enum: [historical, asdf], default: historical }
         confirmation: { type: string, enum: ["DELETE CONFIRMED TEST PROJECTS"] }
     AdminTestProjectCleanupResult:
       type: object
@@ -4170,6 +4171,7 @@ components:
         archived_pledges: { type: integer }
         archived_checkouts: { type: integer }
         remaining_projects: { type: integer }
+        project_scope: { type: string, enum: [historical, asdf] }
         followup_candidate_count: { type: integer }
         cleared_followups: { type: integer }
         remaining_followups: { type: integer }

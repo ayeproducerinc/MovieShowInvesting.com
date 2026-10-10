@@ -18,8 +18,10 @@ const base = args.includes("--base") ? option("--base").replace(/\/$/, "") : nul
 const execute = args.includes("--execute");
 const cleanupMedia = args.includes("--cleanup-media");
 const cleanupFollowups = args.includes("--cleanup-followups");
+const asdfOnly = args.includes("--asdf-only");
 let app;
 let pool;
+let stage = "configuration";
 try {
   assert(["preview", "published"].includes(environment), "Choose preview or published explicitly.");
   assert(base, "An explicit API base URL is required.");
@@ -27,6 +29,8 @@ try {
   assert(target.protocol === "https:" || ["localhost", "127.0.0.1"].includes(target.hostname), "API URL must use HTTPS.");
   assert(!target.username && !target.password && !target.search && !target.hash, "API URL must not contain credentials or query parameters.");
   assert(!cleanupMedia || execute, "Media cleanup requires --execute.");
+  assert(!asdfOnly || (environment === "published" && !cleanupMedia && !cleanupFollowups),
+    "Asdf-only cleanup must target published without media or follow-up cleanup.");
   const account = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
   async function request(path, token, body) {
     const response = await fetch(`${base}${path}`, {
@@ -40,6 +44,7 @@ try {
   }
   const config = await request("/config");
   assert(config.response.ok && config.data?.projectId === account.project_id, "Target Firebase project does not match.");
+  stage = "administrator authentication";
   app = initializeApp({ credential: cert(account) }, "confirmed-project-cleanup");
   const auth = getAuth(app);
   const administrator = await auth.getUserByEmail(process.env.ADMIN_EMAIL);
@@ -51,13 +56,21 @@ try {
   const credential = await exchange.json();
   assert(exchange.ok && credential.idToken, "Administrator authentication failed.");
   const token = credential.idToken;
-  const payload = { environment, dry_run: true, confirmation: "DELETE CONFIRMED TEST PROJECTS", cleanup_media: cleanupMedia, cleanup_followups: cleanupFollowups };
+  const payload = { environment, dry_run: true, confirmation: "DELETE CONFIRMED TEST PROJECTS", cleanup_media: cleanupMedia, cleanup_followups: cleanupFollowups,
+    ...(asdfOnly ? { project_scope: "asdf" } : {}) };
   const path = "/admin/confirmed-test-project-cleanup";
+  stage = "authorization and environment safeguards";
   assert.equal((await request(path, null, payload)).response.status, 401, "Anonymous cleanup must be rejected.");
   assert.equal((await request(path, token, { ...payload, confirmation: "wrong" })).response.status, 400, "Missing confirmation must be rejected.");
   assert.equal((await request(path, token, { ...payload, environment: environment === "preview" ? "published" : "preview" })).response.status, 409, "Wrong environment must be rejected.");
   const dry = await request(path, token, payload);
+  stage = "admin dry run";
   assert.equal(dry.response.status, 200, "Admin dry run must succeed.");
+  if (asdfOnly) {
+    stage = "live asdf-only scope verification (publish the scoped cleanup before executing)";
+    assert.equal(dry.data?.project_scope, "asdf", "The live server must support the exact asdf-only scope before execution.");
+    assert.equal(dry.data.candidate_count, 1, "The exact confirmed project must be present before execution.");
+  }
   if (cleanupFollowups) {
     assert.equal(typeof dry.data?.followup_candidate_count, "number", "This server must have the follow-up cleanup update before execution.");
   }
@@ -82,9 +95,11 @@ try {
     before = await preservedEvidence();
   }
   if (execute) {
+    stage = "deletion and post-deletion verification";
     const deleted = await request(path, token, { ...payload, dry_run: false });
     assert.equal(deleted.response.status, 200, "Deletion must succeed; inspect archive before retrying if a request failed.");
     assert.equal(deleted.data.deleted_count, dry.data.candidate_count, "Deleted count must match the confirmed dry run.");
+    if (asdfOnly) assert.deepEqual(deleted.data.deleted_ids, [16], "Only the confirmed asdf project may be deleted.");
     assert.equal(deleted.data.cleared_followups, dry.data.followup_candidate_count, "Cleared follow-ups must match the dry run.");
     console.log("Deletion result:", JSON.stringify(deleted.data));
     if (pool) {
@@ -93,7 +108,7 @@ try {
     }
     const explore = await request("/explore");
     assert(explore.response.ok && Array.isArray(explore.data?.projects), "Explore must return actual results.");
-    const allowed = new Set(environment === "preview" ? [2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,27,28,30,34,35] : [2,4,5,6,7,8,9,10,11,12,13]);
+    const allowed = new Set(asdfOnly ? [16] : environment === "preview" ? [2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,27,28,30,34,35] : [2,4,5,6,7,8,9,10,11,12,13]);
     assert(!explore.data.projects.some(project => allowed.has(project.id)), "Confirmed test projects must not remain in Explore.");
     console.log("PASS confirmed test projects absent from Explore");
     const queues = await request("/admin/tables/queues", token);
@@ -109,7 +124,7 @@ try {
   }
 } catch {
   // SDK errors can contain personal information. Do not print raw error objects.
-  console.error("Cleanup command stopped. Check the dry-run/deletion result and private archive before retrying.");
+  console.error(`Cleanup command stopped at ${stage}. Check the dry-run/deletion result and private archive before retrying.`);
   process.exitCode = 1;
 } finally {
   await pool?.end();

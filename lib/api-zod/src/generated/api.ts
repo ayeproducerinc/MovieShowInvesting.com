@@ -2634,10 +2634,10 @@ export const CreateConversationResponse = zod.object({
   "project_slug": zod.string(),
   "project_title": zod.string(),
   "other_party_name": zod.string(),
-  "viewer_role": zod.enum(["investor", "filmmaker"]).optional().describe("The signed-in participant's side of this conversation"),
+  "viewer_role": zod.enum(['investor', 'filmmaker']).optional().describe('The signed-in participant\'s side of this conversation'),
   "filmmaker_name": zod.string().optional(),
   "investor_name": zod.string().optional(),
-  "awaiting_reply": zod.boolean().optional().describe("True when the latest message came from the other participant"),
+  "awaiting_reply": zod.boolean().optional().describe('True when the latest message came from the other participant'),
   "locked": zod.boolean(),
   "reported": zod.boolean(),
   "last_message_at": zod.coerce.date().nullable(),
@@ -2659,10 +2659,10 @@ export const GetMyConversationsResponse = zod.object({
   "project_slug": zod.string(),
   "project_title": zod.string(),
   "other_party_name": zod.string(),
-  "viewer_role": zod.enum(["investor", "filmmaker"]).optional().describe("The signed-in participant's side of this conversation"),
+  "viewer_role": zod.enum(['investor', 'filmmaker']).optional().describe('The signed-in participant\'s side of this conversation'),
   "filmmaker_name": zod.string().optional(),
   "investor_name": zod.string().optional(),
-  "awaiting_reply": zod.boolean().optional().describe("True when the latest message came from the other participant"),
+  "awaiting_reply": zod.boolean().optional().describe('True when the latest message came from the other participant'),
   "locked": zod.boolean(),
   "reported": zod.boolean(),
   "last_message_at": zod.coerce.date().nullable(),
@@ -2693,10 +2693,10 @@ export const GetConversationResponse = zod.object({
   "project_slug": zod.string(),
   "project_title": zod.string(),
   "other_party_name": zod.string(),
-  "viewer_role": zod.enum(["investor", "filmmaker"]).optional().describe("The signed-in participant's side of this conversation"),
+  "viewer_role": zod.enum(['investor', 'filmmaker']).optional().describe('The signed-in participant\'s side of this conversation'),
   "filmmaker_name": zod.string().optional(),
   "investor_name": zod.string().optional(),
-  "awaiting_reply": zod.boolean().optional().describe("True when the latest message came from the other participant"),
+  "awaiting_reply": zod.boolean().optional().describe('True when the latest message came from the other participant'),
   "locked": zod.boolean(),
   "reported": zod.boolean(),
   "last_message_at": zod.coerce.date().nullable(),
@@ -2776,10 +2776,10 @@ export const GetAdminConversationsResponse = zod.object({
   "project_slug": zod.string(),
   "project_title": zod.string(),
   "other_party_name": zod.string(),
-  "viewer_role": zod.enum(["investor", "filmmaker"]).optional().describe("The signed-in participant's side of this conversation"),
+  "viewer_role": zod.enum(['investor', 'filmmaker']).optional().describe('The signed-in participant\'s side of this conversation'),
   "filmmaker_name": zod.string().optional(),
   "investor_name": zod.string().optional(),
-  "awaiting_reply": zod.boolean().optional().describe("True when the latest message came from the other participant"),
+  "awaiting_reply": zod.boolean().optional().describe('True when the latest message came from the other participant'),
   "locked": zod.boolean(),
   "reported": zod.boolean(),
   "last_message_at": zod.coerce.date().nullable(),
@@ -2882,12 +2882,14 @@ export const GetAdminTableResponse = zod.object({
 
 export const cleanupAdminTestProjectsBodyCleanupMediaDefault = false;
 export const cleanupAdminTestProjectsBodyCleanupFollowupsDefault = false;
+export const cleanupAdminTestProjectsBodyProjectScopeDefault = `historical`;
 
 export const CleanupAdminTestProjectsBody = zod.object({
   "environment": zod.enum(['preview', 'published']),
   "dry_run": zod.boolean(),
   "cleanup_media": zod.boolean().default(cleanupAdminTestProjectsBodyCleanupMediaDefault),
   "cleanup_followups": zod.boolean().default(cleanupAdminTestProjectsBodyCleanupFollowupsDefault),
+  "project_scope": zod.enum(['historical', 'asdf']).default(cleanupAdminTestProjectsBodyProjectScopeDefault),
   "confirmation": zod.enum(['DELETE CONFIRMED TEST PROJECTS'])
 })
 
@@ -2899,6 +2901,7 @@ export const CleanupAdminTestProjectsResponse = zod.object({
   "archived_pledges": zod.number().int(),
   "archived_checkouts": zod.number().int(),
   "remaining_projects": zod.number().int(),
+  "project_scope": zod.enum(['historical', 'asdf']).optional(),
   "followup_candidate_count": zod.number().int().optional(),
   "cleared_followups": zod.number().int().optional(),
   "remaining_followups": zod.number().int().optional(),

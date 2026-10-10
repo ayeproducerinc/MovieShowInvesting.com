@@ -7,11 +7,13 @@
  */
 import type { AdminTestProjectCleanupInputConfirmation } from './adminTestProjectCleanupInputConfirmation';
 import type { AdminTestProjectCleanupInputEnvironment } from './adminTestProjectCleanupInputEnvironment';
+import type { AdminTestProjectCleanupInputProjectScope } from './adminTestProjectCleanupInputProjectScope';
 
 export interface AdminTestProjectCleanupInput {
   environment: AdminTestProjectCleanupInputEnvironment;
   dry_run: boolean;
   cleanup_media?: boolean;
   cleanup_followups?: boolean;
+  project_scope?: AdminTestProjectCleanupInputProjectScope;
   confirmation: AdminTestProjectCleanupInputConfirmation;
 }

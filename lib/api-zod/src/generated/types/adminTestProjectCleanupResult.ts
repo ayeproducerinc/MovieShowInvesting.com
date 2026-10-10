@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AdminTestProjectCleanupResultEnvironment } from './adminTestProjectCleanupResultEnvironment';
+import type { AdminTestProjectCleanupResultProjectScope } from './adminTestProjectCleanupResultProjectScope';
 
 export interface AdminTestProjectCleanupResult {
   environment: AdminTestProjectCleanupResultEnvironment;
@@ -15,6 +16,7 @@ export interface AdminTestProjectCleanupResult {
   archived_pledges: number;
   archived_checkouts: number;
   remaining_projects: number;
+  project_scope?: AdminTestProjectCleanupResultProjectScope;
   followup_candidate_count?: number;
   cleared_followups?: number;
   remaining_followups?: number;

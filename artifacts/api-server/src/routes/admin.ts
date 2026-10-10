@@ -450,11 +450,18 @@ router.post("/admin/confirmed-test-project-cleanup", async (req, res): Promise<v
     res.status(409).json({ error: "The requested environment does not match this server. Nothing was deleted." });
     return;
   }
+  if (body.data.project_scope === "asdf" && (
+    runtimeEnvironment !== "published" || body.data.cleanup_followups || body.data.cleanup_media
+  )) {
+    res.status(409).json({ error: "This cleanup removes only the confirmed live project; follow-ups and remote media are retained." });
+    return;
+  }
   let deletionCommitted = false;
   try {
-    const result = await cleanupConfirmedTestProjects(pool, runtimeEnvironment, body.data.dry_run, body.data.cleanup_followups);
+    const result = await cleanupConfirmedTestProjects(pool, runtimeEnvironment, body.data.dry_run, body.data.cleanup_followups, body.data.project_scope);
     deletionCommitted = !body.data.dry_run;
-    const media = await cleanupArchivedTestProjectMedia(runtimeEnvironment, body.data.dry_run || !body.data.cleanup_media);
+    const media = body.data.project_scope === "asdf" ? {}
+      : await cleanupArchivedTestProjectMedia(runtimeEnvironment, body.data.dry_run || !body.data.cleanup_media);
     req.log.info({ environment: runtimeEnvironment, dryRun: body.data.dry_run, deletedCount: result.deleted_count },
       "Confirmed test project cleanup");
     res.json(CleanupAdminTestProjectsResponse.parse({ ...result, ...media }));

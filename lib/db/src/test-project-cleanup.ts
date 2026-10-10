@@ -32,8 +32,13 @@ const confirmedTestFollowups: Record<CleanupEnvironment, { calls: number[]; chat
 export async function cleanupConfirmedTestProjects(
   pool: Pool, environment: CleanupEnvironment, dryRun: boolean,
   cleanupFollowups = false,
+  projectScope: "historical" | "asdf" = "historical",
 ) {
-  const confirmed = confirmedTestProjects[environment];
+  if (projectScope === "asdf" && (environment !== "published" || cleanupFollowups)) {
+    throw new TestProjectCleanupConflict("This project cleanup is published-only and cannot clear follow-ups.");
+  }
+  // Separate owner-confirmed scope; never expand or rerun the historical inventory.
+  const confirmed = projectScope === "asdf" ? { 16: "asdf" } : confirmedTestProjects[environment];
   const ids = Object.keys(confirmed).map(Number);
   const client = await pool.connect();
   try {
@@ -52,6 +57,12 @@ export async function cleanupConfirmedTestProjects(
     for (const project of projects.rows) {
       if (project.title !== confirmed[project.id]) {
         throw new TestProjectCleanupConflict("A confirmed project's title has changed. No projects were deleted.");
+      }
+      if (projectScope === "asdf" && (
+        project.slug !== "asdf-448af969-52fc-449c-945b-2e194ed5249e"
+        || project.logline !== "asdf lkjsdf"
+      )) {
+        throw new TestProjectCleanupConflict("The confirmed test project's identity has changed. No projects were deleted.");
       }
     }
     const activeIds = projects.rows.map(project => Number(project.id));
@@ -134,6 +145,7 @@ export async function cleanupConfirmedTestProjects(
       + (SELECT count(*)::int FROM filmmakers WHERE chat_opt_in=true) AS count`);
     await client.query("COMMIT");
     return {
+      project_scope: projectScope,
       environment, candidate_count: activeIds.length, deleted_count: dryRun ? 0 : activeIds.length,
       deleted_ids: dryRun ? [] : activeIds,
       archived_pledges: dryRun ? 0 : Number(dependencies.rows[0].pledges),
