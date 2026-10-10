@@ -122,6 +122,8 @@ export default function Project() {
   const updateCount = updates.data?.updates.length ?? 0;
   const hasTeamPlan = Boolean(data.money_use || data.distribution_plan || data.team_links.length > 0 || data.team_info);
   const named = data.public_backers ?? [];
+  const backerCount = data.backer_count ?? 0;
+  const backersLabel = backerCount ? `${backerCount} ${backerCount === 1 ? 'backer' : 'backers'}` : '';
   const pledgeHref = `${target}${intent?.status === 'confirmed' ? '&new=1' : ''}`;
   const pledgeLabel = intent?.status === 'confirmed' ? 'Add more interest to this project' : 'Pledge to this project';
   const tabList = 'flex h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b border-[#c8c0b5] bg-transparent p-0';
@@ -156,7 +158,7 @@ export default function Project() {
       {panel.show && <aside className="pj-aside">
         <div className="pj-panel" ref={setPledgeCard} data-testid="project-interest-action">
           <span className="dossier-kicker">Pledge interest</span>
-          {panel.showTotal && <div className="pj-total"><p className="pj-total-num" data-testid="text-confirmed-pledge-total">{money(data.confirmed_pledge_total)}</p><p>Confirmed, non-binding interest.</p>{panel.ownerOnlyTotal && <p data-testid="text-owner-only-total">Only you can see this total until your project is approved and listed.</p>}</div>}
+          {panel.showTotal && <div className="pj-total"><p className="pj-total-num" data-testid="text-confirmed-pledge-total">{money(data.confirmed_pledge_total)}</p><p data-testid="text-project-backer-count">{backersLabel ? `${backersLabel} · confirmed, non-binding interest.` : 'Confirmed, non-binding interest.'}</p>{panel.ownerOnlyTotal && <p data-testid="text-owner-only-total">Only you can see this total until your project is approved and listed.</p>}</div>}
           {named.length > 0 && <p className="pj-fine" data-testid="list-public-backers" style={{ overflowWrap: 'anywhere' }}>Backed by {named.slice(0, 3).map(backer => `${backer.name} (${money(backer.amount)})`).join(', ')}{named.length > 3 ? ` and ${named.length - 3} more` : ''}</p>}
           {data.is_owner ? <p>You can manage this project, but you can’t pledge interest in your own project.</p> :
             current.isPending || current.isFetching ? <p role="status">Checking your saved interest…</p> :
@@ -200,7 +202,7 @@ export default function Project() {
       </div>
     </div>
     {panel.show && !data.is_owner && !pledgeCardVisible && current.isSuccess && intent?.status !== 'saved' && <div className="pj-mobile-bar" data-testid="bar-mobile-pledge">
-      {panel.showTotal && <span>{money(data.confirmed_pledge_total)} pledged</span>}
+      {panel.showTotal && <span>{money(data.confirmed_pledge_total)} pledged{backersLabel ? ` · ${backersLabel}` : ''}</span>}
       <Link href={pledgeHref} className="dossier-button pj-primary" data-testid="link-mobile-pledge">{intent?.status === 'confirmed' ? 'Add more' : 'Pledge'} <ArrowUpRight size={16}/></Link>
     </div>}
   </div></section>;

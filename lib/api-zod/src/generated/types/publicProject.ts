@@ -60,6 +60,11 @@ export interface PublicProject {
   pitch_deck_name: string | null;
   /** @minimum 0 */
   confirmed_pledge_total: number;
+  /**
+   * Distinct people with a confirmed pledge; shown only where the confirmed total is shown
+   * @minimum 0
+   */
+  backer_count?: number;
   approved: boolean;
   showcase_requested: boolean;
   phone_verified: boolean;
