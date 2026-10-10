@@ -3542,6 +3542,7 @@ components:
         pitch_deck_url: { type: ["string", "null"], format: uri-reference, description: App-routed public deck link available only while project eligibility holds }
         pitch_deck_name: { type: ["string", "null"] }
         confirmed_pledge_total: { type: number, minimum: 0 }
+        backer_count: { type: integer, minimum: 0, description: Distinct people with a confirmed pledge; shown only where the confirmed total is shown }
         approved: { type: boolean }
         showcase_requested: { type: boolean }
         phone_verified: { type: boolean }

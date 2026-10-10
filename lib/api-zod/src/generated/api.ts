@@ -2164,6 +2164,9 @@ export const getPublicProjectResponseConfirmedPledgeTotalMin = 0;
 
 
 
+export const getPublicProjectResponseBackerCountMin = 0;
+
+
 export const GetPublicProjectResponse = zod.object({
   "public_backers": zod.array(zod.object({
   "name": zod.string().describe('Name the backer chose to show publicly'),
@@ -2205,6 +2208,7 @@ export const GetPublicProjectResponse = zod.object({
   "pitch_deck_url": zod.string().nullable().describe('App-routed public deck link available only while project eligibility holds'),
   "pitch_deck_name": zod.string().nullable(),
   "confirmed_pledge_total": zod.number().min(getPublicProjectResponseConfirmedPledgeTotalMin),
+  "backer_count": zod.number().int().min(getPublicProjectResponseBackerCountMin).optional().describe('Distinct people with a confirmed pledge; shown only where the confirmed total is shown'),
   "approved": zod.boolean(),
   "showcase_requested": zod.boolean(),
   "phone_verified": zod.boolean(),

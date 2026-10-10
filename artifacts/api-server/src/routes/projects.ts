@@ -9,7 +9,7 @@ import {
 import { resolveProtectedIdentity } from "../lib/filmmaker-auth";
 import { serveFilmmakerPitchDeck } from "./filmmaker-draft-materials";
 import { acceptsPledges } from "../lib/pledge-policy";
-import { CONFIRMED_BACKERS_SQL, publicBackers, type BackerRow } from "../lib/backer-visibility";
+import { CONFIRMED_BACKERS_SQL, backerTotals, publicBackers, type BackerRow } from "../lib/backer-visibility";
 import { readMoneyDate } from "../lib/money-date-store";
 
 const router: IRouter = Router();
@@ -152,8 +152,10 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
   // Unlisted pages show everything a listed page shows; only Explore, the public
   // total and search indexing depend on listing (DECISIONS.md › Product and scope).
   const pageVisible = acceptsPledges(project);
-  // Opted-in backer names are public only where the public total is shown.
-  const backers = listingEligible ? publicBackers((await pool.query<BackerRow>(CONFIRMED_BACKERS_SQL, [[project.id]])).rows) : [];
+  // Opted-in backer names are public only where the public total is shown; the
+  // backer count follows the total (listed, or the project's own filmmaker).
+  const backerRows = listingEligible || isOwner ? (await pool.query<BackerRow>(CONFIRMED_BACKERS_SQL, [[project.id]])).rows : [];
+  const backers = listingEligible ? publicBackers(backerRows) : [];
   const response = {
     id: project.id,
     budget: pageVisible || isOwner ? project.budget : null,
@@ -185,6 +187,7 @@ router.get("/projects/:slug", async (req, res): Promise<void> => {
     // Before approval only the project's own filmmaker sees its confirmed total.
     confirmed_pledge_total: listingEligible ? project.confirmedPledgeTotal
       : isOwner ? await getConfirmedPledgeTotal(project.id) : 0,
+    backer_count: backerTotals(backerRows).backer_count,
     approved: project.approved,
     showcase_requested: project.showcaseRequested,
     phone_verified: project.phoneVerified,

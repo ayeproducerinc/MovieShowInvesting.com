@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowUpRight, RotateCcw } from 'lucide-react';
 import { Link, useLocation, useParams } from 'wouter';
-import { getGetCurrentInvestorIntentQueryKey, getGetPublicProjectQueryKey, useGetCurrentInvestorIntent, useGetPublicProject } from '@workspace/api-client-react';
+import { getGetCurrentInvestorIntentQueryKey, getGetPublicProjectQueryKey, getGetPublicProjectUpdatesQueryKey, useGetCurrentInvestorIntent, useGetPublicProject, useGetPublicProjectUpdates } from '@workspace/api-client-react';
 import type { PublicProject } from '@workspace/api-client-react';
 import { useFirebaseSessionReady, useFirebaseUser } from '@/components/firebase-bootstrap';
-import { ProjectShare } from '@/components/project-share';
+import { ProjectShareButtons } from '@/components/project-share';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProjectContactDialog } from '@/components/project-contact-dialog';
 import { money } from './filmmaker-calculator';
 import { ProposalSummary } from '@/components/proposal-summary';
@@ -52,7 +53,19 @@ export default function Project() {
     navigate(`/invest?project=${encodeURIComponent(data.slug)}&one=1&from_update=${increaseFrom}`, { replace: true });
   }, [increaseFrom, data, navigate]);
   const [storyOpen, setStoryOpen] = useState(false);
-  useEffect(() => { setDismissed(false); setStoryOpen(false); }, [slug]);
+  const [tab, setTab] = useState('story');
+  useEffect(() => { setDismissed(false); setStoryOpen(false); setTab('story'); }, [slug]);
+  // Same query (and cache) as ProjectTimeline; used for the Updates tab count.
+  const updates = useGetPublicProjectUpdates(slug, { query: { queryKey: getGetPublicProjectUpdatesQueryKey(slug), enabled: !!slug, retry: false } });
+  // Mobile: show a bottom pledge bar only while the pledge card is off-screen.
+  const [pledgeCard, setPledgeCard] = useState<HTMLDivElement | null>(null);
+  const [pledgeCardVisible, setPledgeCardVisible] = useState(true);
+  useEffect(() => {
+    if (!pledgeCard || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setPledgeCardVisible(entry.isIntersecting));
+    observer.observe(pledgeCard);
+    return () => observer.disconnect();
+  }, [pledgeCard]);
   useEffect(() => {
     let robots = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
     const previous = robots?.content;
@@ -105,41 +118,92 @@ export default function Project() {
   const longStory = synopsis.length > 700;
   const storyText = longStory && !storyOpen ? `${synopsis.slice(0, 640).trimEnd()}…` : synopsis;
   const terms = panel.show && (data.proposal || data.budget);
+  const status = published ? 'Listed' : data.showcase_requested ? 'Review pending' : 'Unlisted';
+  const updateCount = updates.data?.updates.length ?? 0;
+  const hasTeamPlan = Boolean(data.money_use || data.distribution_plan || data.team_links.length > 0 || data.team_info);
+  const named = data.public_backers ?? [];
+  const backerCount = data.backer_count ?? 0;
+  const backersLabel = backerCount ? `${backerCount} ${backerCount === 1 ? 'backer' : 'backers'}` : '';
+  const pledgeHref = `${target}${intent?.status === 'confirmed' ? '&new=1' : ''}`;
+  const pledgeLabel = intent?.status === 'confirmed' ? 'Add more interest to this project' : 'Pledge to this project';
+  const tabList = 'flex h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b border-[#c8c0b5] bg-transparent p-0';
+  const tabTrigger = 'rounded-none border-b-2 border-transparent px-4 py-2 text-[#202936] data-[state=active]:border-[#853c4d] data-[state=active]:bg-transparent data-[state=active]:text-[#853c4d] data-[state=active]:shadow-none';
   return <section className="dossier pj"><div className="pj-wrap">
-    <div className="pj-nav"><Link href="/explore" className="pj-back" data-testid="link-project-back"><ArrowLeft size={15}/> Back to Explore</Link></div>
-    <header className="pj-head"><p className="dossier-kicker">{labels || 'Independent project'} / Prelaunch</p><h1 className="pj-title" data-testid="text-project-title">{data.title}</h1>{data.logline && <p className="pj-logline" data-testid="text-project-logline">{data.logline}</p>}<div className="pj-by" data-testid="row-project-filmmaker">{filmmakerName ? <p className="pj-by-name" data-testid="text-project-filmmaker">Filmmaker: <strong>{filmmakerName}</strong></p> : <p className="pj-by-name pj-by-missing" data-testid="text-project-filmmaker-missing">Filmmaker: public name not provided</p>}{data.is_owner ? <Link href="/messages" className="dossier-button dossier-button-outline pj-contact-btn" data-testid="link-project-messages">View messages <ArrowUpRight size={16}/></Link> : <ProjectContactDialog key={`${data.slug}:${identityId}`} resetKey={`${data.slug}:${identityId}`} slug={data.slug} title={data.title} filmmakerName={filmmakerName}/>}</div>{data.is_owner && <p className="dossier-status" data-testid="badge-owned-project">Your project · This is how visitors see its public page.</p>}{data.is_owner && <div style={{ marginTop: 14 }}><Link href="/me/projects" className="dossier-button" data-testid="link-project-manage">Manage project <ArrowUpRight size={16}/></Link></div>}</header>
-    <div className="pj-media">
-      {trailerEmbed ? <><div className="dossier-video"><iframe key={trailerEmbed} src={trailerEmbed} title={`${data.title} trailer`} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" allow="accelerometer; gyroscope; encrypted-media; picture-in-picture; fullscreen" allowFullScreen data-testid="iframe-project-trailer" /></div><p className="dossier-status">Player not working? <a href={youtubeEmbed ? trailer! : bunnyEmbed!} target="_blank" rel="noopener noreferrer" data-testid="link-project-trailer">{youtubeEmbed ? 'Open on YouTube' : 'Open the trailer in a new tab'} <ArrowUpRight size={14} style={{ display: 'inline' }}/></a></p></>
-      : trailer ? <a className="pj-external" href={trailer} target="_blank" rel="noopener noreferrer" data-testid="link-project-trailer"><span className="dossier-kicker">The trailer</span><strong>Watch the trailer in a new tab <ArrowUpRight size={15} style={{ display: 'inline' }}/></strong><small>This trailer can’t be played on this page.</small></a>
-      : (poster || thumbnail) ? <img className="pj-poster" src={poster || thumbnail || ''} alt={`${data.title} project artwork`} data-testid="img-project-artwork" loading="lazy"/> : null}
+    <div className="pj-nav">
+      <Link href="/explore" className="pj-back" data-testid="link-project-back"><ArrowLeft size={15}/> Back to Explore</Link>
+      {panel.show && !data.is_owner && <ProjectShareButtons slug={data.slug} title={data.title} genre={data.genre} logline={data.logline}/>}
     </div>
-    {synopsis && <section className="dossier-section pj-sec"><span className="dossier-kicker">The story</span><h2>Synopsis.</h2><p>{storyText}</p>{longStory && <button type="button" className="pj-linkbtn" aria-expanded={storyOpen} onClick={() => setStoryOpen(v => !v)} data-testid="button-toggle-story">{storyOpen ? 'Show less' : 'Read the full story'}</button>}</section>}
-    {panel.show && <div className="pj-panel" data-testid="project-interest-action">
-      <span className="dossier-kicker">Pledge interest</span>
-      {panel.showTotal && <div className="pj-total"><p className="pj-total-num" data-testid="text-confirmed-pledge-total">{money(data.confirmed_pledge_total)}</p><p>Confirmed, non-binding interest.</p>{panel.ownerOnlyTotal && <p data-testid="text-owner-only-total">Only you can see this total until your project is approved and listed.</p>}</div>}
-      {!!data.public_backers?.length && <div data-testid="list-public-backers"><p className="pj-fine">Backers who chose to be named</p><ul>{data.public_backers.map(backer => <li key={backer.name} style={{overflowWrap:'anywhere'}}>{backer.name} · {money(backer.amount)}</li>)}</ul></div>}
-      {data.is_owner ? <p>You can manage this project, but you can’t pledge interest in your own project.</p> :
-        current.isPending || current.isFetching ? <p role="status">Checking your saved interest…</p> :
-        current.isError ? <p role="alert">We couldn’t check your saved interest. <button type="button" className="pj-linkbtn" onClick={() => void current.refetch()}>Try again</button></p> :
-        intent?.status === 'saved' ? <div><p>You have saved non-binding interest that is not yet confirmed. No new interest has been recorded for this project.</p><div className="pj-actions"><Link href="/lineup" className="dossier-button pj-primary" data-testid="link-project-continue-interest">Continue saved interest <ArrowUpRight size={16}/></Link></div><p><Link href={`${target}&revise=1`} className="pj-linkbtn" data-testid="link-project-revise-interest">Or revise it for this project</Link></p></div> :
-        intent?.status === 'confirmed' && previousHere && !dismissed ? <div data-testid="prompt-project-more-interest"><p>You are on the waitlist for this project: your confirmed, non-binding interest is on record. A new amount will be a separate non-binding entry, reviewed and signed again; your earlier interest stays unchanged.</p><div className="pj-actions"><Link href={`${target}&new=1`} className="dossier-button pj-primary" data-testid="link-project-add-more">Add more interest to this project <ArrowUpRight size={16}/></Link><Link href="/lineup" className="dossier-button dossier-button-outline">View my lineup <ArrowUpRight size={16}/></Link><button type="button" className="dossier-button dossier-button-outline" onClick={() => setDismissed(true)} data-testid="button-dismiss-project-interest">Dismiss</button></div></div> :
-        <div className="pj-actions"><Link href={`${target}${intent?.status === 'confirmed' ? '&new=1' : ''}`} className="dossier-button pj-primary" data-testid="link-project-pledge">{intent?.status === 'confirmed' ? 'Add more interest to this project' : 'Pledge to this project'} <ArrowUpRight size={18}/></Link></div>}
-      <p className="pj-fine" role="note" data-testid="text-securities-notice">{securitiesNotice} <strong>Returns aren’t guaranteed. You may get back less, or nothing.</strong></p>
+    <div className={`pj-layout${panel.show ? '' : ' pj-layout--solo'}`}>
+      <div className="pj-main">
+        <header className="pj-head">
+          <p className="dossier-kicker">{labels || 'Independent project'}
+            <span className={`pj-badge${published ? ' pj-badge--listed' : ''}`} data-testid="status-public-project-review">{status}</span>
+            {data.phone_verified && <span className="pj-badge" data-testid="badge-public-project-phone-verified" title="The filmmaker has verified a phone number with Firebase.">✓ Phone verified</span>}
+          </p>
+          <h1 className="pj-title" data-testid="text-project-title">{data.title}</h1>
+          {data.logline && <p className="pj-logline" data-testid="text-project-logline">{data.logline}</p>}
+          <div className="pj-by" data-testid="row-project-filmmaker">
+            {filmmakerName ? <p className="pj-by-name" data-testid="text-project-filmmaker">by <strong>{filmmakerName}</strong></p> : <p className="pj-by-name pj-by-missing" data-testid="text-project-filmmaker-missing">Filmmaker name not provided</p>}
+            {data.is_owner ? <Link href="/messages" className="dossier-button dossier-button-outline pj-contact-btn" data-testid="link-project-messages">View messages <ArrowUpRight size={16}/></Link> : <ProjectContactDialog key={`${data.slug}:${identityId}`} resetKey={`${data.slug}:${identityId}`} slug={data.slug} title={data.title} filmmakerName={filmmakerName}/>}
+          </div>
+          {data.is_owner && <div className="pj-owner"><p className="dossier-status" data-testid="badge-owned-project">Your project · This is how visitors see its public page.</p><Link href="/me/projects" className="dossier-button" data-testid="link-project-manage">Manage project <ArrowUpRight size={16}/></Link></div>}
+        </header>
+        <div className="pj-media">
+          {trailerEmbed ? <><div className="dossier-video"><iframe key={trailerEmbed} src={trailerEmbed} title={`${data.title} trailer`} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" allow="accelerometer; gyroscope; encrypted-media; picture-in-picture; fullscreen" allowFullScreen data-testid="iframe-project-trailer" /></div><p className="dossier-status">Player not working? <a href={youtubeEmbed ? trailer! : bunnyEmbed!} target="_blank" rel="noopener noreferrer" data-testid="link-project-trailer">{youtubeEmbed ? 'Open on YouTube' : 'Open the trailer in a new tab'} <ArrowUpRight size={14} style={{ display: 'inline' }}/></a></p></>
+          : trailer ? <a className="pj-external" href={trailer} target="_blank" rel="noopener noreferrer" data-testid="link-project-trailer"><span className="dossier-kicker">The trailer</span><strong>Watch the trailer in a new tab <ArrowUpRight size={15} style={{ display: 'inline' }}/></strong><small>This trailer can’t be played on this page.</small></a>
+          : (poster || thumbnail) ? <img className="pj-poster" src={poster || thumbnail || ''} alt={`${data.title} project artwork`} data-testid="img-project-artwork" loading="lazy"/> : null}
+        </div>
+      </div>
+
+      {panel.show && <aside className="pj-aside">
+        <div className="pj-panel" ref={setPledgeCard} data-testid="project-interest-action">
+          <span className="dossier-kicker">Pledge interest</span>
+          {panel.showTotal && <div className="pj-total"><p className="pj-total-num" data-testid="text-confirmed-pledge-total">{money(data.confirmed_pledge_total)}</p><p data-testid="text-project-backer-count">{backersLabel ? `${backersLabel} · confirmed, non-binding interest.` : 'Confirmed, non-binding interest.'}</p>{panel.ownerOnlyTotal && <p data-testid="text-owner-only-total">Only you can see this total until your project is approved and listed.</p>}</div>}
+          {named.length > 0 && <p className="pj-fine" data-testid="list-public-backers" style={{ overflowWrap: 'anywhere' }}>Backed by {named.slice(0, 3).map(backer => `${backer.name} (${money(backer.amount)})`).join(', ')}{named.length > 3 ? ` and ${named.length - 3} more` : ''}</p>}
+          {data.is_owner ? <p>You can manage this project, but you can’t pledge interest in your own project.</p> :
+            current.isPending || current.isFetching ? <p role="status">Checking your saved interest…</p> :
+            current.isError ? <p role="alert">We couldn’t check your saved interest. <button type="button" className="pj-linkbtn" onClick={() => void current.refetch()}>Try again</button></p> :
+            intent?.status === 'saved' ? <div><p>You have saved non-binding interest that is not yet confirmed. No new interest has been recorded for this project.</p><div className="pj-actions"><Link href="/lineup" className="dossier-button pj-primary" data-testid="link-project-continue-interest">Continue saved interest <ArrowUpRight size={16}/></Link></div><p><Link href={`${target}&revise=1`} className="pj-linkbtn" data-testid="link-project-revise-interest">Or revise it for this project</Link></p></div> :
+            intent?.status === 'confirmed' && previousHere && !dismissed ? <div data-testid="prompt-project-more-interest"><p>You’re on the waitlist for this project. A new amount is a separate non-binding entry you review and sign again; your earlier interest stays unchanged.</p><div className="pj-actions"><Link href={`${target}&new=1`} className="dossier-button pj-primary" data-testid="link-project-add-more">Add more interest to this project <ArrowUpRight size={16}/></Link></div><p><Link href="/lineup" className="pj-linkbtn">View my lineup</Link> · <button type="button" className="pj-linkbtn" onClick={() => setDismissed(true)} data-testid="button-dismiss-project-interest">Dismiss</button></p></div> :
+            <div className="pj-actions"><Link href={pledgeHref} className="dossier-button pj-primary" data-testid="link-project-pledge">{pledgeLabel} <ArrowUpRight size={18}/></Link></div>}
+          <p className="pj-fine" role="note" data-testid="text-securities-notice">{securitiesNotice} <strong>Returns aren’t guaranteed. You may get back less, or nothing.</strong></p>
+        </div>
+        {(data.budget != null || pitchDeckUrl) && <div className="pj-facts" data-testid="section-project-facts">
+          {data.budget != null && <p>Budget <strong>{money(data.budget)}</strong></p>}
+          {pitchDeckUrl && <a href={pitchDeckUrl} target="_blank" rel="noopener noreferrer" className="dossier-button dossier-button-outline" data-testid="link-project-pitch-deck">View pitch deck <ArrowUpRight size={16}/></a>}
+        </div>}
+      </aside>}
+
+      <div className="pj-main pj-tabs">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className={tabList} aria-label="Project details">
+            <TabsTrigger className={tabTrigger} value="story" data-testid="tab-story">Story</TabsTrigger>
+            {updateCount > 0 && <TabsTrigger className={tabTrigger} value="updates" data-testid="tab-updates">Updates ({updateCount})</TabsTrigger>}
+            {terms && <TabsTrigger className={tabTrigger} value="terms" data-testid="tab-terms">Terms</TabsTrigger>}
+            {hasTeamPlan && <TabsTrigger className={tabTrigger} value="team" data-testid="tab-team">Team &amp; plan</TabsTrigger>}
+          </TabsList>
+          <TabsContent value="story" className="pj-tab">
+            {synopsis ? <section className="pj-sec" data-testid="section-project-story"><p>{storyText}</p>{longStory && <button type="button" className="pj-linkbtn" aria-expanded={storyOpen} onClick={() => setStoryOpen(v => !v)} data-testid="button-toggle-story">{storyOpen ? 'Show less' : 'Read the full story'}</button>}</section>
+              : <p className="dossier-status">The filmmaker hasn’t added a synopsis yet.</p>}
+          </TabsContent>
+          {updateCount > 0 && <TabsContent value="updates" className="pj-tab"><ProjectTimeline slug={data.slug} /></TabsContent>}
+          {terms && <TabsContent value="terms" className="pj-tab"><section className="pj-sec" data-testid="section-project-proposal">{data.budget != null && <p>Project budget: <strong>{money(data.budget)}</strong></p>}{data.development_amount != null && <p data-testid="text-project-development">Development amount: <strong>{money(data.development_amount)}</strong></p>}<div className="dossier-notice" role="note">These are the filmmaker’s proposed terms, not an offer. They are illustrative, revenue-dependent and not guaranteed.</div><details className="pj-terms" open><summary>Full proposed terms</summary><ProposalSummary proposal={data.proposal} budget={data.budget} stage={data.stage} testId="project-proposal"/></details></section></TabsContent>}
+          {hasTeamPlan && <TabsContent value="team" className="pj-tab"><section className="pj-sec" data-testid="details-more-about-project">
+            {data.team_info && <><span className="dossier-kicker">The team</span><p>{data.team_info}</p></>}
+            {data.team_links.length > 0 && <ul className="dossier-links">{data.team_links.map((link, i) => {
+              const url = safeUrl(link);
+              return url && <li key={`${link}-${i}`}><a href={url} target="_blank" rel="noopener noreferrer" data-testid={`link-project-team-${i}`}>{url} <ArrowUpRight size={14} style={{ display: 'inline' }}/></a></li>;
+            })}</ul>}
+            {data.distribution_plan && <><span className="dossier-kicker">Distribution</span><p>{data.distribution_plan}</p></>}
+            {data.money_use && <><span className="dossier-kicker">Planned use of funds</span><p>{data.money_use}</p></>}
+          </section></TabsContent>}
+        </Tabs>
+        <p className="dossier-status pj-disc">Project information is supplied by the filmmaker and may change.</p>
+      </div>
+    </div>
+    {panel.show && !data.is_owner && !pledgeCardVisible && current.isSuccess && intent?.status !== 'saved' && <div className="pj-mobile-bar" data-testid="bar-mobile-pledge">
+      {panel.showTotal && <span>{money(data.confirmed_pledge_total)} pledged{backersLabel ? ` · ${backersLabel}` : ''}</span>}
+      <Link href={pledgeHref} className="dossier-button pj-primary" data-testid="link-mobile-pledge">{intent?.status === 'confirmed' ? 'Add more' : 'Pledge'} <ArrowUpRight size={16}/></Link>
     </div>}
-    <div className="pj-facts"><span className="dossier-kicker">Showcase status</span><p className="pj-status" data-testid="status-public-project-review">{published ? 'Approved.' : data.showcase_requested ? 'Pending review.' : 'Not requested.'}</p><p>{published ? 'This project has been approved for showcase.' : data.showcase_requested ? 'A showcase request is pending review. This page is unlisted but anyone with its link can view it.' : 'No showcase review has been requested. This page is unlisted but anyone with its link can view it.'}</p>{data.phone_verified && <p data-testid="badge-public-project-phone-verified"><strong>Phone verified.</strong> The filmmaker has verified a phone number with Firebase.</p>}</div>
-    <ProjectTimeline slug={data.slug} />
-    {(data.money_use || data.distribution_plan || data.team_links.length > 0 || data.team_info) && <details className="dossier-section pj-sec" data-testid="details-more-about-project"><summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 20 }}>More about this project</summary>
-      {data.team_info && <><span className="dossier-kicker">The team</span><p>{data.team_info}</p></>}
-      {data.team_links.length > 0 && <ul className="dossier-links">{data.team_links.map((link, i) => {
-        const url = safeUrl(link);
-        return url && <li key={`${link}-${i}`}><a href={url} target="_blank" rel="noopener noreferrer" data-testid={`link-project-team-${i}`}>{url} <ArrowUpRight size={14} style={{ display: 'inline' }}/></a></li>;
-      })}</ul>}
-      {data.distribution_plan && <><span className="dossier-kicker">Distribution</span><p>{data.distribution_plan}</p></>}
-      {data.money_use && <><span className="dossier-kicker">Planned use of funds</span><p>{data.money_use}</p></>}
-    </details>}
-    {pitchDeckUrl && <section className="dossier-section pj-sec"><a href={pitchDeckUrl} target="_blank" rel="noopener noreferrer" className="dossier-button dossier-button-outline" data-testid="link-project-pitch-deck">View pitch deck <ArrowUpRight size={16}/></a><p className="dossier-status">{data.pitch_deck_name || 'Pitch deck'} · Viewable by anyone with this page’s link while the project is available.</p></section>}
-    {terms && <section className="dossier-section pj-sec" data-testid="section-project-proposal"><span className="dossier-kicker">The filmmaker’s proposed terms</span><h2>Budget and repayment.</h2>{data.budget != null && <p>Project budget: <strong>{money(data.budget)}</strong></p>}{data.development_amount != null && <p data-testid="text-project-development">Development amount: <strong>{money(data.development_amount)}</strong></p>}<div className="dossier-notice" role="note">These are the filmmaker’s proposed terms, not an offer. They are illustrative, revenue-dependent and not guaranteed.</div><details className="pj-terms"><summary>View full proposed terms</summary><ProposalSummary proposal={data.proposal} budget={data.budget} stage={data.stage} testId="project-proposal"/></details></section>}
-    {panel.show && !data.is_owner && <div id="section-project-share"><ProjectShare audience="recipient" slug={data.slug} title={data.title} genre={data.genre} logline={data.logline} approved={data.approved} showcaseRequested={data.showcase_requested}/></div>}
-    <p className="dossier-status pj-disc">Project information is supplied by the filmmaker and may change.</p>
   </div></section>;
 }
