@@ -602,7 +602,7 @@ function FilmmakerWorksheet({ identityId, identityKey, signedInEmail }: { identi
       const submitted = await submit.mutateAsync({ data:{ ...payload(a), website } });
       recordPitchForReview(submitted.project_id);
       storePitchReviewProof(submitted.project_id, submitted.checkout_proof);
-      navigate('/start/filmmaker/done');
+      navigate('/start/filmmaker/done?submitted=1');
     } catch (error) {
       const status = error && typeof error === 'object' && 'status' in error ? error.status : null;
       const responseBody = error && typeof error === 'object' && 'data' in error ? error.data : null;

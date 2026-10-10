@@ -365,6 +365,14 @@ function FilmmakerDoneContent({ identityId }: { identityId: string }) {
       : `${sandboxCheckout ? 'Sandbox test' : 'Editorial review'} checkout is temporarily unavailable. Your free pitch and share link remain saved. Please try again later.`;
   const data = result.data;
   const editMaterials = new URLSearchParams(search).get('edit') === 'materials';
+  // Shown once, right after the worksheet is submitted; not when opened from My projects.
+  const [justSubmitted, setJustSubmitted] = useState(() => new URLSearchParams(search).get('submitted') === '1');
+  function dismissSubmitted() {
+    setJustSubmitted(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('submitted');
+    window.history.replaceState(window.history.state, '', url);
+  }
   const [tab, setTab] = useState(() => new URLSearchParams(search).get('details') === 'materials' ? 'pitch' : 'overview');
   useEffect(() => {
     // Pitch editors elsewhere on the page (e.g. the money date) ask to open the Pitch tab.
@@ -530,6 +538,7 @@ function FilmmakerDoneContent({ identityId }: { identityId: string }) {
       </div>}
       {!user && <p className="dossier-status" data-testid="text-result-receipt">Your submission is received. Sign in to manage it later or on another device.</p>}
     </div>
+    {justSubmitted && <div className="dossier-notice" role="status" data-testid="status-just-submitted" style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' }}><span><Check size={15} style={{ display: 'inline', marginRight: 8 }}/>Your pitch is submitted. {shareable ? 'Its page is live — share the link.' : 'It is saved to My projects.'}</span><button type="button" aria-label="Dismiss" data-testid="button-dismiss-submitted" onClick={dismissSubmitted}><X size={16}/></button></div>}
     <div ref={setReviewOfferSlot} data-testid="slot-review-offer" />
     {!listed && checkoutReturn === 'cancelled' && <p role="status" className="dossier-notice">You returned without completing this checkout. Your free pitch remains unlisted. If you previously completed another checkout, wait for payment verification before trying again.</p>}
     {!listed && checkoutReturn === 'return' && <p role="status" className="dossier-notice">{reviewStatus.isError ? 'We could not verify the checkout yet. Please retry status later and do not complete another checkout.' : reviewStatus.data?.fee_waived ? 'FREE99 verified. Your review fee was waived; no payment was required. Your pitch was submitted for editorial review, not automatically approved for public listing.' : reviewStatus.data?.paid ? 'Payment verified. Your pitch is pending editorial review, not approved for public listing.' : 'We are verifying your checkout. Your pitch stays unlisted until verification completes; do not complete another checkout while it is pending.'}</p>}
