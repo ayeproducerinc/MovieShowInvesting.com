@@ -6,7 +6,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetAdminMeQueryKey, getGetAdminTableQueryKey, getGetFirebaseConfigQueryKey, getGetAdminConversationsQueryKey,
-  leaveFilmmakerAccount, setAuthTokenGetter, useGetAdminMe, useGetAdminTable, useGetFirebaseConfig,
+  leaveFilmmakerAccount, setAuthTokenGetter, useGetAdminMe, useGetAdminTable, useGetFirebaseConfig, useGetAdminConversations,
   useGetAdminProjectReview, useReviewAdminProject, useReviewAdminMessage,
   type AdminSection, type AdminTable,
 } from '@workspace/api-client-react';
@@ -468,6 +468,9 @@ function Dashboard({ userId, email, onSignOut }: { userId: string; email: string
   const view = VIEWS.find(item => item.id === active)!;
   const section = SECTIONS.find(item => item.id === active);
   const group = NAV_GROUPS.find(item => item.views.includes(active))?.label;
+  // Shares the Project threads list cache so the sidebar count matches that view.
+  const threads = useGetAdminConversations({ query: { queryKey: [...getGetAdminConversationsQueryKey(), userId], retry: false, refetchInterval: 60_000 } });
+  const reportedCount = threads.data?.conversations.filter(thread => thread.reported).length ?? 0;
   // The active table is read here for the export control; SectionData shares its query cache.
   const { data, isFetching } = useGetAdminTable(section?.id ?? 'summary', {
     query: { queryKey: [...getGetAdminTableQueryKey(section?.id ?? 'summary'), userId], enabled: !!section, retry: false, staleTime: 20_000, refetchOnWindowFocus: true },
@@ -479,8 +482,9 @@ function Dashboard({ userId, email, onSignOut }: { userId: string; email: string
           {NAV_GROUPS.map(navGroup => <div key={navGroup.label} className="admin-nav-group" role="group" aria-label={navGroup.label}>
             <div className="admin-sidebar-label admin-mono">{navGroup.label}</div>
             {navGroup.views.map(id => <button key={id} type="button" aria-current={active === id ? 'page' : undefined} onClick={() => setActive(id)} data-testid={`button-section-${id}`}>
-              {VIEWS.find(item => item.id === id)!.label}
+              {VIEWS.find(item => item.id === id)!.label}{id === 'conversations' && reportedCount > 0 && ` (${reportedCount})`}
             </button>)}
+            {navGroup.label === 'To do' && reportedCount > 0 && <button type="button" onClick={() => setActive('conversations')} data-testid="button-section-reported-threads">Reported threads ({reportedCount})</button>}
           </div>)}
         </nav>
         <div className="admin-sidebar-foot">{email}</div>
