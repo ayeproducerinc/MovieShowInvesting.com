@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
+import { Redirect, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { FirebaseBootstrap } from '@/components/firebase-bootstrap';
 import { SiteShell } from '@/components/site-shell';
@@ -28,7 +28,6 @@ import Explore from '@/pages/explore';
 import Pricing from '@/pages/pricing';
 import Investor, { InvestorDone } from '@/pages/investor';
 import Lineup from '@/pages/lineup';
-import LineupConfirm from '@/pages/lineup-confirm';
 import Referrals from '@/pages/referrals';
 import { ReferralClaim } from '@/components/referral-claim';
 import Conversation from '@/pages/conversation';
@@ -45,7 +44,6 @@ const metadata: Record<string, [string, string]> = {
   '/invest': ['Express interest | Movie Show Investing', 'Explore independent film projects and save non-binding investor interest. No money is collected.'],
   '/invest/done': ['Interest saved | Movie Show Investing', 'Your non-binding interest has been saved. No money has been collected.'],
   '/lineup': ['My saved lineup | Movie Show Investing', 'A private view of your saved, non-binding project interest. No money has been collected.'],
-  '/lineup/confirm': ['Review & confirm interest | Movie Show Investing', 'Review your saved amount and allocations and sign to confirm non-binding interest. No money is collected.'],
   '/referrals': ['My referrals | Movie Show Investing', 'Your private referral link and reward history.'],
   '/messages': ['Messages | Movie Show Investing', 'Your private project conversations.'],
    '/start/filmmaker': ['Filmmaker worksheet | Movie Show Investing', 'Share your project and explore illustrative terms in a guided worksheet.'],
@@ -56,7 +54,7 @@ const metadata: Record<string, [string, string]> = {
 function PageMetadata() {
   const [location] = useLocation();
   useEffect(() => {
-    if (['/invest', '/invest/done', '/lineup', '/lineup/confirm'].includes(location)) {
+    if (['/invest', '/invest/done', '/lineup'].includes(location)) {
       trackInvestorEvent('inv_page_view', { page: location });
     }
     const [title, description] = metadata[location] ?? (location.startsWith('/messages/') ? ['Conversation | Movie Show Investing', 'Your private project conversation.'] : ['Page not found | Movie Show Investing', 'Explore Movie Show Investing.']);
@@ -119,7 +117,8 @@ function PublicPages() {
         <Route path="/invest/done" component={InvestorDone} />
         <Route path="/invest" component={Investor} />
         <Route path="/lineup" component={Lineup} />
-        <Route path="/lineup/confirm" component={LineupConfirm} />
+        {/* Signing now happens in the investor worksheet; keep old links working. */}
+        <Route path="/lineup/confirm">{() => <Redirect to="/lineup" replace />}</Route>
         <Route path="/referrals" component={Referrals} />
         <Route path="/messages/:id" component={Conversation} />
         <Route path="/messages" component={Conversation} />
