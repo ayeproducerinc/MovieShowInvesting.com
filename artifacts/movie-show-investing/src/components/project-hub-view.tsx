@@ -13,6 +13,8 @@ export type ProjectHubItem = {
   /** Private confirmed pledge total and distinct backers. */
   pledged_total?: number;
   backer_count?: number;
+  /** Threads on this project whose latest message came from an investor. */
+  awaiting_replies?: number;
 };
 
 export type ProjectHubViewProps = {
@@ -112,6 +114,7 @@ export function ProjectHubView({
                     <span className="project-hub__project-title" data-testid={`text-project-title-${project.project_id}`}>{title}</span>
                     <span className="project-hub__project-date" data-testid={`text-project-date-${project.project_id}`}>
                       Created {formattedDate(project.created_at)}
+                      {!!project.awaiting_replies && <span className="project-hub__awaiting" data-testid={`text-project-awaiting-${project.project_id}`}> · {project.awaiting_replies} {project.awaiting_replies === 1 ? 'message' : 'messages'} awaiting your reply</span>}
                       {project.backer_count !== undefined && <span data-testid={`text-project-pledged-${project.project_id}`}> · {project.backer_count ? `${dollars(project.pledged_total ?? 0)} pledged · ${project.backer_count} backer${project.backer_count === 1 ? '' : 's'}` : 'No pledges yet'}</span>}
                     </span>
                   </div>

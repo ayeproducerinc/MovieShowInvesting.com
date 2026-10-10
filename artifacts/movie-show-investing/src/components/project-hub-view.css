@@ -31,6 +31,7 @@
 .project-hub__item:last-child { border-bottom: 0; }
 .project-hub__project-title { display: block; font: 400 clamp(22px, 2.4vw, 30px)/1.1 var(--app-font-serif, 'Instrument Serif', Georgia, serif); overflow-wrap: anywhere; }
 .project-hub__project-date { display: block; color: #706d67; font-size: 12px; margin-top: 6px; }
+.project-hub__awaiting { color: var(--hub-wine); font-weight: 700; }
 .project-hub__status { font: 700 10px/1.5 var(--app-font-mono, 'Space Mono', monospace); letter-spacing: .1em; text-transform: uppercase; border: 1px solid #b9aa97; color: #5e5b56; padding: 5px 8px; white-space: nowrap; }
 .project-hub__status--approved { border-color: #87948a; color: #455c50; }
 .project-hub__status--hidden { border-color: #b79a9c; color: #853c4d; }

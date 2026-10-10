@@ -10,9 +10,17 @@ import './project-hub-view.css';
 
 const LIMIT = 6;
 
+/** Project threads for a signed-in participant; shares one cached query across the page. */
+export function useParticipantThreads(uid: string, provider: string) {
+  const config = useGetMessagingConfig({ query: { queryKey: getGetMessagingConfigQueryKey(), retry: false } });
+  const messaging = config.data?.available === true;
+  const threads = useGetMyConversations({ query: { queryKey: [...getGetMyConversationsQueryKey(), provider, uid], enabled: messaging && !!uid, retry: false } });
+  return { messaging, threads };
+}
+
 type ActivityItem =
   | { kind: 'pledge'; key: string; at: string; id: number; projectId: number; projectTitle: string; unread: boolean }
-  | { kind: 'message'; key: string; at: string; id: number; projectTitle: string; otherParty: string; status: string | null };
+  | { kind: 'message'; key: string; at: string; id: number; projectTitle: string; otherParty: string; status: string | null; awaiting: boolean };
 
 function day(value: string) {
   return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -29,9 +37,7 @@ export function FilmmakerActivity({ uid, provider, projectIds, busy, onOpenProje
   const queryClient = useQueryClient();
   const alertsKey = [...getGetFilmmakerInterestAlertsQueryKey(), uid];
   const alerts = useGetFilmmakerInterestAlerts({ query: { queryKey: alertsKey, refetchOnMount: 'always', refetchInterval: 60_000, retry: false } });
-  const config = useGetMessagingConfig({ query: { queryKey: getGetMessagingConfigQueryKey(), retry: false } });
-  const messaging = config.data?.available === true;
-  const threads = useGetMyConversations({ query: { queryKey: [...getGetMyConversationsQueryKey(), provider, uid], enabled: messaging, retry: false } });
+  const { messaging, threads } = useParticipantThreads(uid, provider);
   const read = useReadFilmmakerInterestAlert();
   const [error, setError] = useState('');
 
@@ -54,6 +60,7 @@ export function FilmmakerActivity({ uid, provider, projectIds, busy, onOpenProje
       kind: 'message' as const, key: `message-${item.id}`, at: item.last_message_at ?? item.created_at, id: item.id,
       projectTitle: item.project_title, otherParty: item.other_party_name,
       status: item.locked ? 'Paused' : item.reported ? 'Under review' : null,
+      awaiting: Boolean(item.awaiting_reply),
     })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   const loading = alerts.isPending || (messaging && threads.isPending);
@@ -73,7 +80,7 @@ export function FilmmakerActivity({ uid, provider, projectIds, busy, onOpenProje
           </div>
         </> : <>
           <div className="project-hub__project-info"><strong>{item.otherParty}</strong> (investor) — {item.projectTitle}<span className="project-hub__project-date">{day(item.at)}{item.status ? ` · ${item.status}` : ''}</span></div>
-          <span />
+          {item.awaiting ? <span className="project-hub__status project-hub__status--hidden" data-testid={`status-awaiting-reply-${item.id}`}>Awaiting your reply</span> : <span />}
           <div className="project-hub__row-actions"><Link href={`/messages/${item.id}`} className="project-hub__action project-hub__action--outline" data-testid={`link-filmmaker-conversation-${item.id}`}>Reply <ArrowRight size={15} aria-hidden="true" /></Link></div>
         </>}
       </li>)}</ul>}

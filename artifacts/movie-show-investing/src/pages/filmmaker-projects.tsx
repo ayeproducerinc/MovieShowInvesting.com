@@ -16,7 +16,7 @@ import {
   phoneSyncErrorMessage,
   synchronizeFilmmakerPhone,
 } from '@/components/filmmaker-phone-verification';
-import { FilmmakerActivity } from '@/components/filmmaker-activity';
+import { FilmmakerActivity, useParticipantThreads } from '@/components/filmmaker-activity';
 import { useFilmmakerAuth } from '@/hooks/use-filmmaker-auth';
 import { clearFilmmakerAction, hasPendingStartAction, pendingFilmmakerAction } from '@/lib/filmmaker-intent';
 import { FilmmakerStartOver } from '@/components/filmmaker-start-over';
@@ -65,6 +65,7 @@ export default function FilmmakerProjects() {
       refetchOnMount: 'always',
     },
   });
+  const { threads } = useParticipantThreads(identityId ?? '', identityProvider ?? 'firebase');
   const start = useStartFilmmakerProject();
   const resume = useResumeFilmmakerProject();
   const select = useSelectFilmmakerProject();
@@ -180,6 +181,7 @@ export default function FilmmakerProjects() {
     created_at: project.created_at,
     pledged_total: project.confirmed_pledge_total,
     backer_count: project.backer_count,
+    awaiting_replies: (threads.data?.conversations ?? []).filter(thread => thread.project_id === project.id && thread.awaiting_reply).length,
   }));
   return <>
     {claimError && <div className="page-wrap dossier-notice" role="alert" style={{ marginTop: 24 }}>{claimError} <Link href="/start/filmmaker">Open this browser’s worksheet</Link> · <button type="button" onClick={() => void linkCurrentVisit()}>Try linking again</button></div>}

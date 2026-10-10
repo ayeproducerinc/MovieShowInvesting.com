@@ -34,6 +34,7 @@ type ConversationRow = {
   viewer_role?: ParticipantRole;
   filmmaker_name?: string;
   investor_name?: string;
+  awaiting_reply?: boolean;
   locked: boolean;
   reported: boolean;
   last_message_at: Date | null;
@@ -220,6 +221,9 @@ router.get("/me/conversations", async (req, res): Promise<void> => {
             else coalesce(i.name, 'Investor') end as other_party_name,
        case when i.${uidColumn} = $1 then 'investor' else 'filmmaker' end as viewer_role,
        coalesce(f.name, 'Filmmaker') as filmmaker_name, coalesce(i.name, 'Investor') as investor_name,
+       coalesce((select m.sender_role from conversation_messages m where m.conversation_id = c.id
+                 order by m.created_at desc, m.id desc limit 1)
+         <> case when i.${uidColumn} = $1 then 'investor' else 'filmmaker' end, false) as awaiting_reply,
        c.locked, c.reported,
        c.last_message_at, c.created_at
      from conversations c

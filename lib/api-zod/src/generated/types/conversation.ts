@@ -19,6 +19,8 @@ export interface Conversation {
   viewer_role?: ConversationViewerRole;
   filmmaker_name?: string;
   investor_name?: string;
+  /** True when the latest message came from the other participant */
+  awaiting_reply?: boolean;
   locked: boolean;
   reported: boolean;
   /** @nullable */

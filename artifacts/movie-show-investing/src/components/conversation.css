@@ -29,6 +29,7 @@
 .corr-message.is-continued{margin-top:-12px}
 .corr-message.is-own{background:var(--c-wine);border-color:var(--c-wine);color:#f7efe3;align-self:flex-end;border-radius:14px 14px 4px 14px;text-align:left}
 .corr-message.is-own time{color:#e6d3d0;align-self:flex-end}
+.corr-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c-wine);margin-right:8px;vertical-align:middle}
 .corr-sender{font-size:12px;font-weight:700;color:var(--c-wine);margin-bottom:2px}
 .corr-message.is-own .corr-sender{color:#f7efe3}
 .corr-message p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;margin:4px 0 6px;font-size:14px}

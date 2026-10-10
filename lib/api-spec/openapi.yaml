@@ -4015,6 +4015,7 @@ components:
         viewer_role: { type: string, enum: [investor, filmmaker], description: The signed-in participant's side of this conversation }
         filmmaker_name: { type: string }
         investor_name: { type: string }
+        awaiting_reply: { type: boolean, description: True when the latest message came from the other participant }
         locked: { type: boolean }
         reported: { type: boolean }
         last_message_at: { type: ["string", "null"], format: date-time }
