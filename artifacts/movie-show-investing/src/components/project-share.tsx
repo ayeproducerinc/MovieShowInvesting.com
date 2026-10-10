@@ -9,21 +9,12 @@ export function projectShareUrl(slug: string) {
   return new URL(getGetProjectShareMetadataUrl(slug), window.location.origin).href;
 }
 
-export function ProjectShare({ slug, title, genre, logline, approved = false, showcaseRequested = false, audience = 'owner' }: {
-  audience?: 'owner' | 'recipient';
-  slug: string;
-  title: string;
-  genre?: string | null;
-  logline?: string | null;
-  approved?: boolean;
-  showcaseRequested?: boolean;
-}) {
+/** Copy and native-share actions for a project's public link. */
+function useProjectShare({ slug, title, genre, logline }: { slug: string; title: string; genre?: string | null; logline?: string | null }) {
   const [feedback, setFeedback] = useState('');
   const url = projectShareUrl(slug);
   const cardTitle = title.replace(/\$\s*[\d,]+(?:\.\d{1,2})?/g, '').replace(/\s{2,}/g, ' ').trim() || 'Untitled project';
-  const owner = audience === 'owner';
   const shortLine = logline ? (logline.length > 140 ? `${logline.slice(0, 137)}...` : logline) : '';
-  const listed = approved && showcaseRequested;
   async function copy() {
     try {
       await navigator.clipboard.writeText(url);
@@ -41,6 +32,32 @@ export function ProjectShare({ slug, title, genre, logline, approved = false, sh
       if ((error as DOMException).name !== 'AbortError') setFeedback('Sharing was unavailable. You can copy the link instead.');
     }
   }
+  return { url, cardTitle, shortLine, feedback, copy, share };
+}
+
+/** Compact share controls for the public project page. */
+export function ProjectShareButtons(props: { slug: string; title: string; genre?: string | null; logline?: string | null }) {
+  const { url, feedback, copy, share } = useProjectShare(props);
+  return <div className="pj-share-buttons">
+    <button type="button" className="pj-share" data-testid="button-copy-project-link" onClick={() => void copy()}><Copy size={14}/> Copy link</button>
+    <button type="button" className="pj-share" data-testid="button-share-project" onClick={() => void share()}><Share2 size={14}/> Share</button>
+    {feedback && <p className="dossier-status pj-share-feedback" role="status" data-testid="status-share">{feedback}</p>}
+    {feedback.startsWith('Could not copy') && <input className="pj-share-url" aria-label="Project link" data-testid="input-share-url" value={url} readOnly onFocus={event => event.currentTarget.select()} />}
+  </div>;
+}
+
+export function ProjectShare({ slug, title, genre, logline, approved = false, showcaseRequested = false, audience = 'owner' }: {
+  audience?: 'owner' | 'recipient';
+  slug: string;
+  title: string;
+  genre?: string | null;
+  logline?: string | null;
+  approved?: boolean;
+  showcaseRequested?: boolean;
+}) {
+  const { url, cardTitle, shortLine, feedback, copy, share } = useProjectShare({ slug, title, genre, logline });
+  const owner = audience === 'owner';
+  const listed = approved && showcaseRequested;
   return <div className="dossier-section" data-testid="section-project-share">
     <span className="dossier-kicker">{owner ? 'Share this pitch with potential investors' : 'Know someone who would like this?'}</span>
     <h2>{owner ? 'Send investors to this project.' : 'Share this project.'}</h2>

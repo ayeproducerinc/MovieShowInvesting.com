@@ -4,8 +4,9 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { ProjectConversationEntry } from '@/components/project-conversation-entry';
 
 export function ProjectContactDialog({ slug, title, filmmakerName, resetKey }: { slug: string; title: string; filmmakerName?: string | null; resetKey: string }) {
-  const [open, setOpen] = useState(false);
-  useEffect(() => { setOpen(false); }, [resetKey]);
+  // Links such as My lineup’s “Message filmmaker” arrive with #message-filmmaker.
+  const [open, setOpen] = useState(() => window.location.hash === '#message-filmmaker');
+  useEffect(() => { setOpen(window.location.hash === '#message-filmmaker'); }, [resetKey]);
   const who = filmmakerName?.trim();
   return <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
